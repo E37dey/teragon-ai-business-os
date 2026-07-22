@@ -7,7 +7,7 @@ import { COLLECTIONS } from "./collections";
 
 export const IDB_NAME = "teragon-os";
 // v2: + "notifications" object store (Wave 2 notification center)
-export const IDB_VERSION = 2;
+export const IDB_VERSION = 3; // v3: + agentRuns/agentEvents/agentErrors (Wave 5 orchestration)
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
