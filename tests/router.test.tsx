@@ -34,9 +34,11 @@ describe("router smoke — all canonical paths render", () => {
     });
   }
 
-  it("/customers/:id shows the routed param", () => {
+  it("/customers/:id shows the routed param", async () => {
     mount("/customers/cu-1");
-    expect(screen.getAllByText((t) => t.includes("cu-1")).length).toBeGreaterThanOrEqual(1);
+    // module pages are lazy-loaded — await the chunk before asserting
+    const matches = await screen.findAllByText((t) => t.includes("cu-1"));
+    expect(matches.length).toBeGreaterThanOrEqual(1);
   });
 
   it("unknown path renders the Hebrew NotFound page (mount #30)", () => {

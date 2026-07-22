@@ -1,11 +1,40 @@
-// Router — all 28 canonical routes + /customers index + * NotFound, each rendering
-// an honest RTL placeholder inside the temporary MinimalShell. Route objects are
+// Router — all canonical routes. Module routes lazy-load their page from
+// src/modules/** (stubs until the owning wave agent replaces them — agents
+// never edit this file; see docs/INTEGRATION_QUEUE.md). Route objects are
 // exported separately so tests can mount them with createMemoryRouter.
+import { Suspense, lazy } from "react";
+import type { ComponentType, LazyExoticComponent } from "react";
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import OsShell from "./OsShell";
 import { NotFoundPage, RoutedPlaceholder } from "./routerPages";
 import { APP_ROUTES } from "./routes";
 import DesignShowcase from "@/design-system/showcase/DesignShowcase";
+
+// Module page registry — path → lazy page (single place the shell learns about modules).
+const MODULE_PAGES: Record<string, LazyExoticComponent<ComponentType>> = {
+  "/": lazy(() => import("@/modules/command-center/CommandCenterPage")),
+  "/crm": lazy(() => import("@/modules/crm/CrmPage")),
+  "/customers": lazy(() => import("@/modules/customers/CustomersPage")),
+  "/customers/:id": lazy(() => import("@/modules/customers/CustomerDetailPage")),
+  "/sales": lazy(() => import("@/modules/sales/SalesPage")),
+  "/documents": lazy(() => import("@/modules/documents/DocumentsPage")),
+  "/courses": lazy(() => import("@/modules/courses/CoursesPage")),
+  "/service": lazy(() => import("@/modules/service/ServicePage")),
+  "/printers": lazy(() => import("@/modules/printers/PrintersPage")),
+  "/organizations": lazy(() => import("@/modules/organizations/OrganizationsPage")),
+  "/tasks": lazy(() => import("@/modules/tasks/TasksPage")),
+  "/support": lazy(() => import("@/modules/support/SupportPage")),
+};
+
+function routeElement(path: string, title: string, wave: number) {
+  const Page = MODULE_PAGES[path];
+  if (!Page) return <RoutedPlaceholder title={title} wave={wave} />;
+  return (
+    <Suspense fallback={<div className="os-route-loading" aria-busy="true" />}>
+      <Page />
+    </Suspense>
+  );
+}
 
 export const appRouteObjects: RouteObject[] = [
   {
@@ -13,7 +42,7 @@ export const appRouteObjects: RouteObject[] = [
     element: <OsShell />,
     children: [
       ...APP_ROUTES.map((r): RouteObject => {
-        const element = <RoutedPlaceholder title={r.title} wave={r.wave} />;
+        const element = routeElement(r.path, r.title, r.wave);
         return r.path === "/" ? { index: true, element } : { path: r.path.slice(1), element };
       }),
       { path: "*", element: <NotFoundPage /> },

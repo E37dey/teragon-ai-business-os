@@ -29,6 +29,8 @@ import {
   type QuickCreateKind,
   type QuickCreateState,
 } from "./quick-create/QuickCreateHost";
+import { RailProvider } from "./rail";
+import { useRailContent } from "./railContext";
 
 /** Honest default rail until each screen ships its contextual rail (PAGE_CONTRACT). */
 function DefaultRail() {
@@ -54,7 +56,21 @@ interface PaletteState {
   initialQuery: string;
 }
 
+/** Rail slot content — the page's PageRail when provided, else the honest default. */
+function RailSlot(): ReactElement {
+  const pageRail = useRailContent();
+  return <>{pageRail ?? <DefaultRail />}</>;
+}
+
 export default function OsShell(): ReactElement {
+  return (
+    <RailProvider>
+      <OsShellInner />
+    </RailProvider>
+  );
+}
+
+function OsShellInner(): ReactElement {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -212,7 +228,7 @@ export default function OsShell(): ReactElement {
             collapsed={shellState.railCollapsed}
             onToggleCollapsed={toggleRail}
           >
-            <DefaultRail />
+            <RailSlot />
           </LeftIntelligenceRail>
         }
       >
