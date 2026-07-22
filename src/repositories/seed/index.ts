@@ -86,6 +86,10 @@ export const SEED: Record<CollectionKey, readonly BaseEntity[]> = {
   agentMessages: AGENT_MESSAGES,
   agentHandoffs: AGENT_HANDOFFS,
   agentConflicts: AGENT_CONFLICTS,
+  // Wave 5 orchestration collections — derived at runtime, never seeded
+  agentRuns: [],
+  agentEvents: [],
+  agentErrors: [],
   aiRecommendations: AI_RECOMMENDATIONS,
   evidence: EVIDENCE,
   approvals: APPROVALS,
