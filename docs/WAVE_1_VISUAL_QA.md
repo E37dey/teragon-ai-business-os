@@ -1,0 +1,36 @@
+# WAVE 1 — VISUAL QA
+
+תאריך: 23.07.2026 · Viewport: 1920×1080 · Production preview (`vite preview :4173`) · צילומים: `docs/screenshots/wave1/`
+
+## רשימת האימות שנדרשה — תוצאות בפועל
+
+| בדיקה | תוצאה | ראיה |
+|-------|--------|------|
+| ניווט ימני קבוע נראה | ✅ 220px, לוגו TERAGON · AI BUSINESS OS, אייקונים+זוהר cyan לפריט פעיל | wave1-home-1920.png |
+| rail אינטליגנציה שמאלי נראה | ✅ "לוח הקשר" + תוכן כן (מצב הדגמה, גל בנייה) | wave1-home-1920.png |
+| canvas מרכזי שמיש | ✅ placeholder כן במרכז; ב-/design שורת KPI מלאה מעל הקיפול | שני הצילומים |
+| עברית מיושרת נכון (RTL) | ✅ כל הטקסטים start-aligned ימינה; מספרים/תאריכים ב-LTR isolation | שני הצילומים |
+| אין חיתוך טקסט | ✅ פרט לקיצור אליפסיס מכוון בפריטי ניווט ארוכים (Stage Gates, CRM) — התנהגות רצויה | wave1-home-1920.png |
+| אין overflow אופקי | ✅ אין פס גלילה אופקי בשני הראוטים | שני הצילומים |
+| לכל בקר גלוי handler או disabled+סיבה | ✅ ניווט=Links אמיתיים; Copilot/חיפוש/פעמון/מעטפה disabled עם title בעברית ("יחובר בהמשך"/"טרם מחובר למנוע AI"); ב-/design כל הכפתורים חיים (toast/חלון) | snapshot נגישות |
+| browser refresh משמר ראוט | ✅ ניווט ישיר ל-/crm, /agents/collaboration, /design ב-production preview נטען נכון | ניווטי Playwright |
+| קונסול נקי | ✅ 0 שגיאות, 0 אזהרות ב-/ וב-/design | browser_console_messages |
+| זהות קנונית | ✅ צחי זוסטייהם · מנכ"ל · טרגון טכנולוגיות בכותרת; "ערב טוב, צחי" ב-Showcase | שני הצילומים |
+| תאריכים אמיתיים | ✅ 23.07.2026 · ט' באב תשפ"ו (Intl he-IL-u-ca-hebrew) · שעון חי | צילומים |
+
+## השוואה מול teragon-command-center.png (DNA, לא פיקסלים)
+
+| ממד | ציון | הערות |
+|-----|------|-------|
+| משפחה ויזואלית (כהה, metallic-blue, זוהר מרוסן) | 9/10 | פלטה מחייבת מיושמת אחד-לאחד |
+| RTL: ניווט ימין / canvas מרכז / rail שמאל | 10/10 | הסדר נכון בכל רזולוציה |
+| צפיפות והיררכיה | 8/10 | שורת KPI + stepper + טבלה צפופה מעל הקיפול ב-/design |
+| טיפוגרפיה (Heebo/Assistant) | 9/10 | נטען מ-Google Fonts + fallback |
+| מצבי אינטראקציה | 8/10 | active glow, hover, focus ring cyan, chips סטטוס קנוניים |
+| בהירות workflow ייחודי לעמוד | N/A בגל זה | placeholders עד Waves 3–9 |
+
+## ליקויים פתוחים (מוקצים ל-Wave 2/3)
+
+1. ניווט 28 פריטים שטוח וגולל — נדרש קיבוץ קטגוריות כמו בייחוס (בעלים: Design, Wave 2)
+2. badges בניווט הם דמו ב-Showcase בלבד — יש לחברם ל-repositories (בעלים: Architect, Wave 2)
+3. צילומי 2560×1440 ו-3840×2160 יבוצעו החל ממסכי Wave 3 האמיתיים (placeholders לא מצדיקים)

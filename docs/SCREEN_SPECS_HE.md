@@ -16,27 +16,7 @@ TERAGON AI BUSINESS OS
 הערת איחוד
 הפרומפט "ניהול המערכת" הופיע בשיחה פעמיים בנוסח זהה, ולכן נכלל כאן פעם אחת בלבד. כל שאר הפרומפטים נכללו כפרקים נפרדים.
 
-תוכן העניינים
-01. שירות ותיקונים
-02. משימות ופגישות
-03. מסמכים והצעות מחיר
-04. אוטומציות
-05. סוכני AI
-06. חדר התיאום של הסוכנים
-07. זיכרון ארגוני · Obsidian
-08. מאגר ידע
-09. מרכז למידה ושיפור
-10. דוחות וניתוחים
-11. ממשל ובקרת AI
-12. תכנית ההטמעה
-13. פרסונות ומסלולי הדרכה
-14. Stage Gates · שערי מעבר וראיות
-15. מרכז חומרי ההדרכה
-16. התחלה מהירה ושימוש נכון
-17. FAQ והתנגדויות
-18. תמיכה לאחר ההשקה
-19. מרכז ההגשה והראיות
-20. ניהול המערכת
+תוכן העניינים 01. שירות ותיקונים 02. משימות ופגישות 03. מסמכים והצעות מחיר 04. אוטומציות 05. סוכני AI 06. חדר התיאום של הסוכנים 07. זיכרון ארגוני · Obsidian 08. מאגר ידע 09. מרכז למידה ושיפור 10. דוחות וניתוחים 11. ממשל ובקרת AI 12. תכנית ההטמעה 13. פרסונות ומסלולי הדרכה 14. Stage Gates · שערי מעבר וראיות 15. מרכז חומרי ההדרכה 16. התחלה מהירה ושימוש נכון 17. FAQ והתנגדויות 18. תמיכה לאחר ההשקה 19. מרכז ההגשה והראיות 20. ניהול המערכת
 פרומפט הבסיס המשותף
 שימוש
 העתיקו את הטקסט הבא בשלמותו, ולאחריו צרפו את פרומפט העמוד הנבחר.
@@ -100,6 +80,7 @@ Do not make every card equally important.
 Do not use tiny unreadable Hebrew.
 
 Top-right always contains:
+
 - Teragon logo
 - product name
 - current page
@@ -116,6 +97,7 @@ Every AI recommendation must display:
 סטטוס אישור
 
 Every page must visibly demonstrate:
+
 - one real business workflow
 - one current state
 - one responsible owner
@@ -123,8 +105,7 @@ Every page must visibly demonstrate:
 - one measurable outcome
 
 The result is a high-fidelity product UI reference.
-Production text will later be rendered as real HTML and must not rely on image-generated text.
-01. שירות ותיקונים
+Production text will later be rendered as real HTML and must not rely on image-generated text. 01. שירות ותיקונים
 אופן שימוש
 צרפו את פרומפט העמוד הזה מיד לאחר פרומפט הבסיס המשותף.
 
@@ -214,8 +195,7 @@ Recommended tests:
 ordered sequence.
 
 Human approval:
-"ממתין לטכנאי"
-02. משימות ופגישות
+"ממתין לטכנאי" 02. משימות ופגישות
 אופן שימוש
 צרפו את פרומפט העמוד הזה מיד לאחר פרומפט הבסיס המשותף.
 
@@ -288,8 +268,7 @@ Show:
 Recommended action:
 "סדר מחדש את לוח היום"
 
-Require preview before schedule changes.
-03. מסמכים והצעות מחיר
+Require preview before schedule changes. 03. מסמכים והצעות מחיר
 אופן שימוש
 צרפו את פרומפט העמוד הזה מיד לאחר פרומפט הבסיס המשותף.
 
@@ -364,8 +343,7 @@ Unavailable controls must be disabled and visibly labelled:
 
 "ייצוא STEP עדיין אינו זמין בגרסה המקומית"
 
-No dead buttons.
-04. אוטומציות
+No dead buttons. 04. אוטומציות
 אופן שימוש
 צרפו את פרומפט העמוד הזה מיד לאחר פרומפט הבסיס המשותף.
 
@@ -440,8 +418,7 @@ cost
 duration
 records affected
 rollback availability
-audit events
-05. סוכני AI
+audit events 05. סוכני AI
 אופן שימוש
 צרפו את פרומפט העמוד הזה מיד לאחר פרומפט הבסיס המשותף.
 
@@ -507,8 +484,7 @@ Selected agent details:
 - audit trail
 - emergency stop
 
-The page must communicate control, not autonomous chaos.
-06. חדר התיאום של הסוכנים
+The page must communicate control, not autonomous chaos. 06. חדר התיאום של הסוכנים
 אופן שימוש
 צרפו את פרומפט העמוד הזה מיד לאחר פרומפט הבסיס המשותף.
 
@@ -570,8 +546,7 @@ Include:
 approve
 request revision
 reject
-open complete evidence
-07. זיכרון ארגוני · Obsidian
+open complete evidence 07. זיכרון ארגוני · Obsidian
 אופן שימוש
 צרפו את פרומפט העמוד הזה מיד לאחר פרומפט הבסיס המשותף.
 
@@ -647,8 +622,7 @@ Show truthful modes:
 ייצוא Markdown
 עותק מסונכרן לענן
 
-Do not claim that the deployed browser directly reads a local disk.
-08. מאגר ידע
+Do not claim that the deployed browser directly reads a local disk. 08. מאגר ידע
 אופן שימוש
 צרפו את פרומפט העמוד הזה מיד לאחר פרומפט הבסיס המשותף.
 
@@ -715,8 +689,7 @@ Show:
 - proposed article updates
 - new recurring question
 
-Require approval before changing an approved article.
-09. מרכז למידה ושיפור
+Require approval before changing an approved article. 09. מרכז למידה ושיפור
 אופן שימוש
 צרפו את פרומפט העמוד הזה מיד לאחר פרומפט הבסיס המשותף.
 
@@ -776,8 +749,7 @@ Show:
 - approver
 - rollback option
 
-Never imply uncontrolled self-learning.
-10. דוחות וניתוחים
+Never imply uncontrolled self-learning. 10. דוחות וניתוחים
 אופן שימוש
 צרפו את פרומפט העמוד הזה מיד לאחר פרומפט הבסיס המשותף.
 
@@ -857,8 +829,7 @@ Show:
 - missing data
 - recommended investigation
 
-No fabricated measurements.
-11. ממשל ובקרת AI
+No fabricated measurements. 11. ממשל ובקרת AI
 אופן שימוש
 צרפו את פרומפט העמוד הזה מיד לאחר פרומפט הבסיס המשותף.
 
@@ -927,8 +898,7 @@ review date
 
 LEFT INTELLIGENCE PANEL:
 
-Complete audit trail and provider health.
-12. תכנית ההטמעה
+Complete audit trail and provider health. 12. תכנית ההטמעה
 אופן שימוש
 צרפו את פרומפט העמוד הזה מיד לאחר פרומפט הבסיס המשותף.
 
@@ -983,8 +953,7 @@ Show:
 - suggested action
 - current adoption score
 
-The page must clearly show implementation as an ongoing operating system.
-13. פרסונות ומסלולי הדרכה
+The page must clearly show implementation as an ongoing operating system. 13. פרסונות ומסלולי הדרכה
 אופן שימוש
 צרפו את פרומפט העמוד הזה מיד לאחר פרומפט הבסיס המשותף.
 
@@ -1041,8 +1010,7 @@ Show:
 - generic material warning
 - missing named owner
 
-Do not display decorative avatars without operational training data.
-14. Stage Gates · שערי מעבר וראיות
+Do not display decorative avatars without operational training data. 14. Stage Gates · שערי מעבר וראיות
 אופן שימוש
 צרפו את פרומפט העמוד הזה מיד לאחר פרומפט הבסיס המשותף.
 
@@ -1091,14 +1059,14 @@ Title:
 "בדיקת מוכנות"
 
 Show:
+
 - blocked gate
 - missing evidence
 - inconsistent metric
 - expired document
 - next review
 
-No gate may pass based only on a progress percentage.
-15. מרכז חומרי ההדרכה
+No gate may pass based only on a progress percentage. 15. מרכז חומרי ההדרכה
 אופן שימוש
 צרפו את פרומפט העמוד הזה מיד לאחר פרומפט הבסיס המשותף.
 
@@ -1155,9 +1123,10 @@ Show:
 - no measurable outcome
 - mismatch with current system
 - material not assigned to persona
+
 16. התחלה מהירה ושימוש נכון
-אופן שימוש
-צרפו את פרומפט העמוד הזה מיד לאחר פרומפט הבסיס המשותף.
+    אופן שימוש
+    צרפו את פרומפט העמוד הזה מיד לאחר פרומפט הבסיס המשותף.
 
 Design the page:
 
@@ -1212,8 +1181,7 @@ LEFT INTELLIGENCE PANEL:
 Interactive personal coach:
 "בדוק אם הפעולה שתכננת מותרת"
 
-Show a sample question and governed answer.
-17. FAQ והתנגדויות
+Show a sample question and governed answer. 17. FAQ והתנגדויות
 אופן שימוש
 צרפו את פרומפט העמוד הזה מיד לאחר פרומפט הבסיס המשותף.
 
@@ -1272,8 +1240,7 @@ Show:
 - unsafe wording warning
 - recommended follow-up
 
-The interface must feel empathetic and professional.
-18. תמיכה לאחר ההשקה
+The interface must feel empathetic and professional. 18. תמיכה לאחר ההשקה
 אופן שימוש
 צרפו את פרומפט העמוד הזה מיד לאחר פרומפט הבסיס המשותף.
 
@@ -1338,8 +1305,7 @@ Show:
 - issue suggested for Microlearning
 - monthly refresh meeting
 
-The escalation path must be clearly visible.
-19. מרכז ההגשה והראיות
+The escalation path must be clearly visible. 19. מרכז ההגשה והראיות
 אופן שימוש
 צרפו את פרומפט העמוד הזה מיד לאחר פרומפט הבסיס המשותף.
 
@@ -1408,8 +1374,7 @@ Show:
 - outdated screenshot
 - presentation timing issue
 
-Do not display green ready state while any blocking item remains.
-20. ניהול המערכת
+Do not display green ready state while any blocking item remains. 20. ניהול המערכת
 אופן שימוש
 צרפו את פרומפט העמוד הזה מיד לאחר פרומפט הבסיס המשותף.
 
@@ -1488,4 +1453,3 @@ Use honest connection states:
 סיום · בקרת עקביות
 כלל עבודה
 שמרו בכל המסכים על אותה היררכיה, ניווט ימני קבוע, מרכז תפעולי, פאנל אינטליגנציה שמאלי, נתונים עסקיים אמינים, סטטוס אישור אנושי ותצוגת ראיות ברורה.
-

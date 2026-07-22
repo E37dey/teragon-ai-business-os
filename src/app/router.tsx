@@ -3,9 +3,10 @@
 // exported separately so tests can mount them with createMemoryRouter.
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import { useLocation, useParams, Link } from "react-router-dom";
-import MinimalShell from "./MinimalShell";
+import OsShell from "./OsShell";
 import PlaceholderPage from "./PlaceholderPage";
 import { APP_ROUTES } from "./routes";
+import DesignShowcase from "@/design-system/showcase/DesignShowcase";
 
 /** wraps PlaceholderPage so the live path (incl. params) is shown */
 function RoutedPlaceholder({ title, wave }: { title: string; wave: number }) {
@@ -33,7 +34,7 @@ function NotFoundPage() {
 export const appRouteObjects: RouteObject[] = [
   {
     path: "/",
-    element: <MinimalShell />,
+    element: <OsShell />,
     children: [
       ...APP_ROUTES.map((r): RouteObject => {
         const element = <RoutedPlaceholder title={r.title} wave={r.wave} />;
@@ -42,6 +43,8 @@ export const appRouteObjects: RouteObject[] = [
       { path: "*", element: <NotFoundPage /> },
     ],
   },
+  // Design-system showcase — renders its own full AppShell, so it lives outside OsShell.
+  { path: "/design", element: <DesignShowcase /> },
 ];
 
 export function createAppRouter() {

@@ -1,0 +1,135 @@
+/**
+ * TERAGON AI BUSINESS OS — Base theme layer
+ * This app is 100% dark-OS: :root/body are styled directly.
+ * .theme-os remains as an equivalent scoping alias (portals, tests, embeds).
+ * RTL-first — logical properties only.
+ */
+
+@import "./tokens.css";
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-block-size: 100%;
+}
+
+body,
+.theme-os {
+  direction: rtl;
+  background-color: var(--os-bg);
+  color: var(--os-text);
+  font-family: var(--os-font);
+  font-size: var(--os-text-md);
+  line-height: var(--os-leading-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* ── Selection ───────────────────────────────────────────────── */
+::selection {
+  background-color: rgba(32, 196, 232, 0.28);
+  color: var(--os-text);
+}
+
+/* ── Focus ring (cyan, keyboard only) ────────────────────────── */
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--os-focus-ring);
+  border-radius: var(--os-radius-xs);
+}
+
+/* ── Scrollbars — thin, dark ─────────────────────────────────── */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(112, 158, 220, 0.25) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(112, 158, 220, 0.22);
+  border-radius: var(--os-radius-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(112, 158, 220, 0.38);
+  background-clip: padding-box;
+}
+
+/* ── Typography resets ───────────────────────────────────────── */
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--os-cyan);
+  text-decoration: none;
+  transition: color var(--os-transition-fast);
+}
+
+a:hover {
+  color: var(--os-text);
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+/* ── LTR isolation helpers ───────────────────────────────────── */
+/* Free-form technical values (paths, emails, model names) */
+.os-ltr {
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline-block;
+}
+
+/* Numbers: tabular + LTR inside RTL flow */
+.os-num {
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

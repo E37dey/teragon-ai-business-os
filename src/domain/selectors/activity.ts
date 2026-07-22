@@ -12,5 +12,8 @@ export function activityByKind(
   kind: string,
   limit = 10,
 ): Activity[] {
-  return recentActivity(activities.filter((a) => a.kind === kind), limit);
+  return recentActivity(
+    activities.filter((a) => a.kind === kind),
+    limit,
+  );
 }

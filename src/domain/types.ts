@@ -23,13 +23,7 @@ export interface BaseEntity {
 /** Generic lifecycle status shared by many entities. */
 export type EntityStatus = "פעיל" | "לא פעיל" | "בארכיון";
 
-export type UserRoleKey =
-  | 'מנכ"ל'
-  | "מכירות"
-  | "מדריך"
-  | "תמיכה"
-  | "תלמיד"
-  | "מנהל מערכת";
+export type UserRoleKey = 'מנכ"ל' | "מכירות" | "מדריך" | "תמיכה" | "תלמיד" | "מנהל מערכת";
 
 export type LeadStatus =
   | "חדש"
@@ -53,22 +47,11 @@ export const LEAD_FUNNEL_ORDER: readonly LeadStatus[] = [
 ] as const;
 
 export type OpportunityStage =
-  | "זיהוי"
-  | "אפיון צרכים"
-  | "הצעה"
-  | "משא ומתן"
-  | "נסגרה - זכייה"
-  | "נסגרה - הפסד";
+  "זיהוי" | "אפיון צרכים" | "הצעה" | "משא ומתן" | "נסגרה - זכייה" | "נסגרה - הפסד";
 
 export type QuotationStatus = "טיוטה" | "נשלחה" | "אושרה" | "נדחתה" | "פג תוקף";
 
-export type TicketStatus =
-  | "חדש"
-  | "בבדיקה"
-  | "ממתין ללקוח"
-  | "ממתין לחלק"
-  | "טופל"
-  | "נסגר";
+export type TicketStatus = "חדש" | "בבדיקה" | "ממתין ללקוח" | "ממתין לחלק" | "טופל" | "נסגר";
 
 export type TicketPriority = "גבוהה" | "בינונית" | "נמוכה";
 
@@ -91,14 +74,7 @@ export type StageProgressStatus =
 /** Product-agent operational status (spec: exact Hebrew values). */
 export type AgentStatus = "פעיל" | "ממתין" | "דורש אישור" | "חסום" | "מושבת";
 
-export type AgentTaskStatus =
-  | "בתור"
-  | "רץ"
-  | "ממתין לאישור"
-  | "אושר"
-  | "נדחה"
-  | "הושלם"
-  | "נכשל";
+export type AgentTaskStatus = "בתור" | "רץ" | "ממתין לאישור" | "אושר" | "נדחה" | "הושלם" | "נכשל";
 
 export type ApprovalStatus = "ממתין" | "אושר" | "נדחה";
 

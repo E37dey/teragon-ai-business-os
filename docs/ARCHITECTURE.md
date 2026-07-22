@@ -48,9 +48,10 @@ e2e/              ← Agent 8: Playwright + axe
 ## AI
 
 `AIProvider`: health/capabilities/stream/generateStructured/summarize/classify/recommend/explain/embed.
+
 - `LocalRulesProvider`: דטרמיניסטי, שקוף ("מנוע חוקים מקומי"), ללא רשת.
 - `RemoteAIProvider`: fetch ל-`/.netlify/functions/ai-*` בלבד. השרת: env vars, timeout, retry מוגבל, rate limit, תקציב יומי, zod על קלט/פלט, correlation ID, audit.
-כל תשובה = AIResponseEnvelope: result · reason · evidence[] · confidenceMethod · limitations · nextAction · approvalRequired.
+  כל תשובה = AIResponseEnvelope: result · reason · evidence[] · confidenceMethod · limitations · nextAction · approvalRequired.
 
 ## אישורים אנושיים
 

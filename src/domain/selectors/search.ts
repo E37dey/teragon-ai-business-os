@@ -46,22 +46,46 @@ export function globalSearch(data: SearchableData, query: string, limit = 20): S
 
   for (const c of data.customers ?? []) {
     if (matches(q, c.name, c.email, c.phone, c.city)) {
-      hits.push({ kind: "לקוח", id: c.id, title: c.name, subtitle: `${c.type} · ${c.city}`, route: `/customers/${c.id}` });
+      hits.push({
+        kind: "לקוח",
+        id: c.id,
+        title: c.name,
+        subtitle: `${c.type} · ${c.city}`,
+        route: `/customers/${c.id}`,
+      });
     }
   }
   for (const l of data.leads ?? []) {
     if (matches(q, l.name, l.email, l.phone, l.interest, l.notes)) {
-      hits.push({ kind: "ליד", id: l.id, title: l.name, subtitle: `${l.interest} · ${l.status}`, route: "/crm" });
+      hits.push({
+        kind: "ליד",
+        id: l.id,
+        title: l.name,
+        subtitle: `${l.interest} · ${l.status}`,
+        route: "/crm",
+      });
     }
   }
   for (const t of data.tickets ?? []) {
     if (matches(q, t.customerName, t.printer, t.issue, t.description)) {
-      hits.push({ kind: "קריאת שירות", id: t.id, title: `${t.customerName} — ${t.issue}`, subtitle: t.status, route: "/service" });
+      hits.push({
+        kind: "קריאת שירות",
+        id: t.id,
+        title: `${t.customerName} — ${t.issue}`,
+        subtitle: t.status,
+        route: "/service",
+      });
     }
   }
   for (const qu of data.quotations ?? []) {
     if (matches(q, qu.customerName, qu.title, ...qu.lines.map((li) => li.description))) {
-      hits.push({ kind: "הצעת מחיר", id: qu.id, title: qu.title, subtitle: `${qu.customerName} · ${qu.status}`, route: "/sales" });
+      hits.push({
+        kind: "הצעת מחיר",
+        id: qu.id,
+        title: qu.title,
+        subtitle: `${qu.customerName} · ${qu.status}`,
+        route: "/sales",
+      });
     }
   }
   for (const c of data.courses ?? []) {
@@ -76,17 +100,35 @@ export function globalSearch(data: SearchableData, query: string, limit = 20): S
   }
   for (const doc of data.documents ?? []) {
     if (matches(q, doc.name, doc.description)) {
-      hits.push({ kind: "מסמך", id: doc.id, title: doc.name, subtitle: doc.type, route: "/documents" });
+      hits.push({
+        kind: "מסמך",
+        id: doc.id,
+        title: doc.name,
+        subtitle: doc.type,
+        route: "/documents",
+      });
     }
   }
   for (const kn of data.knowledgeNotes ?? []) {
     if (matches(q, kn.title, kn.content, ...kn.tags)) {
-      hits.push({ kind: "רשומת ידע", id: kn.id, title: kn.title, subtitle: kn.category, route: "/knowledge" });
+      hits.push({
+        kind: "רשומת ידע",
+        id: kn.id,
+        title: kn.title,
+        subtitle: kn.category,
+        route: "/knowledge",
+      });
     }
   }
   for (const task of data.tasks ?? []) {
     if (matches(q, task.title, task.description)) {
-      hits.push({ kind: "משימה", id: task.id, title: task.title, subtitle: task.status, route: "/tasks" });
+      hits.push({
+        kind: "משימה",
+        id: task.id,
+        title: task.title,
+        subtitle: task.status,
+        route: "/tasks",
+      });
     }
   }
 

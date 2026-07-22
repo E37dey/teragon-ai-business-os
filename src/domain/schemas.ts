@@ -55,7 +55,14 @@ const baseEntity = {
 };
 
 export const entityStatusSchema = z.enum(["פעיל", "לא פעיל", "בארכיון"]);
-export const userRoleKeySchema = z.enum(['מנכ"ל', "מכירות", "מדריך", "תמיכה", "תלמיד", "מנהל מערכת"]);
+export const userRoleKeySchema = z.enum([
+  'מנכ"ל',
+  "מכירות",
+  "מדריך",
+  "תמיכה",
+  "תלמיד",
+  "מנהל מערכת",
+]);
 export const leadStatusSchema = z.enum([
   "חדש",
   "נוצר קשר",
@@ -67,12 +74,27 @@ export const leadStatusSchema = z.enum([
   "לא רלוונטי",
 ]);
 export const quotationStatusSchema = z.enum(["טיוטה", "נשלחה", "אושרה", "נדחתה", "פג תוקף"]);
-export const ticketStatusSchema = z.enum(["חדש", "בבדיקה", "ממתין ללקוח", "ממתין לחלק", "טופל", "נסגר"]);
+export const ticketStatusSchema = z.enum([
+  "חדש",
+  "בבדיקה",
+  "ממתין ללקוח",
+  "ממתין לחלק",
+  "טופל",
+  "נסגר",
+]);
 export const ticketPrioritySchema = z.enum(["גבוהה", "בינונית", "נמוכה"]);
 export const taskStatusSchema = z.enum(["פתוחה", "בתהליך", "הושלמה", "בוטלה"]);
 export const courseStatusSchema = z.enum(["פעיל", "פתוח להרשמה", "הסתיים", "מלא"]);
 export const agentStatusSchema = z.enum(["פעיל", "ממתין", "דורש אישור", "חסום", "מושבת"]);
-export const agentTaskStatusSchema = z.enum(["בתור", "רץ", "ממתין לאישור", "אושר", "נדחה", "הושלם", "נכשל"]);
+export const agentTaskStatusSchema = z.enum([
+  "בתור",
+  "רץ",
+  "ממתין לאישור",
+  "אושר",
+  "נדחה",
+  "הושלם",
+  "נכשל",
+]);
 export const approvalStatusSchema = z.enum(["ממתין", "אושר", "נדחה"]);
 export const customerTypeSchema = z.enum(["פרטי", "עסק", "בית ספר", "ארגון"]);
 export const stageProgressStatusSchema = z.enum([

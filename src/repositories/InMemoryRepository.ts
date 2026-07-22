@@ -27,7 +27,12 @@ export class InMemoryRepository<T extends BaseEntity> extends BaseRepository<T> 
     }
     const clone = structuredClone(item);
     this.items.push(clone);
-    this.emit({ type: "create", collection: this.collection, id: item.id, item: structuredClone(clone) });
+    this.emit({
+      type: "create",
+      collection: this.collection,
+      id: item.id,
+      item: structuredClone(clone),
+    });
     return Promise.resolve(structuredClone(clone));
   }
 

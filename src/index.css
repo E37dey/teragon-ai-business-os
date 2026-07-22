@@ -1,4 +1,6 @@
-/* Wave 1 minimal base — the Design agent's src/styles/ tokens replace/extend this. */
+/* Global entry stylesheet — chains the OS theme (components → base → tokens). */
+@import "./styles/components.css";
+
 * {
   box-sizing: border-box;
 }

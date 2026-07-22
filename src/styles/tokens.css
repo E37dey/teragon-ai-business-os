@@ -1,0 +1,136 @@
+/**
+ * TERAGON AI BUSINESS OS — Design Tokens
+ * Source of truth: docs/VISUAL_DNA.md (mandatory palette — do not alter hex values).
+ * RTL-first: consumers must use CSS logical properties (margin-inline-start etc.).
+ *
+ * NOTE FOR ARCHITECT (index.html is NOT owned by the design agent):
+ * please add to <head> for best font loading performance:
+ *   <link rel="preconnect" href="https://fonts.googleapis.com">
+ *   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+ *   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&family=Assistant:wght@400;600;700&display=swap" rel="stylesheet">
+ * The @import below is a functional fallback until then (display=swap included).
+ */
+@import url("https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&family=Assistant:wght@400;600;700&display=swap");
+
+:root,
+.theme-os {
+  /* ── Surfaces (mandatory palette) ─────────────────────────── */
+  --os-bg: #030812;
+  --os-nav: #050b15;
+  --os-panel: #07111f;
+  --os-raised: #0a1627;
+  --os-highlight: #0c1c31;
+
+  /* ── Borders (mandatory palette) ──────────────────────────── */
+  --os-border: rgba(112, 158, 220, 0.17);
+  --os-border-strong: rgba(112, 158, 220, 0.28);
+
+  /* ── Text (mandatory palette) ─────────────────────────────── */
+  --os-text: #f5f8fd;
+  --os-text-2: #98a8bd;
+  --os-muted: #65758b;
+
+  /* ── Accents (mandatory palette) ──────────────────────────── */
+  --os-blue: #287bff;
+  --os-cyan: #20c4e8;
+  --os-violet: #7655ff;
+  --os-success: #21c981;
+  --os-warning: #e7a93d;
+  --os-danger: #ec5d68;
+
+  /* ── Accent tints (derived, for chips / soft fills) ───────── */
+  --os-blue-soft: rgba(40, 123, 255, 0.12);
+  --os-cyan-soft: rgba(32, 196, 232, 0.12);
+  --os-violet-soft: rgba(118, 85, 255, 0.12);
+  --os-success-soft: rgba(33, 201, 129, 0.12);
+  --os-warning-soft: rgba(231, 169, 61, 0.12);
+  --os-danger-soft: rgba(236, 93, 104, 0.12);
+
+  --os-blue-border: rgba(40, 123, 255, 0.45);
+  --os-cyan-border: rgba(32, 196, 232, 0.45);
+  --os-violet-border: rgba(118, 85, 255, 0.45);
+  --os-success-border: rgba(33, 201, 129, 0.45);
+  --os-warning-border: rgba(231, 169, 61, 0.45);
+  --os-danger-border: rgba(236, 93, 104, 0.45);
+
+  /* violet reads too dark on near-black surfaces — readable text variant */
+  --os-violet-text: #a18dff;
+
+  /* ── Spacing scale (dense enterprise) ─────────────────────── */
+  --os-space-0: 0;
+  --os-space-1: 2px;
+  --os-space-2: 4px;
+  --os-space-3: 6px;
+  --os-space-4: 8px;
+  --os-space-5: 12px;
+  --os-space-6: 16px;
+  --os-space-7: 20px;
+  --os-space-8: 24px;
+  --os-space-9: 32px;
+  --os-space-10: 40px;
+
+  /* ── Radius scale ─────────────────────────────────────────── */
+  --os-radius-xs: 4px;
+  --os-radius-sm: 6px;
+  --os-radius-md: 8px;
+  --os-radius-lg: 10px;
+  --os-radius-xl: 14px;
+  --os-radius-full: 999px;
+
+  /* ── Typography ───────────────────────────────────────────── */
+  --os-font: "Heebo", "Assistant", "Rubik", -apple-system, "Segoe UI", sans-serif;
+  --os-font-mono: "JetBrains Mono", "Consolas", "Courier New", monospace;
+
+  /* dense enterprise type scale (11-28px) */
+  --os-text-2xs: 11px;
+  --os-text-xs: 12px;
+  --os-text-sm: 13px;
+  --os-text-md: 14px;
+  --os-text-lg: 16px;
+  --os-text-xl: 20px;
+  --os-text-2xl: 28px;
+
+  --os-leading-tight: 1.25;
+  --os-leading-normal: 1.45;
+
+  --os-weight-regular: 400;
+  --os-weight-medium: 500;
+  --os-weight-semibold: 600;
+  --os-weight-bold: 700;
+
+  /* ── Shadows / restrained glow (per accent) ───────────────── */
+  --os-shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.35), 0 4px 14px rgba(0, 0, 0, 0.25);
+  --os-shadow-raised: 0 2px 6px rgba(0, 0, 0, 0.45), 0 8px 24px rgba(0, 0, 0, 0.3);
+  --os-shadow-overlay: 0 8px 32px rgba(0, 0, 0, 0.65), 0 2px 8px rgba(0, 0, 0, 0.5);
+
+  --os-glow-blue: 0 0 0 1px var(--os-blue-border), 0 0 14px rgba(40, 123, 255, 0.18);
+  --os-glow-cyan: 0 0 0 1px var(--os-cyan-border), 0 0 14px rgba(32, 196, 232, 0.18);
+  --os-glow-violet: 0 0 0 1px var(--os-violet-border), 0 0 14px rgba(118, 85, 255, 0.18);
+  --os-glow-success: 0 0 0 1px var(--os-success-border), 0 0 14px rgba(33, 201, 129, 0.18);
+  --os-glow-warning: 0 0 0 1px var(--os-warning-border), 0 0 14px rgba(231, 169, 61, 0.18);
+  --os-glow-danger: 0 0 0 1px var(--os-danger-border), 0 0 14px rgba(236, 93, 104, 0.18);
+
+  /* focus ring (cyan) */
+  --os-focus-ring: 0 0 0 2px rgba(32, 196, 232, 0.55);
+
+  /* ── Borders (composed) ───────────────────────────────────── */
+  --os-border-thin: 1px solid var(--os-border);
+  --os-border-strong-line: 1px solid var(--os-border-strong);
+
+  /* ── Transitions ──────────────────────────────────────────── */
+  --os-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --os-transition-fast: 120ms var(--os-ease);
+  --os-transition-base: 200ms var(--os-ease);
+  --os-transition-slow: 320ms var(--os-ease);
+
+  /* ── Layout dimensions (app shell) ────────────────────────── */
+  --os-nav-width: 220px;
+  --os-rail-width: 300px;
+  --os-rail-collapsed-width: 44px;
+  --os-header-height: 56px;
+  --os-z-header: 30;
+  --os-z-nav: 40;
+  --os-z-drawer: 50;
+  --os-z-modal: 60;
+  --os-z-toast: 70;
+}
