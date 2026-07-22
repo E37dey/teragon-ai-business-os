@@ -1,0 +1,10 @@
+# DECISION LOG — TERAGON AI BUSINESS OS (teragon-os)
+
+| # | תאריך | החלטה | מי | רציונל |
+|---|-------|--------|----|--------|
+| D-001 | 22.07.2026 | **פרויקט קנוני חדש ונקי: `Desktop/teragon-os`**. שני הפרויקטים הישנים — `Desktop/teragon-final` ו-`Desktop/CRM -TERAGON` — הם **תורמים לקריאה בלבד** (read-only donors). אין לשנות/למחוק/להזיז אותם | המשתמש (החלטה מפורשת, מחליפה את D-001 הקודמת ב-teragon-final) | הפרויקטים הישנים מכילים מבנה legacy, כפילויות, state קשיח ומקורות אמת סותרים; נדרש התחלה נקייה עם TS strict מיום ראשון |
+| D-002 | 22.07.2026 | teragon-final הוקפא בקומיט FREEZE 7b54d6a (ענף feat/teragon-ai-business-os); עבודת Waves 0–1.6 שנעשתה שם משמשת כרפרנס/תורם | Orchestrator | שימור מלא, אפס אובדן עבודה |
+| D-003 | 22.07.2026 | סיבת הנטישה של teragon-final: שני סוכנים חיצוניים (Cursor, ואחריו משימת Hermes chat) כתבו וקימטו על הריפו במקביל וגרמו לזיהומים (סינית בעברית, שגיאות TS, קומיטים עם הודעות כוזבות). משימות ה-Hermes הופסקו; gateway נשאר חי | Orchestrator + המשתמש | שליטה בלעדית = תנאי לאמינות ה-gates |
+| D-004 | 22.07.2026 | סטאק: Vite 7 + React 19 + TS strict + react-router-dom + TanStack Query/Table + zod + idb; בדיקות: Vitest + RTL + Playwright + axe; פריסה: Netlify (SPA redirect + Functions). ללא Tailwind — ארכיטקטורת CSS מבוססת tokens (עברה ולידציה ויזואלית ב-design-system הקודם) | Orchestrator לפי הבריף | הבריף מתיר "Tailwind v4 או ארכיטקטורת CSS נקייה מבוססת tokens"; ה-tokens כבר תוכננו ותועדו |
+| D-005 | 22.07.2026 | זהות קנונית: טרגון טכנולוגיות · מנכ"ל צחי זוסטייהם · "ערב טוב, צחי". בתמונות הייחוס מופיעים שמות שגויים (בניימן/טוגלמן) — אין להעתיק. אין להציג את איליה נודלמן כמנכ"ל | הבריף | פרופיל ארגוני קנוני |
+| D-006 | 22.07.2026 | מדיניות תורמים: rewrite-cleanly כברירת מחדל; העתקה רק לקוד מבודד/מוקלד/בטוח. אסור bulk-copy של src ישן. הכול דרך docs/LEGACY_DONOR_MATRIX.md | הבריף | מניעת ייבוא חוב טכני |
