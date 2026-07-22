@@ -5,10 +5,8 @@ import { AppShell, LeftIntelligenceRail, type NavItem } from "@/layout";
 import { ToastProvider } from "@/design-system";
 import type { IconName } from "@/design-system/icons";
 import { APP_ROUTES } from "./routes";
+import { CANONICAL_USER } from "./identity";
 import { MODE_LABEL, useAppMode } from "./mode";
-
-/** Canonical identity — the single place the app injects it (docs/DECISION_LOG D-005). */
-export const CANONICAL_USER = { name: "צחי זוסטייהם", role: 'מנכ"ל · טרגון טכנולוגיות' } as const;
 
 const ROUTE_ICONS: Record<string, IconName> = {
   "/": "home",

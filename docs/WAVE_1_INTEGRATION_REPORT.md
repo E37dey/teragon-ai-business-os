@@ -4,13 +4,13 @@
 
 ## סוכנים שהופעלו בפועל
 
-| Agent | תפקיד | תוצאה |
-|---|---|---|
-| D1 Donor-Discovery (teragon-final) | read-only | docs/LEGACY_DONOR_MATRIX.md — 21 COPY / 23 REWRITE / 8 REJECT |
-| D2 Donor-Discovery (CRM -TERAGON snapshot) | read-only | docs/LEGACY_DONOR_MATRIX_CRM.md — 27 מסכים, 17 יכולות AI, דפוס 3 רמות מדידה |
-| W1-A Architecture & Integration | domain/repos/router/seed | קומיט 33c55a8 — 45 ישויות, 34 סכמות zod, IndexedDB+InMemory, seed עקבי, 28 ראוטים |
-| W1-B Design System & RTL | tokens/primitives/layout | 19 פרימיטיבים + 5 רכיבי layout + 3 קובצי styles (לא קומט — אינטגרציה כאן) |
-| Orchestrator (inline) | אינטגרציה סדרתית | OsShell.tsx, router swap, fonts, index.css chain, תיקוני /design ו-icon |
+| Agent                                      | תפקיד                    | תוצאה                                                                             |
+| ------------------------------------------ | ------------------------ | --------------------------------------------------------------------------------- |
+| D1 Donor-Discovery (teragon-final)         | read-only                | docs/LEGACY_DONOR_MATRIX.md — 21 COPY / 23 REWRITE / 8 REJECT                     |
+| D2 Donor-Discovery (CRM -TERAGON snapshot) | read-only                | docs/LEGACY_DONOR_MATRIX_CRM.md — 27 מסכים, 17 יכולות AI, דפוס 3 רמות מדידה       |
+| W1-A Architecture & Integration            | domain/repos/router/seed | קומיט 33c55a8 — 45 ישויות, 34 סכמות zod, IndexedDB+InMemory, seed עקבי, 28 ראוטים |
+| W1-B Design System & RTL                   | tokens/primitives/layout | 19 פרימיטיבים + 5 רכיבי layout + 3 קובצי styles (לא קומט — אינטגרציה כאן)         |
+| Orchestrator (inline)                      | אינטגרציה סדרתית         | OsShell.tsx, router swap, fonts, index.css chain, תיקוני /design ו-icon           |
 
 ## סדר האינטגרציה (כפי שנדרש)
 
@@ -30,10 +30,10 @@
 
 ## תקלות שנמצאו ותוקנו (2 מחזורי תיקון מתוך 3 מותרים)
 
-| # | תקלה | תיקון |
-|---|------|-------|
-| 1 | TS2322: `"img"` אינו IconName | החלפה ל-`doc` |
-| 2 | Shell כפול ב-/design (showcase בתוך OsShell) | הוצאת הראוט לרמה עליונה |
+| #   | תקלה                                         | תיקון                   |
+| --- | -------------------------------------------- | ----------------------- |
+| 1   | TS2322: `"img"` אינו IconName                | החלפה ל-`doc`           |
+| 2   | Shell כפול ב-/design (showcase בתוך OsShell) | הוצאת הראוט לרמה עליונה |
 
 ## מגבלות ידועות (כנות)
 
@@ -46,6 +46,7 @@
 ## תוכנית Wave 2 מדויקת (הבא)
 
 Wave 2 בפועל כבר כמעט הושלם בתוך Wave 1 (design system + AppShell). נותר:
+
 1. קיבוץ פריטי ניווט לקטגוריות עם כותרות (עסקי / AI / ידע / הטמעה / מערכת) + badges אמיתיים מ-repositories
 2. חיווט חיפוש גלובלי (selector `globalSearch` קיים) + ⌘K Command Palette
 3. NotificationCenter מונע-נתונים (activities)

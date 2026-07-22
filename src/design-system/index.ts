@@ -2,7 +2,8 @@
  * TERAGON AI BUSINESS OS — Design System barrel.
  * Importing anything from here also pulls in src/styles tokens+base+components CSS.
  */
-export { OsIcon, ICON_NAMES } from "./icons";
+export { OsIcon } from "./icons";
+export { ICON_NAMES, PATHS } from "./iconPaths";
 export type { IconName, OsIconProps } from "./icons";
 
 export type { OsAccent, OsTierAccent, OsStatus } from "./types";
@@ -17,7 +18,8 @@ export type { SparklineProps } from "./Sparkline";
 export { KpiCard } from "./KpiCard";
 export type { KpiCardProps } from "./KpiCard";
 
-export { StatusChip, STATUS_MAP } from "./StatusChip";
+export { StatusChip } from "./StatusChip";
+export { STATUS_MAP } from "./statusMap";
 export type { StatusChipProps } from "./StatusChip";
 
 export { SectionTitle } from "./SectionTitle";
@@ -59,5 +61,6 @@ export type { TabsProps, TabItem } from "./Tabs";
 export { SearchInput } from "./SearchInput";
 export type { SearchInputProps } from "./SearchInput";
 
-export { ToastProvider, useToast } from "./Toast";
-export type { ToastApi, ToastItem, ToastTone, ToastProviderProps } from "./Toast";
+export { ToastProvider } from "./Toast";
+export { useToast, ToastContext } from "./toastContext";
+export type { ToastApi, ToastItem, ToastTone } from "./toastContext";

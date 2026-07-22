@@ -1,23 +1,8 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { OsIcon, type IconName } from "./icons";
 import "../styles/components.css";
-
-export type ToastTone = "success" | "danger" | "warning" | "info";
-
-export interface ToastItem {
-  id: number;
-  message: string;
-  tone: ToastTone;
-}
-
-export interface ToastApi {
-  /** Show a toast (default tone 'info', auto-dismisses after `durationMs`, default 4000). */
-  toast: (message: string, tone?: ToastTone, durationMs?: number) => void;
-  dismiss: (id: number) => void;
-}
-
-const ToastContext = createContext<ToastApi | null>(null);
+import { ToastContext, type ToastApi, type ToastItem, type ToastTone } from "./toastContext";
 
 const TONE_ICON: Record<ToastTone, IconName> = {
   success: "check",
@@ -75,13 +60,4 @@ export function ToastProvider({ children }: ToastProviderProps): ReactElement {
       </div>
     </ToastContext.Provider>
   );
-}
-
-/** useToast — must be used inside ToastProvider (throws otherwise, honestly). */
-export function useToast(): ToastApi {
-  const ctx = useContext(ToastContext);
-  if (!ctx) {
-    throw new Error("useToast חייב לרוץ בתוך <ToastProvider> — עטפו את האפליקציה ב-ToastProvider.");
-  }
-  return ctx;
 }
