@@ -9,3 +9,4 @@ dist-ssr
 playwright-report
 test-results
 *.tsbuildinfo
+.claude/
