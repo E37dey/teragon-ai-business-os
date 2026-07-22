@@ -1,12 +1,22 @@
 import type { ReactElement, ReactNode } from "react";
-import { RightPrimaryNavigation, type NavItem, type RenderNavLink } from "./RightPrimaryNavigation";
+import {
+  RightPrimaryNavigation,
+  type NavGroupSpec,
+  type NavItem,
+  type RenderNavLink,
+} from "./RightPrimaryNavigation";
 import { CompactTopHeader, type CompactTopHeaderProps, type ShellUser } from "./CompactTopHeader";
 import { MainOperationalWorkspace } from "./MainOperationalWorkspace";
 import "../styles/components.css";
 
 export interface AppShellProps {
-  /** Primary navigation items. */
-  navItems: readonly NavItem[];
+  /** Primary navigation items (flat mode — used when navGroups is absent). */
+  navItems?: readonly NavItem[];
+  /** Grouped navigation (Wave 2) — overrides navItems when provided. */
+  navGroups?: readonly NavGroupSpec[];
+  /** group id → open? (controlled + persisted by the app shell). */
+  openGroups?: Record<string, boolean>;
+  onToggleGroup?: (groupId: string) => void;
   /**
    * Active route path — matched against NavItem.href (exact, then longest
    * prefix) to light the active item. Alternatively pass activeNavId.
@@ -62,6 +72,9 @@ function resolveActiveId(
  */
 export function AppShell({
   navItems,
+  navGroups,
+  openGroups,
+  onToggleGroup,
   activeRoute,
   activeNavId,
   user,
@@ -73,12 +86,18 @@ export function AppShell({
   children,
   className = "",
 }: AppShellProps): ReactElement {
-  const activeId = resolveActiveId(navItems, activeNavId, activeRoute);
+  const flatItems: readonly NavItem[] = navGroups
+    ? navGroups.flatMap((g) => g.items)
+    : (navItems ?? []);
+  const activeId = resolveActiveId(flatItems, activeNavId, activeRoute);
 
   return (
     <div className={`os-shell ${className}`.trim()}>
       <RightPrimaryNavigation
         items={navItems}
+        groups={navGroups}
+        openGroups={openGroups}
+        onToggleGroup={onToggleGroup}
         activeId={activeId}
         renderLink={renderLink}
         onNavigate={onNavigate}

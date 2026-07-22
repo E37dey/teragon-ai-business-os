@@ -47,6 +47,7 @@ export const COLLECTIONS = [
   "implementationStages",
   "stageGates",
   "supportRequests",
+  "notifications",
 ] as const;
 
 export type CollectionKey = (typeof COLLECTIONS)[number];

@@ -646,6 +646,41 @@ export interface SupportRequest extends BaseEntity {
 }
 
 // ---------------------------------------------------------------------------
+// notifications (Wave 2 — derived from real repository conditions, never invented)
+// ---------------------------------------------------------------------------
+
+export type NotificationSeverity = "מידע" | "אזהרה" | "דחוף";
+
+export type NotificationCategory =
+  "מכירות" | "משימות" | "שירות" | "מסמכים" | "למידה" | "סוכני AI" | "אוטומציות";
+
+/** Entity reference a notification points at (type + id + destination route). */
+export interface NotificationRelatedEntity {
+  /** entity kind, e.g. "lead" | "task" | "quotation" | "serviceTicket" ... */
+  type: string;
+  id: string;
+  /** in-app destination route */
+  route: string;
+}
+
+/**
+ * AppNotification — derived notification record (collection "notifications").
+ * Ids are STABLE per condition (e.g. "ntf-task-overdue-task-1") so the boot
+ * generator is idempotent: refresh never duplicates, read-state survives.
+ */
+export interface AppNotification extends BaseEntity {
+  category: NotificationCategory;
+  title: string;
+  /** short explanatory line (may be empty) */
+  body: string;
+  relatedEntity: NotificationRelatedEntity;
+  read: boolean;
+  severity: NotificationSeverity;
+  /** owning User.id when the condition has a clear owner, else null */
+  ownerId: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // AI response envelope (mandatory 7-field contract for every AI output)
 // ---------------------------------------------------------------------------
 

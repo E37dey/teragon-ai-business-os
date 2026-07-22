@@ -36,6 +36,8 @@ export function getRepository<T extends BaseEntity = BaseEntity>(
 export async function seedIfEmpty(): Promise<CollectionKey[]> {
   const seeded: CollectionKey[] = [];
   for (const collection of COLLECTIONS) {
+    // collections with an empty seed (e.g. derived "notifications") have nothing to seed
+    if (SEED[collection].length === 0) continue;
     const repo = getRepository(collection);
     if (repo instanceof IndexedDBRepository) {
       const count = await repo.count();

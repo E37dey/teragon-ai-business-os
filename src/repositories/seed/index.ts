@@ -99,4 +99,7 @@ export const SEED: Record<CollectionKey, readonly BaseEntity[]> = {
   implementationStages: IMPLEMENTATION_STAGES,
   stageGates: STAGE_GATES,
   supportRequests: SUPPORT_REQUESTS,
+  // notifications are DERIVED at boot from real repository conditions
+  // (src/app/notifications/deriveNotifications.ts) — never seeded with fixed data.
+  notifications: [],
 } as const;

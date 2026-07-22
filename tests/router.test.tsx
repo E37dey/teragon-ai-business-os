@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { appRouteObjects } from "@/app/router";
 import { APP_ROUTES } from "@/app/routes";
 
@@ -10,13 +11,18 @@ afterEach(cleanup);
 
 function mount(path: string) {
   const router = createMemoryRouter(appRouteObjects, { initialEntries: [path] });
-  render(<RouterProvider router={router} />);
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={qc}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
   return router;
 }
 
 describe("router smoke — all canonical paths render", () => {
-  it("has the full 29-entry route table (28 routes + customers index)", () => {
-    expect(APP_ROUTES.length).toBe(29);
+  it("has the full 31-entry route table (30 routes + customers index sample)", () => {
+    expect(APP_ROUTES.length).toBe(31);
   });
 
   for (const r of APP_ROUTES) {

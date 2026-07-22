@@ -35,9 +35,17 @@ export type IconName =
   | "inbox"
   | "send"
   | "bot"
-  | "evidence";
+  | "evidence"
+  | "menu";
 
 export const PATHS: Record<IconName, ReactNode> = {
+  menu: (
+    <>
+      <path d="M3.5 6h17" />
+      <path d="M3.5 12h17" />
+      <path d="M3.5 18h17" />
+    </>
+  ),
   home: (
     <>
       <path d="M3 10.5 12 3l9 7.5" />

@@ -2,7 +2,12 @@
  * TERAGON AI BUSINESS OS — Layout barrel (app shell components).
  */
 export { RightPrimaryNavigation } from "./RightPrimaryNavigation";
-export type { RightPrimaryNavigationProps, NavItem, RenderNavLink } from "./RightPrimaryNavigation";
+export type {
+  RightPrimaryNavigationProps,
+  NavItem,
+  NavGroupSpec,
+  RenderNavLink,
+} from "./RightPrimaryNavigation";
 
 export { CompactTopHeader } from "./CompactTopHeader";
 export type { CompactTopHeaderProps, ShellUser } from "./CompactTopHeader";

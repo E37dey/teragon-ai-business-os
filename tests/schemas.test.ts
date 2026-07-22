@@ -105,10 +105,20 @@ const cases: { name: string; schema: z.ZodType; items: readonly unknown[]; min: 
   { name: "approvals", schema: approvalSchema, items: APPROVALS, min: 3 },
   { name: "auditEvents", schema: auditEventSchema, items: AUDIT_EVENTS, min: 6 },
   { name: "metricDefinitions", schema: metricDefinitionSchema, items: METRIC_DEFINITIONS, min: 9 },
-  { name: "metricObservations", schema: metricObservationSchema, items: METRIC_OBSERVATIONS, min: 2 },
+  {
+    name: "metricObservations",
+    schema: metricObservationSchema,
+    items: METRIC_OBSERVATIONS,
+    min: 2,
+  },
   { name: "personas", schema: personaSchema, items: PERSONAS, min: 7 },
   { name: "trainingMaterials", schema: trainingMaterialSchema, items: TRAINING_MATERIALS, min: 13 },
-  { name: "implementationStages", schema: implementationStageSchema, items: IMPLEMENTATION_STAGES, min: 6 },
+  {
+    name: "implementationStages",
+    schema: implementationStageSchema,
+    items: IMPLEMENTATION_STAGES,
+    min: 6,
+  },
   { name: "stageGates", schema: stageGateSchema, items: STAGE_GATES, min: 6 },
 ];
 
@@ -136,9 +146,7 @@ describe("zod round-trip over the deterministic seed", () => {
 
   it("rejects invalid data (honesty: bad records must not slip through)", () => {
     expect(() => leadSchema.parse({ id: "x" })).toThrow();
-    expect(() =>
-      quotationSchema.parse({ ...QUOTATIONS[0], discountPercent: 150 }),
-    ).toThrow();
+    expect(() => quotationSchema.parse({ ...QUOTATIONS[0], discountPercent: 150 })).toThrow();
     expect(() => agentSchema.parse({ ...AGENTS[0], status: "לא סטטוס אמיתי" })).toThrow();
   });
 });

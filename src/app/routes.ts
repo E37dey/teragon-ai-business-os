@@ -85,6 +85,14 @@ export const APP_ROUTES: readonly AppRouteDef[] = [
     inNav: true,
   },
   {
+    path: "/system-health",
+    navPath: "/system-health",
+    title: "בריאות המערכת",
+    wave: 9,
+    inNav: true,
+  },
+  { path: "/settings", navPath: "/settings", title: "הגדרות", wave: 9, inNav: true },
+  {
     path: "/submission",
     navPath: "/submission",
     title: "מרכז ההגשה והראיות",

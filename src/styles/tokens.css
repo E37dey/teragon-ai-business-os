@@ -28,7 +28,7 @@
   /* ── Text (mandatory palette) ─────────────────────────────── */
   --os-text: #f5f8fd;
   --os-text-2: #98a8bd;
-  --os-muted: #65758b;
+  --os-muted: #75879f; /* Wave 2: lightened from #65758b — axe WCAG AA contrast (≥4.5:1) on all shell surfaces */
 
   /* ── Accents (mandatory palette) ──────────────────────────── */
   --os-blue: #287bff;

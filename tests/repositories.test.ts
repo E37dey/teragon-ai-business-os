@@ -124,7 +124,9 @@ describe("factory + seedIfEmpty boot path", () => {
 
   it("seeds every empty collection once; second run is a no-op", async () => {
     const seeded = await seedIfEmpty();
-    expect(seeded.length).toBe(COLLECTIONS.length);
+    // only collections with a non-empty seed are seeded ("notifications" is derived at boot)
+    const seedable = COLLECTIONS.filter((c) => SEED[c].length > 0);
+    expect(seeded.length).toBe(seedable.length);
     const leads = await getRepository("leads").list();
     expect(leads.length).toBe(SEED.leads.length);
     const again = await seedIfEmpty();

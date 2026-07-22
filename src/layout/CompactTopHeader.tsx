@@ -24,6 +24,8 @@ export interface CompactTopHeaderProps {
   mailCount?: number;
   /** Global search submit. */
   onSearch?: (query: string) => void;
+  /** Called when the search box gains focus (opens the global search overlay). */
+  onSearchOpen?: () => void;
   searchPlaceholder?: string;
   /** Extra inline-end actions slot. */
   actions?: ReactNode;
@@ -65,6 +67,7 @@ export function CompactTopHeader({
   onMail,
   mailCount,
   onSearch,
+  onSearchOpen,
   searchPlaceholder = "חיפוש חכם בכל המערכת…",
   actions,
   className = "",
@@ -134,7 +137,7 @@ export function CompactTopHeader({
         {actions}
       </div>
 
-      <div className="os-header__search">
+      <div className="os-header__search" onFocusCapture={onSearchOpen}>
         <SearchInput
           value={query}
           onChange={setQuery}

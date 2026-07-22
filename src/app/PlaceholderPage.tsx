@@ -32,7 +32,7 @@ export default function PlaceholderPage({ title, wave, path }: PlaceholderPagePr
           border: "1px solid rgba(112,158,220,.17)",
           borderRadius: "999px",
           padding: "0.15rem 0.7rem",
-          color: "#65758B",
+          color: "#75879F",
         }}
       >
         נתוני הדגמה · מצב הדגמה מקומי
@@ -41,7 +41,7 @@ export default function PlaceholderPage({ title, wave, path }: PlaceholderPagePr
       <p style={{ margin: 0 }}>
         המסך ייבנה בגל {wave}. בשלב זה מוצג עמוד מחזיק־מקום כן — ללא תוכן מדומה.
       </p>
-      <code dir="ltr" style={{ color: "#65758B", fontSize: "0.8rem" }}>
+      <code dir="ltr" style={{ color: "#75879F", fontSize: "0.8rem" }}>
         {path}
       </code>
       <Link to="/" style={{ color: "#20C4E8", marginBlockStart: "0.5rem" }}>

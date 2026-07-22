@@ -6,7 +6,8 @@ import { BaseRepository, DuplicateIdError, NotFoundError } from "./Repository";
 import { COLLECTIONS } from "./collections";
 
 export const IDB_NAME = "teragon-os";
-export const IDB_VERSION = 1;
+// v2: + "notifications" object store (Wave 2 notification center)
+export const IDB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
 

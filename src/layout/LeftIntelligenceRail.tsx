@@ -9,23 +9,37 @@ export interface LeftIntelligenceRailProps {
   /** Slot content — agent card, trace, evidence, approvals… per screen. */
   children?: ReactNode;
   collapsible?: boolean;
+  /** Uncontrolled initial state. */
   defaultCollapsed?: boolean;
+  /** Controlled mode: pass both `collapsed` and `onToggleCollapsed` (persisted by the shell). */
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
   className?: string;
 }
 
 /**
  * LeftIntelligenceRail — the contextual intelligence rail at the inline-end
  * (physical left in RTL), ~300px. A pure slot container: each screen fills
- * it with its own contextual content. Collapsible.
+ * it with its own contextual content. Collapsible; when collapsed an explicit
+ * restore button (chevron) stays visible.
  */
 export function LeftIntelligenceRail({
   title,
   children,
   collapsible = true,
   defaultCollapsed = false,
+  collapsed: collapsedProp,
+  onToggleCollapsed,
   className = "",
 }: LeftIntelligenceRailProps): ReactElement {
-  const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  const [collapsedState, setCollapsedState] = useState(defaultCollapsed);
+  const controlled = collapsedProp !== undefined;
+  const collapsed = controlled ? collapsedProp : collapsedState;
+
+  const toggle = (): void => {
+    if (onToggleCollapsed) onToggleCollapsed();
+    if (!controlled) setCollapsedState((c) => !c);
+  };
 
   return (
     <aside
@@ -38,7 +52,7 @@ export function LeftIntelligenceRail({
           <button
             type="button"
             className="os-close-btn"
-            onClick={() => setCollapsed((c) => !c)}
+            onClick={toggle}
             aria-expanded={!collapsed}
             aria-label={collapsed ? "פתיחת הסרגל" : "כיווץ הסרגל"}
             title={collapsed ? "פתיחת הסרגל" : "כיווץ הסרגל"}

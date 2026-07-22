@@ -9,6 +9,7 @@ import type {
   AgentMessage,
   AgentTask,
   AIRecommendation,
+  AppNotification,
   Approval,
   AuditEvent,
   Automation,
@@ -22,6 +23,7 @@ import type {
   ImplementationStage,
   KnowledgeNote,
   Lead,
+  Meeting,
   MemoryRecord,
   MetricDefinition,
   MetricObservation,
@@ -298,6 +300,17 @@ export const taskSchema = z.object({
   relatedRef: z.string().nullable(),
 }) satisfies z.ZodType<Task>;
 
+export const meetingSchema = z.object({
+  ...baseEntity,
+  title: z.string().min(1, "כותרת פגישה היא שדה חובה"),
+  scheduledAt: isoDate,
+  durationMinutes: z.number().positive("משך פגישה חייב להיות חיובי"),
+  location: z.string(),
+  participantIds: z.array(z.string()),
+  agenda: z.string(),
+  relatedRef: z.string().nullable(),
+}) satisfies z.ZodType<Meeting>;
+
 export const activitySchema = z.object({
   ...baseEntity,
   kind: z.string().min(1),
@@ -516,3 +529,32 @@ export const stageGateSchema = z.object({
   decidedAt: isoDate.nullable(),
   decidedById: z.string().nullable(),
 }) satisfies z.ZodType<StageGate>;
+
+// ---------- notifications (Wave 2) ----------
+
+export const notificationSeveritySchema = z.enum(["מידע", "אזהרה", "דחוף"]);
+
+export const notificationCategorySchema = z.enum([
+  "מכירות",
+  "משימות",
+  "שירות",
+  "מסמכים",
+  "למידה",
+  "סוכני AI",
+  "אוטומציות",
+]);
+
+export const notificationSchema = z.object({
+  ...baseEntity,
+  category: notificationCategorySchema,
+  title: z.string().min(1, "כותרת התראה היא שדה חובה"),
+  body: z.string(),
+  relatedEntity: z.object({
+    type: z.string().min(1),
+    id: z.string().min(1),
+    route: z.string().min(1),
+  }),
+  read: z.boolean(),
+  severity: notificationSeveritySchema,
+  ownerId: z.string().nullable(),
+}) satisfies z.ZodType<AppNotification>;
