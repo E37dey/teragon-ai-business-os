@@ -1,14 +1,16 @@
 // Wave 3 — מרכז הפיקוד (/): the operational home screen.
 // Every metric is derived from repository data via selectors — no hardcoded KPIs.
-// AI content is the seeded local demo trace, clearly labeled "מצב הדגמה מקומי".
+// W5-D (Phase 5.13): the agent-network band is LIVE engine data
+// (AgentNetworkLive), the decision center opens evidence/related records/
+// audit trails and drives the canonical ApprovalPanel for engine approvals.
 import { useState } from "react";
 import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
-  AgentCard,
   ConfidenceBar,
   EmptyState,
   KpiCard,
+  Modal,
   OsButton,
   OsIcon,
   Panel,
@@ -26,10 +28,13 @@ import { CEO_USER_ID, SEED_ANCHOR } from "@/repositories/seed";
 import type {
   Activity,
   Agent,
+  AgentConflict,
   AgentHandoff,
+  AgentMessage,
   AgentTask,
   AIRecommendation,
   Approval,
+  AuditEvent,
   Customer,
   Enrollment,
   Evidence,
@@ -41,6 +46,14 @@ import type {
   Task,
   User,
 } from "@/domain/types";
+import type { AgentRun } from "@/domain/agents";
+import { pendingApprovals } from "@/agents";
+import { ProviderStateBadge } from "@/components/ai";
+import { ApprovalPanel } from "@/components/approval";
+import { AgentNetworkLive } from "./AgentNetworkLive";
+import CopilotWorkspace from "@/modules/ai-copilot/CopilotWorkspace";
+import { CopilotProvider } from "@/modules/ai-copilot/copilotContext";
+import { useCopilot } from "@/modules/ai-copilot/copilotApi";
 import { dashboardKpis, salesFunnel, recentActivity } from "@/domain/selectors";
 import {
   followUpQueue,
@@ -61,16 +74,6 @@ const stack = (gap = "var(--os-space-4)"): CSSProperties => ({
   display: "grid",
   gap,
 });
-
-const AGENT_ACCENT: Record<string, OsAccent> = {
-  "ag-orchestrator": "blue",
-  "ag-hunter": "cyan",
-  "ag-fixer": "warning",
-  "ag-mentor": "violet",
-  "ag-nexa": "blue",
-  "ag-wiki": "cyan",
-  "ag-flow": "success",
-};
 
 function agentStatusChip(status: Agent["status"]): OsStatus {
   return status;
@@ -99,10 +102,18 @@ interface DecisionCardProps {
   agents: readonly Agent[];
   evidence: readonly Evidence[];
   onDecide: (rec: AIRecommendation, decision: "אושר" | "נדחה") => void;
+  onOpenDetails: (rec: AIRecommendation) => void;
   busy: boolean;
 }
 
-function DecisionCard({ rec, agents, evidence, onDecide, busy }: DecisionCardProps): ReactElement {
+function DecisionCard({
+  rec,
+  agents,
+  evidence,
+  onDecide,
+  onOpenDetails,
+  busy,
+}: DecisionCardProps): ReactElement {
   const agent = agents.find((a) => a.id === rec.agentId);
   const evidenceItems = evidence.filter((e) => rec.evidenceIds.includes(e.id));
   return (
@@ -166,6 +177,15 @@ function DecisionCard({ rec, agents, evidence, onDecide, busy }: DecisionCardPro
             דחה
           </OsButton>
         )}
+        <OsButton
+          variant="ghost"
+          size="sm"
+          icon="evidence"
+          onClick={() => onOpenDetails(rec)}
+          data-testid="decision-open-details"
+        >
+          פתח ראיות
+        </OsButton>
       </div>
     </Panel>
   );
@@ -236,10 +256,40 @@ function SidePanel({ title, children }: { title: string; children: ReactNode }):
   );
 }
 
+/**
+ * W5-D interim Copilot mount: until the lead wires CopilotProvider +
+ * CopilotWorkspace into OsShell (snippet in docs/integration-requests-w5d.md),
+ * the Command Center hosts the drawer so the Copilot is genuinely usable.
+ */
 export default function CommandCenterPage(): ReactElement {
+  return (
+    <CopilotProvider>
+      <CommandCenterInner />
+      <CopilotWorkspace />
+    </CopilotProvider>
+  );
+}
+
+function CopilotOpenButton(): ReactElement {
+  const { openCopilot } = useCopilot();
+  return (
+    <OsButton
+      variant="cyan"
+      size="sm"
+      icon="sparkle"
+      onClick={openCopilot}
+      data-testid="open-copilot"
+    >
+      AI Copilot
+    </OsButton>
+  );
+}
+
+function CommandCenterInner(): ReactElement {
   const { toast } = useToast();
   const invalidate = useInvalidateCollections();
   const [busyRec, setBusyRec] = useState<string | null>(null);
+  const [detailsRec, setDetailsRec] = useState<AIRecommendation | null>(null);
 
   const leadsQ = useCollection<Lead>("leads");
   const ticketsQ = useCollection<ServiceTicket>("serviceTickets");
@@ -257,6 +307,10 @@ export default function CommandCenterPage(): ReactElement {
   const evidenceQ = useCollection<Evidence>("evidence");
   const usersQ = useCollection<User>("users");
   const memoryQ = useCollection<MemoryRecord>("memoryRecords");
+  const agentRunsQ = useCollection<AgentRun>("agentRuns");
+  const agentMessagesQ = useCollection<AgentMessage>("agentMessages");
+  const agentConflictsQ = useCollection<AgentConflict>("agentConflicts");
+  const auditQ = useCollection<AuditEvent>("auditEvents");
 
   const queries = [
     leadsQ,
@@ -275,6 +329,10 @@ export default function CommandCenterPage(): ReactElement {
     evidenceQ,
     usersQ,
     memoryQ,
+    agentRunsQ,
+    agentMessagesQ,
+    agentConflictsQ,
+    auditQ,
   ];
   const isLoading = queries.some((q) => q.isLoading);
   const isError = queries.some((q) => q.isError);
@@ -295,6 +353,10 @@ export default function CommandCenterPage(): ReactElement {
   const evidence = evidenceQ.data ?? [];
   const users = usersQ.data ?? [];
   const memoryRecords = memoryQ.data ?? [];
+  const agentRuns = agentRunsQ.data ?? [];
+  const agentMessages = agentMessagesQ.data ?? [];
+  const agentConflicts = agentConflictsQ.data ?? [];
+  const auditEvents = auditQ.data ?? [];
 
   const today = todayIso();
   const greeting = greetingForHour(new Date().getHours());
@@ -307,6 +369,14 @@ export default function CommandCenterPage(): ReactElement {
   const timeline = todayTimeline(tasks, meetings, today);
   const pendingRecs = pendingRecommendations(recs, approvals);
   const feed = recentActivity(activities, 8);
+
+  // engine approvals — pending approvals that belong to persisted agent runs
+  const pendingEngineApprovals = pendingApprovals(approvals)
+    .map((a) => {
+      const run = agentRuns.find((r) => r.approvalIds.includes(a.id));
+      return run ? { approval: a, run } : null;
+    })
+    .filter((x): x is { approval: Approval; run: AgentRun } => x !== null);
 
   const userName = (id: string): string => users.find((u) => u.id === id)?.name ?? id;
 
@@ -434,6 +504,7 @@ export default function CommandCenterPage(): ReactElement {
                 נתוני הדגמה נזרעו לעוגן <span className="os-num">{dateHe(SEED_ANCHOR)}</span>
               </div>
               <div>ספק AI מרוחק: לא מחובר — כל הלוגיקה דטרמיניסטית מקומית</div>
+              <ProviderStateBadge provider="local-rules" />
             </div>
           </SidePanel>
         </div>
@@ -455,7 +526,10 @@ export default function CommandCenterPage(): ReactElement {
             מרכז הפיקוד של טרגון טכנולוגיות · {dateHe(today)}
           </div>
         </div>
-        <DemoBadge />
+        <div style={{ display: "flex", gap: "var(--os-space-2)", alignItems: "center" }}>
+          <CopilotOpenButton />
+          <DemoBadge />
+        </div>
       </div>
 
       {/* KPI strip — all values from dashboardKpis selectors */}
@@ -528,8 +602,47 @@ export default function CommandCenterPage(): ReactElement {
                   agents={agents}
                   evidence={evidence}
                   onDecide={(r, d) => void decide(r, d)}
+                  onOpenDetails={setDetailsRec}
                   busy={busyRec === rec.id}
                 />
+              ))
+            )}
+          </div>
+          {/* engine approvals — the canonical approval workflow (W5-D) */}
+          <div
+            style={{ ...stack("var(--os-space-3)"), marginBlockStart: "var(--os-space-4)" }}
+            data-testid="engine-approvals"
+          >
+            <SectionTitle
+              title="אישורי מנוע התזמור"
+              subtitle="בקשות אישור חיות מריצות סוכנים — ההחלטה דרך מנוע האישורים הקנוני"
+              icon="shield"
+            />
+            {pendingEngineApprovals.length === 0 ? (
+              <div style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-muted)" }}>
+                אין בקשות אישור ממתינות מריצות המנוע.{" "}
+                <Link to="/agents/collaboration" style={{ color: "var(--os-cyan)" }}>
+                  להרצת תרחיש בחדר התיאום ←
+                </Link>
+              </div>
+            ) : (
+              pendingEngineApprovals.map(({ approval, run }) => (
+                <div key={approval.id} style={stack("var(--os-space-2)")}>
+                  <div style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-text-2)" }}>
+                    ריצה: {run.goal} ·{" "}
+                    <Link to="/agents/collaboration" style={{ color: "var(--os-cyan)" }}>
+                      לריצה בחדר התיאום ←
+                    </Link>
+                  </div>
+                  <ApprovalPanel
+                    runId={run.id}
+                    approvalId={approval.id}
+                    compact
+                    onChanged={() =>
+                      void invalidate(["approvals", "agentRuns", "agentEvents", "auditEvents"])
+                    }
+                  />
+                </div>
               ))
             )}
           </div>
@@ -551,59 +664,17 @@ export default function CommandCenterPage(): ReactElement {
         </Panel>
       </div>
 
-      {/* agent network */}
-      <Panel variant="panel" style={{ padding: "var(--os-space-5)" }}>
-        <SectionTitle
-          title="רשת הסוכנים התפעולית"
-          subtitle="מצב הדגמה מקומי — האירועים נזרעו מראש; אף מודל שפה מרוחק אינו פועל"
-          icon="network"
-        />
-        <div
-          style={{
-            ...gridStyle("repeat(auto-fit, minmax(210px, 1fr))", "var(--os-space-3)"),
-            marginBlockStart: "var(--os-space-3)",
-          }}
-        >
-          {agents.map((a) => {
-            const openTasks = agentTasks.filter((t) => t.agentId === a.id);
-            const lastTask = openTasks[openTasks.length - 1];
-            const evidenceCount = lastTask ? lastTask.evidenceIds.length : null;
-            return (
-              <AgentCard
-                key={a.id}
-                name={a.name}
-                role={a.purpose.split(":")[0] ?? a.purpose}
-                accent={AGENT_ACCENT[a.id] ?? "blue"}
-                owner={userName(CEO_USER_ID)}
-                {...(lastTask ? { input: lastTask.title } : {})}
-                {...(lastTask ? { output: lastTask.status } : {})}
-                status={agentStatusChip(a.status)}
-                evidenceCount={evidenceCount}
-              />
-            );
-          })}
-        </div>
-        {handoffs.length > 0 && (
-          <div
-            style={{
-              marginBlockStart: "var(--os-space-4)",
-              display: "grid",
-              gap: "var(--os-space-2)",
-              fontSize: "var(--os-text-2xs, 11px)",
-              color: "var(--os-text-2)",
-            }}
-          >
-            <strong style={{ color: "var(--os-text)" }}>מסירות (Handoffs) אחרונות:</strong>
-            {handoffs.map((h: AgentHandoff) => (
-              <div key={h.id}>
-                {agents.find((a) => a.id === h.fromAgentId)?.name ?? h.fromAgentId} ←{" "}
-                {agents.find((a) => a.id === h.toAgentId)?.name ?? h.toAgentId} · {h.reason} ·{" "}
-                {dateTimeHe(h.at)}
-              </div>
-            ))}
-          </div>
-        )}
-      </Panel>
+      {/* agent network — LIVE engine data (W5-D Phase 5.13) */}
+      <AgentNetworkLive
+        agents={agents}
+        agentTasks={agentTasks}
+        runs={agentRuns}
+        approvals={approvals}
+        conflicts={agentConflicts}
+        messages={agentMessages}
+        handoffs={handoffs}
+        ownerName={userName(CEO_USER_ID)}
+      />
 
       {/* course / service / revenue */}
       <div style={gridStyle("repeat(auto-fit, minmax(260px, 1fr))")}>
@@ -800,6 +871,119 @@ export default function CommandCenterPage(): ReactElement {
           </div>
         </Panel>
       </div>
+
+      {/* decision details — evidence, related records, run link, audit trail */}
+      {detailsRec &&
+        (() => {
+          const rec = detailsRec;
+          const recEvidence = evidence.filter((e) => rec.evidenceIds.includes(e.id));
+          const relatedRun = agentRuns.find(
+            (r) => rec.approvalId !== null && r.approvalIds.includes(rec.approvalId),
+          );
+          const linkedTask = agentTasks.find((t) => t.approvalId === rec.approvalId);
+          const recAudit = auditEvents
+            .filter(
+              (a) =>
+                (rec.approvalId !== null && a.entityRef === `approval:${rec.approvalId}`) ||
+                a.entityRef === rec.entityRef ||
+                a.entityRef === `ai-recommendation:${rec.id}`,
+            )
+            .sort((a, b) => b.at.localeCompare(a.at));
+          return (
+            <Modal open onClose={() => setDetailsRec(null)} title={`ראיות והקשר: ${rec.title}`}>
+              <div style={stack("var(--os-space-3)")} data-testid="decision-details-modal">
+                <div style={{ fontSize: "var(--os-text-sm, 13px)", fontWeight: 600 }}>
+                  ראיות ({recEvidence.length})
+                </div>
+                {recEvidence.length === 0 ? (
+                  <div style={{ fontSize: "var(--os-text-2xs, 12px)", color: "var(--os-muted)" }}>
+                    לא צורפו רשומות ראיה להמלצה זו
+                  </div>
+                ) : (
+                  <ul
+                    style={{
+                      margin: 0,
+                      paddingInlineStart: "1.2em",
+                      fontSize: "var(--os-text-2xs, 12px)",
+                      color: "var(--os-text-2)",
+                      display: "grid",
+                      gap: 4,
+                    }}
+                  >
+                    {recEvidence.map((e) => (
+                      <li key={e.id}>
+                        {e.claim}{" "}
+                        <span className="os-ltr" style={{ color: "var(--os-muted)" }}>
+                          ({e.sourceRef})
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div style={{ fontSize: "var(--os-text-2xs, 12px)", color: "var(--os-text-2)" }}>
+                  <strong style={{ color: "var(--os-text)" }}>רשומה קשורה: </strong>
+                  {rec.entityRef ? (
+                    <span className="os-ltr">{rec.entityRef}</span>
+                  ) : (
+                    "לא קושרה רשומה"
+                  )}
+                  {linkedTask && (
+                    <>
+                      {" "}
+                      · משימת סוכן: {linkedTask.title} ({linkedTask.status})
+                    </>
+                  )}
+                </div>
+                <div style={{ fontSize: "var(--os-text-2xs, 12px)", color: "var(--os-text-2)" }}>
+                  <strong style={{ color: "var(--os-text)" }}>ריצת סוכן: </strong>
+                  {relatedRun ? (
+                    <Link to="/agents/collaboration" style={{ color: "var(--os-cyan)" }}>
+                      {relatedRun.goal} ({relatedRun.status}) — לחדר התיאום ←
+                    </Link>
+                  ) : (
+                    "ההמלצה אינה מקושרת לריצת מנוע (רשומת seed)"
+                  )}
+                </div>
+                {rec.approvalId !== null && relatedRun && (
+                  <ApprovalPanel
+                    runId={relatedRun.id}
+                    approvalId={rec.approvalId}
+                    compact
+                    onChanged={() =>
+                      void invalidate(["approvals", "agentRuns", "agentEvents", "auditEvents"])
+                    }
+                  />
+                )}
+                <div style={{ fontSize: "var(--os-text-sm, 13px)", fontWeight: 600 }}>
+                  יומן ביקורת ({recAudit.length})
+                </div>
+                {recAudit.length === 0 ? (
+                  <div style={{ fontSize: "var(--os-text-2xs, 12px)", color: "var(--os-muted)" }}>
+                    לא נרשמו אירועי ביקורת עבור המלצה זו
+                  </div>
+                ) : (
+                  <ul
+                    style={{
+                      margin: 0,
+                      paddingInlineStart: "1.2em",
+                      fontSize: "var(--os-text-2xs, 12px)",
+                      color: "var(--os-text-2)",
+                      display: "grid",
+                      gap: 4,
+                    }}
+                  >
+                    {recAudit.map((a) => (
+                      <li key={a.id}>
+                        <span className="os-num">{dateTimeHe(a.at)}</span> · {a.actor} ·{" "}
+                        <span className="os-ltr">{a.action}</span> — {a.details}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </Modal>
+          );
+        })()}
     </div>
   );
 }

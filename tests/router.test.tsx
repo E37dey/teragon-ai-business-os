@@ -47,7 +47,8 @@ describe("router smoke — all canonical paths render", () => {
   });
 
   it("placeholder pages state their wave honestly", () => {
-    mount("/agents");
-    expect(screen.getByText((t) => t.includes("המסך ייבנה בגל 5"))).toBeTruthy();
+    // W5-D built /agents — the wave-6 memory screen is still a placeholder
+    mount("/memory");
+    expect(screen.getByText((t) => t.includes("המסך ייבנה בגל 6"))).toBeTruthy();
   });
 });
