@@ -36,6 +36,8 @@ export interface AppShellProps {
   headerProps?: Omit<CompactTopHeaderProps, "user">;
   /** Copilot ask handler (wired in a later wave). */
   onAsk?: (text: string) => void;
+  /** Full replacement for the nav Copilot card (wired by the app). */
+  copilotSlot?: ReactNode;
   /** Center canvas content (the routed page). */
   children?: ReactNode;
   className?: string;
@@ -83,6 +85,7 @@ export function AppShell({
   railContent,
   headerProps,
   onAsk,
+  copilotSlot,
   children,
   className = "",
 }: AppShellProps): ReactElement {
@@ -102,6 +105,7 @@ export function AppShell({
         renderLink={renderLink}
         onNavigate={onNavigate}
         onAsk={onAsk}
+        copilotSlot={copilotSlot}
       />
       <div className="os-shell__main">
         <CompactTopHeader user={user} {...headerProps} />

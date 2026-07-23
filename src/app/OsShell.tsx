@@ -31,6 +31,10 @@ import {
 } from "./quick-create/QuickCreateHost";
 import { RailProvider } from "./rail";
 import { useRailContent } from "./railContext";
+import CopilotWorkspace from "@/modules/ai-copilot/CopilotWorkspace";
+import { CopilotProvider } from "@/modules/ai-copilot/copilotContext";
+import { useCopilot } from "@/modules/ai-copilot/copilotApi";
+import { GlowOrb } from "@/design-system";
 
 /** Honest default rail until each screen ships its contextual rail (PAGE_CONTRACT). */
 function DefaultRail() {
@@ -65,8 +69,33 @@ function RailSlot(): ReactElement {
 export default function OsShell(): ReactElement {
   return (
     <RailProvider>
-      <OsShellInner />
+      <CopilotProvider>
+        <OsShellInner />
+      </CopilotProvider>
     </RailProvider>
+  );
+}
+
+/** Nav Copilot card — opens the real Copilot workspace (W5-D integration). */
+function NavCopilotCard(): ReactElement {
+  const { openCopilot } = useCopilot();
+  return (
+    <button
+      type="button"
+      onClick={openCopilot}
+      className="os-copilot os-copilot--button"
+      aria-label="פתיחת AI Copilot"
+      data-testid="shell-open-copilot"
+    >
+      <GlowOrb size={56} accent="violet" />
+      <div>
+        <div className="os-copilot__title">AI Copilot</div>
+        <div className="os-copilot__sub">העוזר החכם שלך</div>
+      </div>
+      <div className="os-copilot__form" aria-hidden="true">
+        <span className="os-copilot__input">שאל כל דבר…</span>
+      </div>
+    </button>
   );
 }
 
@@ -221,6 +250,7 @@ function OsShellInner(): ReactElement {
             </button>
           ),
         }}
+        copilotSlot={<NavCopilotCard />}
         railContent={
           <LeftIntelligenceRail
             title="לוח הקשר"
@@ -270,6 +300,7 @@ function OsShellInner(): ReactElement {
         onClose={() => setQuickCreate(null)}
         onSelectKind={(kind) => setQuickCreate({ view: kind })}
       />
+      <CopilotWorkspace />
     </ToastProvider>
   );
 }

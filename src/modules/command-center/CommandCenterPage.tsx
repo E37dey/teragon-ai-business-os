@@ -51,8 +51,6 @@ import { pendingApprovals } from "@/agents";
 import { ProviderStateBadge } from "@/components/ai";
 import { ApprovalPanel } from "@/components/approval";
 import { AgentNetworkLive } from "./AgentNetworkLive";
-import CopilotWorkspace from "@/modules/ai-copilot/CopilotWorkspace";
-import { CopilotProvider } from "@/modules/ai-copilot/copilotContext";
 import { useCopilot } from "@/modules/ai-copilot/copilotApi";
 import { dashboardKpis, salesFunnel, recentActivity } from "@/domain/selectors";
 import {
@@ -256,18 +254,9 @@ function SidePanel({ title, children }: { title: string; children: ReactNode }):
   );
 }
 
-/**
- * W5-D interim Copilot mount: until the lead wires CopilotProvider +
- * CopilotWorkspace into OsShell (snippet in docs/integration-requests-w5d.md),
- * the Command Center hosts the drawer so the Copilot is genuinely usable.
- */
+// Copilot is provided app-wide by OsShell (W5-D integration complete).
 export default function CommandCenterPage(): ReactElement {
-  return (
-    <CopilotProvider>
-      <CommandCenterInner />
-      <CopilotWorkspace />
-    </CopilotProvider>
-  );
+  return <CommandCenterInner />;
 }
 
 function CopilotOpenButton(): ReactElement {
