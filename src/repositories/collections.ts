@@ -76,6 +76,27 @@ export const COLLECTIONS = [
   "learningRules",
   "learningRuleVersions",
   "learningRollbacks",
+  // Wave 7 — adoption programme
+  "implementationProgrammes",
+  "implementationMilestones",
+  "implementationRisks",
+  "implementationEvidence",
+  "implementationDecisions",
+  "rolloutWaves",
+  "pilotDefinitions",
+  "pilotResults",
+  // Wave 7 — submission & presentation
+  "submissionPackages",
+  "submissionDeliverables",
+  "submissionEvidence",
+  "submissionValidations",
+  "submissionBlockers",
+  "submissionSnapshots",
+  "presentationSections",
+  "presenterNotes",
+  "demoSteps",
+  "qualityValidations",
+  "objections",
   // Wave 6 — schema meta (migration bookkeeping)
   "meta",
 ] as const;
