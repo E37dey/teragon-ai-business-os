@@ -1,8 +1,11 @@
 // Wave 3 — the 10-step RTL sales journey, layered over the coarse
-// OpportunityStage of the domain. The fine-grained journey position is
-// persisted in localStorage per opportunity; the coarse stage is persisted
-// on the Opportunity record itself — both survive reload.
+// OpportunityStage of the domain. Wave 6 (m003): the canonical home of the
+// fine-grained position is Opportunity.journeyStepId (extension typing in
+// src/integration/domainExtensions.ts until the lead folds it into
+// domain/types.ts); the legacy localStorage map remains a read fallback for
+// un-migrated data and is NOT deleted this wave.
 import type { Opportunity, OpportunityStage } from "@/domain/types";
+import type { OpportunityX } from "@/integration/domainExtensions";
 
 export interface JourneyStep {
   id: string;
@@ -86,9 +89,13 @@ export function saveJourneyPositions(
   }
 }
 
-/** resolve the journey step of an opportunity (stored fine position, else derived). */
+/**
+ * Resolve the journey step of an opportunity: canonical field (m003) →
+ * legacy localStorage position → derived from the coarse stage.
+ */
 export function journeyStepOf(opp: Opportunity, positions: JourneyPositions): string {
-  const stored = positions[opp.id];
+  const canonical = (opp as OpportunityX).journeyStepId;
+  const stored = canonical && stepIndex(canonical) !== -1 ? canonical : positions[opp.id];
   if (stored && stepIndex(stored) !== -1) {
     // the stored fine position must not contradict a more advanced coarse stage
     const derived = defaultStepForStage(opp.stage);

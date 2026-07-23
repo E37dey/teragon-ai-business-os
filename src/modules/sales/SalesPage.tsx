@@ -18,6 +18,7 @@ import { useCollection, useInvalidateCollections } from "@/app/data/hooks";
 import { getRepository, nextId } from "@/repositories";
 import { CEO_USER_ID } from "@/repositories/seed";
 import type { Opportunity, PrinterModel, Product, Quotation, User } from "@/domain/types";
+import type { OpportunityX } from "@/integration/domainExtensions";
 import { quotationSchema } from "@/domain/schemas";
 import { ils, dateHe, todayIso } from "@/modules/quotations/fmt";
 import {
@@ -98,15 +99,15 @@ export default function SalesPage(): ReactElement {
     }
     const nextPositions = { ...positions, [opp.id]: next.id };
     setPositions(nextPositions);
+    // legacy convenience mirror only (m003) — the record field is canonical
     saveJourneyPositions(nextPositions);
     try {
-      if (next.stage !== opp.stage) {
-        await getRepository<Opportunity>("opportunities").update(opp.id, {
-          stage: next.stage,
-          updatedAt: new Date().toISOString(),
-        });
-        await invalidate(["opportunities"]);
-      }
+      await getRepository<OpportunityX>("opportunities").update(opp.id, {
+        journeyStepId: next.id,
+        ...(next.stage !== opp.stage ? { stage: next.stage } : {}),
+        updatedAt: new Date().toISOString(),
+      });
+      await invalidate(["opportunities"]);
       toast(`«${opp.name}» קודמה לשלב «${next.label}»`, "success");
     } catch {
       toast("שמירת השלב נכשלה — נסו שוב", "danger");

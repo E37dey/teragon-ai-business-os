@@ -42,6 +42,8 @@ import {
 } from "@/modules/quotations/quoteMath";
 import { openQuotationPrintView } from "@/modules/quotations/printView";
 import { ils, dateHe, todayIso } from "@/modules/quotations/fmt";
+import type { QuotationX } from "@/integration/domainExtensions";
+import { loadLegacyVersions, quotationVersion } from "@/integration/quotationVersions";
 
 const railTitle: CSSProperties = {
   fontSize: "var(--os-text-2xs, 11px)",
@@ -73,28 +75,9 @@ function statusChip(status: QuotationStatus): ReactElement {
   return <StatusChip status={m.chip} label={m.label} />;
 }
 
-// version state — module-local edit counter per quotation (localStorage)
-const VERSIONS_KEY = "teragon-w3.quotations.versions";
-function loadVersions(): Record<string, number> {
-  try {
-    const raw = localStorage.getItem(VERSIONS_KEY);
-    const parsed: unknown = raw ? JSON.parse(raw) : {};
-    return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, number>) : {};
-  } catch {
-    return {};
-  }
-}
-function bumpVersion(id: string): number {
-  const versions = loadVersions();
-  const next = (versions[id] ?? 1) + 1;
-  versions[id] = next;
-  try {
-    localStorage.setItem(VERSIONS_KEY, JSON.stringify(versions));
-  } catch {
-    // convenience only
-  }
-  return next;
-}
+// version state — Wave 6 (m004): the canonical counter is Quotation.version;
+// the legacy localStorage map is read-only fallback for un-migrated records
+// and is no longer written.
 
 type StatusFilter = QuotationStatus | "הכול";
 type ExpiryFilter = "הכול" | "פג בקרוב" | "פג תוקף";
@@ -130,7 +113,7 @@ export default function DocumentsPage(): ReactElement {
   const [docTypeFilter, setDocTypeFilter] = useState<"הכול" | "קובץ" | "קישור">("הכול");
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [discountError, setDiscountError] = useState<string | null>(null);
-  const [versions, setVersions] = useState<Record<string, number>>(() => loadVersions());
+  const [legacyVersions] = useState<Record<string, number>>(() => loadLegacyVersions());
   const [busy, setBusy] = useState(false);
 
   const pipeline = useMemo(() => revenuePipeline(quotations), [quotations]);
@@ -224,17 +207,18 @@ export default function DocumentsPage(): ReactElement {
     setBusy(true);
     try {
       const now = new Date().toISOString();
-      await getRepository<Quotation>("quotations").update(editor.quotation.id, {
+      // W6 m004: version is a canonical record field — incremented on save
+      const v = quotationVersion(editor.quotation, legacyVersions) + 1;
+      await getRepository<QuotationX>("quotations").update(editor.quotation.id, {
         title: editor.title.trim() || editor.quotation.title,
         customerName: editor.customerName.trim() || editor.quotation.customerName,
         lines: editor.lines,
         discountPercent: discountNum,
         validUntil: editor.validUntil,
         terms: editor.terms,
+        version: v,
         updatedAt: now,
       });
-      const v = bumpVersion(editor.quotation.id);
-      setVersions(loadVersions());
       await invalidate(["quotations", "notifications"]);
       toast(`ההצעה נשמרה (גרסה ${v})`, "success");
       setEditor(null);
@@ -500,7 +484,7 @@ export default function DocumentsPage(): ReactElement {
                     <span
                       style={{ fontSize: "var(--os-text-2xs, 10px)", color: "var(--os-muted)" }}
                     >
-                      גרסה <span className="os-num">{versions[q.id] ?? 1}</span>
+                      גרסה <span className="os-num">{quotationVersion(q, legacyVersions)}</span>
                     </span>
                   </span>
                 ),
@@ -640,7 +624,7 @@ export default function DocumentsPage(): ReactElement {
         <Modal
           open
           onClose={() => setEditor(null)}
-          title={`עריכת הצעה ${editor.quotation.id} (גרסה ${versions[editor.quotation.id] ?? 1})`}
+          title={`עריכת הצעה ${editor.quotation.id} (גרסה ${quotationVersion(editor.quotation, legacyVersions)})`}
           footer={
             <div style={{ display: "flex", gap: "var(--os-space-2)" }}>
               {busy ? (

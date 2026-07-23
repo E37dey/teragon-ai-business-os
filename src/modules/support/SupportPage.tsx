@@ -36,16 +36,17 @@ import { useCollection, useInvalidateCollections } from "@/app/data/hooks";
 import {
   categorize,
   championLoad,
-  parseSupport,
+  effectiveCategory,
+  effectiveSupport,
   recurringIssues,
   relatedKnowledge,
   RULES_ENGINE_LABEL,
   slaCompliancePercent,
   supportSla,
   TIER_INFO,
-  withSupportMarkers,
   type Tier,
 } from "./lib";
+import type { SupportRequestX } from "@/integration/domainExtensions";
 
 const kpiRowStyle: CSSProperties = {
   display: "grid",
@@ -372,14 +373,14 @@ function SupportQueue({
     {
       key: "tier",
       header: "שלב נוכחי",
-      render: (r) => tierChip(parseSupport(r.description).tier),
+      render: (r) => tierChip(effectiveSupport(r).tier),
     },
     {
       key: "category",
       header: "קטגוריה (כללים)",
       render: (r) => (
         <span style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-xs)" }}>
-          {categorize(r.subject, parseSupport(r.description).clean)}
+          {effectiveCategory(r)}
         </span>
       ),
     },
@@ -444,21 +445,22 @@ function RequestDrawer({
 }): ReactElement {
   const { toast } = useToast();
   const invalidate = useInvalidateCollections();
-  const parsed = parseSupport(request.description);
+  const parsed = effectiveSupport(request);
   const sla = supportSla(request, nowMs);
-  const category = categorize(request.subject, parsed.clean);
+  const category = effectiveCategory(request);
   const knowledge = relatedKnowledge(category, notes);
   const [resolution, setResolution] = useState(request.resolution);
   const [busy, setBusy] = useState(false);
   const closed = request.status === "נסגרה";
 
   async function update(
-    patch: Partial<Omit<SupportRequest, "id">>,
+    patch: Partial<Omit<SupportRequestX, "id">>,
     activityText: string,
   ): Promise<void> {
     setBusy(true);
     try {
-      const repo = getRepository<SupportRequest>("supportRequests");
+      // W6 m002: canonical fields — descriptions stay clean, no ⟦…⟧ markers
+      const repo = getRepository<SupportRequestX>("supportRequests");
       await repo.update(request.id, { ...patch, updatedAt: new Date().toISOString() });
       await logSupportActivity(activityText, `supportRequest:${request.id}`);
       await invalidate(["supportRequests", "activities"]);
@@ -525,12 +527,11 @@ function RequestDrawer({
                   const next = (parsed.tier + 1) as Tier;
                   void update(
                     {
-                      description: withSupportMarkers(
-                        parsed.clean,
-                        next,
-                        parsed.assigneeId,
-                        parsed.feedback,
-                      ),
+                      description: parsed.clean,
+                      tier: next,
+                      assigneeId: parsed.assigneeId,
+                      feedback: parsed.feedback,
+                      category,
                       status: "בטיפול",
                     },
                     `הפנייה «${request.subject}» הוסלמה ל-Tier ${next}`,
@@ -555,12 +556,11 @@ function RequestDrawer({
                   const u = users.find((x) => x.id === id);
                   void update(
                     {
-                      description: withSupportMarkers(
-                        parsed.clean,
-                        parsed.tier,
-                        id,
-                        parsed.feedback,
-                      ),
+                      description: parsed.clean,
+                      tier: parsed.tier,
+                      assigneeId: id,
+                      feedback: parsed.feedback,
+                      category,
                       status: request.status === "פתוחה" ? "בטיפול" : request.status,
                     },
                     `הפנייה «${request.subject}» שויכה ל${u?.name ?? "ללא מטפל"}`,
@@ -690,12 +690,11 @@ function RequestDrawer({
                 onClick={() => {
                   void update(
                     {
-                      description: withSupportMarkers(
-                        parsed.clean,
-                        parsed.tier,
-                        parsed.assigneeId,
-                        "חיובי",
-                      ),
+                      description: parsed.clean,
+                      tier: parsed.tier,
+                      assigneeId: parsed.assigneeId,
+                      feedback: "חיובי",
+                      category,
                     },
                     `נקלט משוב חיובי לפנייה «${request.subject}»`,
                   ).then(() => toast("המשוב נשמר", "success"));
@@ -710,12 +709,11 @@ function RequestDrawer({
                 onClick={() => {
                   void update(
                     {
-                      description: withSupportMarkers(
-                        parsed.clean,
-                        parsed.tier,
-                        parsed.assigneeId,
-                        "שלילי",
-                      ),
+                      description: parsed.clean,
+                      tier: parsed.tier,
+                      assigneeId: parsed.assigneeId,
+                      feedback: "שלילי",
+                      category,
                     },
                     `נקלט משוב שלילי לפנייה «${request.subject}»`,
                   ).then(() => toast("המשוב נשמר — כדאי לפתוח משימת מעקב", "warning"));
@@ -759,7 +757,8 @@ function NewRequestModal({
       return;
     }
     setBusy(true);
-    const repo = getRepository<SupportRequest>("supportRequests");
+    // W6 m002: new records are born with canonical fields, never markers
+    const repo = getRepository<SupportRequestX>("supportRequests");
     void repo
       .list()
       .then((all) => {
@@ -771,6 +770,10 @@ function NewRequestModal({
           ),
           subject: subject.trim(),
           description: description.trim(),
+          tier: 1,
+          assigneeId: null,
+          feedback: null,
+          category: categorize(subject.trim(), description.trim()),
           requesterId,
           channel,
           status: "פתוחה",

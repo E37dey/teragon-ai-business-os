@@ -1,8 +1,9 @@
 // Tasks module — pure derivations for the combined human+agent work queue.
-// The domain TaskStatus has 4 values; the operational board needs 6 work
-// states, so the extra states are persisted as a compact machine-readable
-// marker inside `description` (module-local workaround; the proper
-// `workState` field is an integration request). Unit-tested.
+// Wave 6 (m001): the canonical home of the 6 operational work states is the
+// persisted `workState`/`ownership` fields (module-local extension typing in
+// src/integration/domainExtensions.ts until the lead folds them into
+// domain/types.ts). Reading FALLS BACK to the legacy ⟦…⟧ description markers
+// for un-migrated records; new records never write markers. Unit-tested.
 import type {
   AgentTask,
   AgentTaskStatus,
@@ -11,6 +12,7 @@ import type {
   Task,
   TaskStatus,
 } from "@/domain/types";
+import type { TaskX } from "@/integration/domainExtensions";
 
 export const WORK_STATES = [
   "לביצוע",
@@ -58,10 +60,12 @@ export function withMarkers(clean: string, state: WorkState | null, shared: bool
   return parts.filter(Boolean).join(" ");
 }
 
-/** Effective board state of a human task. */
+/** Effective board state of a human task: canonical field → legacy marker → status. */
 export function taskWorkState(task: Task): WorkState {
   if (task.status === "הושלמה") return "הושלם";
   if (task.status === "בוטלה") return "הושלם";
+  const ext = (task as TaskX).workState;
+  if (ext && ext !== "הושלם" && (WORK_STATES as readonly string[]).includes(ext)) return ext;
   const { state } = parseMarkers(task.description);
   if (state) return state;
   return task.status === "בתהליך" ? "בביצוע" : "לביצוע";
@@ -99,8 +103,20 @@ export function agentTaskWorkState(status: AgentTaskStatus): WorkState {
   }
 }
 
+/** Shared-ownership flag: canonical field → legacy marker. */
+export function isSharedTask(task: Task): boolean {
+  const ext = (task as TaskX).ownership;
+  if (ext !== undefined) return ext === "משותפת";
+  return parseMarkers(task.description).shared;
+}
+
 export function taskOwnership(task: Task): OwnershipType {
-  return parseMarkers(task.description).shared ? "משימה משותפת" : "משימה אנושית";
+  return isSharedTask(task) ? "משימה משותפת" : "משימה אנושית";
+}
+
+/** Marker-free description for display/editing (migrated records are already clean). */
+export function cleanDescription(task: Task): string {
+  return parseMarkers(task.description).clean;
 }
 
 export type WorkItem =
