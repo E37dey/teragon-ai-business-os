@@ -83,10 +83,10 @@ describe("recordToMarkdown — safe serialization", () => {
 
   it("redacts provider-secret patterns from the body", () => {
     const { text, redactionCount } = redactSecrets(
-      "מפתח: sk-abc123def456ghij ועוד password: hunter22 וטקסט רגיל",
+      "מפתח: sk-FAKEabc123def456 ועוד password: hunter22 וטקסט רגיל",
     );
     expect(redactionCount).toBe(2);
-    expect(text).not.toContain("sk-abc123def456ghij");
+    expect(text).not.toContain("sk-FAKEabc123def456");
     expect(text).not.toContain("hunter22");
     expect(text).toContain("וטקסט רגיל");
   });

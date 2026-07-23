@@ -86,6 +86,9 @@ const INVALIDATE_KEYS: CollectionKey[] = [
   "agentEvents",
 ];
 
+// Module-level single-flight guard for the idempotent seed bridge (W6-F defect #1).
+let knowledgeSeedOnce: ReturnType<typeof ensureKnowledgeSeed> | null = null;
+
 const STATE_CHIP: Record<KnowledgeState, OsStatus> = {
   טיוטה: "מושבת",
   "ממתין לבדיקה": "דורש אישור",
@@ -129,12 +132,19 @@ export default function KnowledgePage(): ReactElement {
   const ticketsQ = useCollection<ServiceTicket>("serviceTickets");
   const coursesQ = useCollection<Course>("courses");
 
-  // idempotent seed bridge — Wave-1 notes → governed articles ("נתוני הדגמה")
+  // idempotent seed bridge — Wave-1 notes → governed articles ("נתוני הדגמה").
+  // Module-level single-flight guard prevents concurrent seeding races (W6-F defect #1).
   useEffect(() => {
     let cancelled = false;
-    void ensureKnowledgeSeed(knowledgeStores()).then(({ created }) => {
-      if (!cancelled && created > 0) void invalidate(INVALIDATE_KEYS);
-    });
+    knowledgeSeedOnce ??= ensureKnowledgeSeed(knowledgeStores());
+    knowledgeSeedOnce
+      .then(({ created }) => {
+        if (!cancelled && created > 0) void invalidate(INVALIDATE_KEYS);
+      })
+      .catch(() => {
+        // seed is idempotent; a transient failure retries on next mount
+        knowledgeSeedOnce = null;
+      });
     return () => {
       cancelled = true;
     };
@@ -502,7 +512,10 @@ function ArticleDrawer({
         {article.safetyNotes.length > 0 && (
           <Panel
             variant="raised"
-            style={{ padding: "var(--os-space-4)", borderInlineStart: "3px solid var(--os-warning)" }}
+            style={{
+              padding: "var(--os-space-4)",
+              borderInlineStart: "3px solid var(--os-warning)",
+            }}
           >
             <b style={{ fontSize: "var(--os-text-sm)" }}>הערות בטיחות</b>
             {article.safetyNotes.map((n) => (
@@ -597,7 +610,11 @@ function ArticleDrawer({
                       onClick={() =>
                         void run(
                           () =>
-                            governance().requestChanges(article.id, CEO_USER_ID, decisionNote.trim()),
+                            governance().requestChanges(
+                              article.id,
+                              CEO_USER_ID,
+                              decisionNote.trim(),
+                            ),
                           "הוחזר למחבר עם בקשת שינויים",
                         )
                       }
@@ -607,10 +624,22 @@ function ArticleDrawer({
                   </>
                 ) : (
                   <>
-                    <OsButton size="sm" variant="reject" icon="x" disabled disabledReason="דחייה מחייבת נימוק — כתבו אותו בשדה ההערה">
+                    <OsButton
+                      size="sm"
+                      variant="reject"
+                      icon="x"
+                      disabled
+                      disabledReason="דחייה מחייבת נימוק — כתבו אותו בשדה ההערה"
+                    >
                       דחייה
                     </OsButton>
-                    <OsButton size="sm" variant="ghost" icon="alert" disabled disabledReason="בקשת שינויים מחייבת נימוק — כתבו אותו בשדה ההערה">
+                    <OsButton
+                      size="sm"
+                      variant="ghost"
+                      icon="alert"
+                      disabled
+                      disabledReason="בקשת שינויים מחייבת נימוק — כתבו אותו בשדה ההערה"
+                    >
                       בקשת שינויים
                     </OsButton>
                   </>
@@ -627,7 +656,8 @@ function ArticleDrawer({
                   {...busyDisabled(busy)}
                   onClick={() =>
                     void run(
-                      () => governance().markNeedsUpdate(article.id, CEO_USER_ID, decisionNote.trim()),
+                      () =>
+                        governance().markNeedsUpdate(article.id, CEO_USER_ID, decisionNote.trim()),
                       "המאמר סומן «דורש עדכון» — התוקף הוסר עד בדיקה חוזרת",
                     )
                   }
@@ -635,7 +665,13 @@ function ArticleDrawer({
                   סימון דורש עדכון
                 </OsButton>
               ) : (
-                <OsButton size="sm" variant="ghost" icon="alert" disabled disabledReason="סימון «דורש עדכון» מחייב נימוק — כתבו אותו בשדה ההערה">
+                <OsButton
+                  size="sm"
+                  variant="ghost"
+                  icon="alert"
+                  disabled
+                  disabledReason="סימון «דורש עדכון» מחייב נימוק — כתבו אותו בשדה ההערה"
+                >
                   סימון דורש עדכון
                 </OsButton>
               ))}
@@ -656,7 +692,13 @@ function ArticleDrawer({
                 העברה לארכיון
               </OsButton>
             ) : (
-              <OsButton size="sm" variant="ghost" icon="inbox" disabled disabledReason="המאמר כבר בארכיון">
+              <OsButton
+                size="sm"
+                variant="ghost"
+                icon="inbox"
+                disabled
+                disabledReason="המאמר כבר בארכיון"
+              >
                 העברה לארכיון
               </OsButton>
             )}
@@ -701,7 +743,10 @@ function ArticleDrawer({
 
         {/* versions + comparison */}
         <div>
-          <SectionTitle icon="doc" title={`גרסאות (${articleVersions.length}) — בלתי ניתנות לשינוי`} />
+          <SectionTitle
+            icon="doc"
+            title={`גרסאות (${articleVersions.length}) — בלתי ניתנות לשינוי`}
+          />
           {articleVersions.length === 0 && (
             <div style={{ color: "var(--os-muted)", fontSize: "var(--os-text-sm)" }}>
               עדיין אין גרסה חתומה — גרסה נוצרת באישור הראשון.
@@ -941,7 +986,13 @@ function QuestionsPanel({
           >
             שאל את סוכן הידע
           </OsButton>
-          <OsButton size="sm" variant="ghost" icon="plus" {...busyDisabled(busy)} onClick={() => void saveQuestion()}>
+          <OsButton
+            size="sm"
+            variant="ghost"
+            icon="plus"
+            {...busyDisabled(busy)}
+            onClick={() => void saveQuestion()}
+          >
             הוספה לתור
           </OsButton>
         </div>
@@ -989,7 +1040,11 @@ function QuestionsPanel({
               <div style={{ fontSize: "var(--os-text-xs)" }}>
                 מקורות:{" "}
                 {answer.sources.map((s) => (
-                  <span key={s.articleId} className="os-chip os-chip--blue" style={{ marginInlineEnd: 4 }}>
+                  <span
+                    key={s.articleId}
+                    className="os-chip os-chip--blue"
+                    style={{ marginInlineEnd: 4 }}
+                  >
                     {s.titleHe} · v{s.version}
                   </span>
                 ))}
@@ -1109,7 +1164,10 @@ function ContradictionPanel({
               ⚡ {c.overlapKeyHe} — {c.articleIds.map(titleOf).join(" ↔ ")}
             </b>
             {c.claims.map((cl) => (
-              <div key={cl.articleId} style={{ fontSize: "var(--os-text-xs)", color: "var(--os-text-2)" }}>
+              <div
+                key={cl.articleId}
+                style={{ fontSize: "var(--os-text-xs)", color: "var(--os-text-2)" }}
+              >
                 «{titleOf(cl.articleId)}» (v{cl.articleVersion}): {cl.claimHe}
               </div>
             ))}
@@ -1127,17 +1185,35 @@ function ContradictionPanel({
                   onChange={(e) => setResolveNote(e.target.value)}
                 />
                 {resolveNote.trim() ? (
-                  <OsButton size="sm" variant="approve" icon="check" {...busyDisabled(busy)} onClick={() => void resolve(c.id)}>
+                  <OsButton
+                    size="sm"
+                    variant="approve"
+                    icon="check"
+                    {...busyDisabled(busy)}
+                    onClick={() => void resolve(c.id)}
+                  >
                     סגירת הסתירה עם נימוק
                   </OsButton>
                 ) : (
-                  <OsButton size="sm" variant="approve" icon="check" disabled disabledReason="סגירת סתירה מחייבת נימוק">
+                  <OsButton
+                    size="sm"
+                    variant="approve"
+                    icon="check"
+                    disabled
+                    disabledReason="סגירת סתירה מחייבת נימוק"
+                  >
                     סגירת הסתירה עם נימוק
                   </OsButton>
                 )}
               </div>
             ) : (
-              <OsButton size="sm" variant="ghost" icon="check" {...busyDisabled(busy)} onClick={() => setResolvingId(c.id)}>
+              <OsButton
+                size="sm"
+                variant="ghost"
+                icon="check"
+                {...busyDisabled(busy)}
+                onClick={() => setResolvingId(c.id)}
+              >
                 הכרעה…
               </OsButton>
             )}
@@ -1233,13 +1309,23 @@ function DraftEditorModal({
           <label className="os-qc-label" htmlFor="kd-title">
             כותרת
           </label>
-          <input id="kd-title" className="os-qc-input" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <input
+            id="kd-title"
+            className="os-qc-input"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
         </div>
         <div className="os-qc-field">
           <label className="os-qc-label" htmlFor="kd-category">
             קטגוריה
           </label>
-          <select id="kd-category" className="os-qc-input" value={category} onChange={(e) => setCategory(e.target.value)}>
+          <select
+            id="kd-category"
+            className="os-qc-input"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
             {KNOWLEDGE_CATEGORIES.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -1251,7 +1337,12 @@ function DraftEditorModal({
           <label className="os-qc-label" htmlFor="kd-summary">
             תקציר
           </label>
-          <input id="kd-summary" className="os-qc-input" value={summary} onChange={(e) => setSummary(e.target.value)} />
+          <input
+            id="kd-summary"
+            className="os-qc-input"
+            value={summary}
+            onChange={(e) => setSummary(e.target.value)}
+          />
         </div>
         <div className="os-qc-field">
           <label className="os-qc-label" htmlFor="kd-content">
@@ -1291,7 +1382,12 @@ function DraftEditorModal({
           <label className="os-qc-label" htmlFor="kd-materials">
             חומרים נתמכים (מופרדים בפסיק)
           </label>
-          <input id="kd-materials" className="os-qc-input" value={materials} onChange={(e) => setMaterials(e.target.value)} />
+          <input
+            id="kd-materials"
+            className="os-qc-input"
+            value={materials}
+            onChange={(e) => setMaterials(e.target.value)}
+          />
         </div>
         <div className="os-qc-field">
           <label className="os-qc-label" htmlFor="kd-troubleshooting">
@@ -1308,7 +1404,12 @@ function DraftEditorModal({
           <label className="os-qc-label" htmlFor="kd-safety">
             הערות בטיחות (מופרדות בפסיק)
           </label>
-          <input id="kd-safety" className="os-qc-input" value={safety} onChange={(e) => setSafety(e.target.value)} />
+          <input
+            id="kd-safety"
+            className="os-qc-input"
+            value={safety}
+            onChange={(e) => setSafety(e.target.value)}
+          />
         </div>
         {errors.map((e) => (
           <div key={e} className="os-qc-error">
@@ -1362,9 +1463,11 @@ function KnowledgeRail({
         <div style={railSub}>שימושי AI (רשומות אמת)</div>
         <RailRow label="סה״כ שימושים" value={stats.total} warn={false} />
         <RailRow label="שימושים שהוחלפו בגרסה חדשה" value={stats.superseded} warn={false} />
-        {[...stats.byAgent.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([agent, n]) => (
-          <RailRow key={agent} label={agent} value={n} warn={false} />
-        ))}
+        {[...stats.byAgent.entries()]
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([agent, n]) => (
+            <RailRow key={agent} label={agent} value={n} warn={false} />
+          ))}
       </div>
       <div>
         <div style={railSub}>כיסוי ראיות (מאמרים תקפים עם מקור)</div>
@@ -1379,7 +1482,15 @@ function KnowledgeRail({
   );
 }
 
-function RailRow({ label, value, warn }: { label: string; value: number; warn: boolean }): ReactElement {
+function RailRow({
+  label,
+  value,
+  warn,
+}: {
+  label: string;
+  value: number;
+  warn: boolean;
+}): ReactElement {
   return (
     <div
       style={{

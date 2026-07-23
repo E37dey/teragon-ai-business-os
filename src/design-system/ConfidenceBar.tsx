@@ -32,14 +32,17 @@ export function ConfidenceBar({
   const fillTone = tone ?? autoTone;
 
   return (
+    // a11y (W6-F trivial fix): role="meter" REQUIRES aria-valuenow — an
+    // unmeasured value must not claim the meter role (axe aria-required-attr,
+    // critical). Unmeasured renders as a labeled image; measured is a meter.
     <div
       className={`os-confidence ${className}`.trim()}
-      role="meter"
-      aria-label={label}
-      aria-valuemin={0}
-      aria-valuemax={100}
+      role={measured ? "meter" : "img"}
+      aria-label={measured ? label : `${label} — טרם נמדד`}
+      aria-valuemin={measured ? 0 : undefined}
+      aria-valuemax={measured ? 100 : undefined}
       aria-valuenow={measured ? pct : undefined}
-      aria-valuetext={measured ? `${pct}%` : "טרם נמדד"}
+      aria-valuetext={measured ? `${pct}%` : undefined}
     >
       <div className="os-confidence__head">
         <span className="os-confidence__label">{label}</span>

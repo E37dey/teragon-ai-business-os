@@ -1,6 +1,7 @@
 // Repository ⇄ TanStack Query bridge — the single read/invalidate layer the
 // shell (badges, search, notifications, quick-create) builds on. Screens in
 // later waves reuse the same keys, so one mutation invalidates everything.
+import { useCallback } from "react";
 import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import type { BaseEntity } from "@/domain/types";
 import { getRepository, type CollectionKey } from "@/repositories";
@@ -32,9 +33,13 @@ export function useInvalidateCollections(): (
   collections: readonly CollectionKey[],
 ) => Promise<void> {
   const qc = useQueryClient();
-  return async (collections) => {
-    await Promise.all(
-      collections.map((c) => qc.invalidateQueries({ queryKey: collectionQueryKey(c) })),
-    );
-  };
+  // stable identity — safe to use in effect deps (W6-F defect #1)
+  return useCallback(
+    async (collections) => {
+      await Promise.all(
+        collections.map((c) => qc.invalidateQueries({ queryKey: collectionQueryKey(c) })),
+      );
+    },
+    [qc],
+  );
 }

@@ -113,7 +113,11 @@ for (const file of distFiles) {
 // --------------------------------------------------------------------------
 // 6. bounded git-history scan for key-shaped additions
 // --------------------------------------------------------------------------
-const FAKE_MARKERS = /FAKE|EXAMPLE|PLACEHOLDER|test-model|sk-ant-api03-xxxx|your[-_]?key/i;
+// sk-abc123def456ghij: historical W6-B test fixture (commit 8416433) — renamed to
+// sk-FAKE… in the working tree; the old string remains in git history and is a
+// documented known-fake, never a real credential (WAVE_6_SECURITY_REPORT).
+const FAKE_MARKERS =
+  /FAKE|EXAMPLE|PLACEHOLDER|test-model|sk-ant-api03-xxxx|your[-_]?key|sk-abc123def456ghij/i;
 const HISTORY_PATTERNS = [
   { id: "sk-key", pickaxe: "sk-[A-Za-z0-9_-]{16,}" },
   { id: "aws-akia", pickaxe: "AKIA[A-Z0-9]{12,}" },
