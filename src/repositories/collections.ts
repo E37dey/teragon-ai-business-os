@@ -97,6 +97,22 @@ export const COLLECTIONS = [
   "demoSteps",
   "qualityValidations",
   "objections",
+  // Wave 8 — analytics
+  "reportDefinitions",
+  "reportRuns",
+  "metricAlerts",
+  "analyticsViews",
+  // Wave 8 — governance
+  "governancePolicies",
+  "governancePolicyVersions",
+  "governanceRisks",
+  "governanceIncidents",
+  "governanceReviews",
+  "promptVersions",
+  // Wave 8 — administration + health
+  "accessChangeRequests",
+  "accessReviews",
+  "healthSnapshots",
   // Wave 6 — schema meta (migration bookkeeping)
   "meta",
 ] as const;

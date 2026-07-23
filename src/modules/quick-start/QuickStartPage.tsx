@@ -30,9 +30,25 @@ const PRINT_CSS = `
   .qs-print-root { position: absolute; inset-inline-start: 0; inset-block-start: 0; inline-size: 100%; }
   .qs-no-print { display: none !important; }
   .qs-print-root { color: #000; background: #fff; }
+  .qs-print-header { display: block !important; }
 }
 @page { size: A4; margin: 14mm; }
+.qs-print-root { counter-reset: qspage; direction: rtl; }
+.qs-print-section { counter-increment: qspage; }
+.qs-print-section .qs-print-footer::after { content: "עמוד " counter(qspage); color: #555; font-size: 11px; }
+.qs-print-header { display: none; font-size: 11px; color: #333; border-block-end: 1px solid #ccc; padding-block-end: 4px; margin-block-end: 8px; }
 `;
+
+/** print-only metadata header (P-2 fix): product, version, date, owner, approval */
+function QsPrintHeader(): ReactElement {
+  return (
+    <div className="qs-print-header">
+      מוצר: TERAGON AI BUSINESS OS · טרגון טכנולוגיות · חומר tm-3 "התחלה מהירה" · תאריך הפקה:{" "}
+      {new Date().toISOString().slice(0, 10)} · בעלים: צחי זוסטייהם · מצב אישור: לפי רשומת החומר
+      במרכז ההדרכה
+    </div>
+  );
+}
 
 export interface QuickStartPageProps {
   /** presentation-view prop — start in full-screen-style presentation mode */
@@ -45,6 +61,7 @@ export default function QuickStartPage({ presentation = false }: QuickStartPageP
   return (
     <div className="qs-print-root" style={{ display: "grid", gap: "var(--os-space-6)" }}>
       <style>{PRINT_CSS}</style>
+      <QsPrintHeader />
       <PageRail>
         <QuickStartRail />
       </PageRail>

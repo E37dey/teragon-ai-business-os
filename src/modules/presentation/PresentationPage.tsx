@@ -69,6 +69,12 @@ const PRINT_CSS = `
   .pres-handout-section { break-inside: avoid; }
 }
 @page { size: A4; margin: 14mm; }
+
+@page { size: A4; margin: 14mm; }
+.pres-handout-root { counter-reset: prespage; direction: rtl; }
+.pres-handout-section { counter-increment: prespage; break-after: page; }
+.pres-handout-section .pres-handout-footer::after { content: "עמוד " counter(prespage); color: #555; font-size: 11px; }
+.pres-handout-header { font-size: 11px; color: #333; border-block-end: 1px solid #ccc; padding-block-end: 4px; margin-block-end: 8px; }
 `;
 
 export default function PresentationPage(): ReactElement {
@@ -833,6 +839,10 @@ function HandoutView({
         <b style={{ fontSize: "var(--os-text-lg)", color: "var(--os-text)" }}>
           מצגת ההגשה — מערכת טרגון · 5 שקפים · 10 דקות
         </b>
+        <span className="pres-handout-header">
+          מוצר: TERAGON AI BUSINESS OS · טרגון טכנולוגיות · תאריך הפקה:{" "}
+          {new Date().toISOString().slice(0, 10)} · בעלים: צחי זוסטייהם · מצב: דף עזר למרצה
+        </span>
         <span style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-xs)" }}>
           דף עזר למרצה — כולל יעדי זמן, מסרים מרכזיים, קישורי דמו וצילומי גיבוי.
         </span>
@@ -860,6 +870,7 @@ function HandoutView({
             <span style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-sm)" }}>
               מטרה: {s.objectiveHe}
             </span>
+            <span className="pres-handout-footer" aria-hidden="true" />
             <span style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-sm)" }}>
               מסר מרכזי: {s.mainMessageHe}
             </span>
