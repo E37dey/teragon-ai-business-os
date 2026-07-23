@@ -989,12 +989,15 @@ function NewTicketModal({
           </select>
         </div>
         <div className="os-qc-field">
-          <label className="os-qc-label" htmlFor="nt-printer">
+          <label
+            className="os-qc-label"
+            htmlFor={printerOptions.length > 0 ? "nt-printer-select" : "nt-printer-input"}
+          >
             מדפסת {printerOptions.length > 0 ? "(מהצי של הלקוח)" : "(הזנה ידנית)"}
           </label>
           {printerOptions.length > 0 ? (
             <select
-              id="nt-printer"
+              id="nt-printer-select"
               className="os-qc-input"
               value={printer}
               onChange={(e) => setPrinter(e.target.value)}
@@ -1008,7 +1011,7 @@ function NewTicketModal({
             </select>
           ) : (
             <input
-              id="nt-printer"
+              id="nt-printer-input"
               className="os-qc-input"
               placeholder="דגם המדפסת"
               value={printer}

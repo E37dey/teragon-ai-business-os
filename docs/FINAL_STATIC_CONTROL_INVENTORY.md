@@ -20,7 +20,7 @@
 | חומרה | כמות |
 |---|---|
 | high | 0 |
-| medium | 2 |
+| medium | 0 |
 | low | 5 |
 | info | 3 |
 
@@ -28,16 +28,14 @@
 
 | # | קובץ:שורה | בקרה | חומרה | חוק | סיבה | Owner | פתרון | בדיקת אימות |
 |---|---|---|---|---|---|---|---|---|
-| 1 | `src/design-system/Stepper.tsx:52` | <div onClick> | medium | R08 אלמנט לחיץ ללא מקלדת | אלמנט לחיץ ללא role=button + מטפל מקלדת | Lead (integration-requests-w9a) | בדיקה ידנית / החלטת Lead | e2e/final-interactions (per-route control walk) + tests/final-interactions |
-| 2 | `src/modules/service/ServicePage.tsx:1011` | id="nt-printer" | medium | R15 id כפול בקובץ | מזהה כפול id="nt-printer" מופיע 2 פעמים בקובץ | Lead (integration-requests-w9a) | בדיקה ידנית / החלטת Lead | e2e/final-interactions (per-route control walk) + tests/final-interactions |
-| 3 | `src/memory/import/ui/ImportPanel.tsx:236` | <OsButton> | low | R12 אישור לא דרך רשומות Approval | פעולת אישור ללא התייחסות נראית למנוע/רשומות אישור | Lead (integration-requests-w9a) | בדיקה ידנית / החלטת Lead | e2e/final-interactions (per-route control walk) + tests/final-interactions |
-| 4 | `src/modules/administration/AdministrationPage.tsx:453` | <OsButton> | low | R12 אישור לא דרך רשומות Approval | פעולת אישור ללא התייחסות נראית למנוע/רשומות אישור | Lead (integration-requests-w9a) | בדיקה ידנית / החלטת Lead | e2e/final-interactions (per-route control walk) + tests/final-interactions |
-| 5 | `src/modules/courses/CoursesPage.tsx:601` | <OsButton> | low | R12 אישור לא דרך רשומות Approval | פעולת אישור ללא התייחסות נראית למנוע/רשומות אישור | Lead (integration-requests-w9a) | בדיקה ידנית / החלטת Lead | e2e/final-interactions (per-route control walk) + tests/final-interactions |
-| 6 | `src/modules/customers/Customer360MemoryTab.tsx:253` | <OsButton> | low | R12 אישור לא דרך רשומות Approval | פעולת אישור ללא התייחסות נראית למנוע/רשומות אישור | Lead (integration-requests-w9a) | בדיקה ידנית / החלטת Lead | e2e/final-interactions (per-route control walk) + tests/final-interactions |
-| 7 | `src/modules/documents/DocumentsPage.tsx:517` | <OsButton> | low | R12 אישור לא דרך רשומות Approval | פעולת אישור ללא התייחסות נראית למנוע/רשומות אישור | Lead (integration-requests-w9a) | בדיקה ידנית / החלטת Lead | e2e/final-interactions (per-route control walk) + tests/final-interactions |
-| 8 | `src/app/commands/CommandPalette.tsx:95` | <div onClick> (overlay) | info | R08 אלמנט לחיץ ללא מקלדת | רקע לסגירה בלחיצה — סגירה במקלדת מטופלת ע"י ESC של הדיאלוג | Lead (integration-requests-w9a) | מקובל — מתועד | e2e/final-interactions (per-route control walk) + tests/final-interactions |
-| 9 | `src/design-system/Drawer.tsx:42` | <div onClick> (overlay) | info | R08 אלמנט לחיץ ללא מקלדת | רקע לסגירה בלחיצה — סגירה במקלדת מטופלת ע"י ESC של הדיאלוג | Lead (integration-requests-w9a) | מקובל — מתועד | e2e/final-interactions (per-route control walk) + tests/final-interactions |
-| 10 | `src/design-system/Modal.tsx:78` | <div onClick> (overlay) | info | R08 אלמנט לחיץ ללא מקלדת | רקע לסגירה בלחיצה — סגירה במקלדת מטופלת ע"י ESC של הדיאלוג | Lead (integration-requests-w9a) | מקובל — מתועד | e2e/final-interactions (per-route control walk) + tests/final-interactions |
+| 1 | `src/memory/import/ui/ImportPanel.tsx:236` | <OsButton> | low | R12 אישור לא דרך רשומות Approval | פעולת אישור ללא התייחסות נראית למנוע/רשומות אישור | Lead (integration-requests-w9a) | בדיקה ידנית / החלטת Lead | e2e/final-interactions (per-route control walk) + tests/final-interactions |
+| 2 | `src/modules/administration/AdministrationPage.tsx:453` | <OsButton> | low | R12 אישור לא דרך רשומות Approval | פעולת אישור ללא התייחסות נראית למנוע/רשומות אישור | Lead (integration-requests-w9a) | בדיקה ידנית / החלטת Lead | e2e/final-interactions (per-route control walk) + tests/final-interactions |
+| 3 | `src/modules/courses/CoursesPage.tsx:601` | <OsButton> | low | R12 אישור לא דרך רשומות Approval | פעולת אישור ללא התייחסות נראית למנוע/רשומות אישור | Lead (integration-requests-w9a) | בדיקה ידנית / החלטת Lead | e2e/final-interactions (per-route control walk) + tests/final-interactions |
+| 4 | `src/modules/customers/Customer360MemoryTab.tsx:253` | <OsButton> | low | R12 אישור לא דרך רשומות Approval | פעולת אישור ללא התייחסות נראית למנוע/רשומות אישור | Lead (integration-requests-w9a) | בדיקה ידנית / החלטת Lead | e2e/final-interactions (per-route control walk) + tests/final-interactions |
+| 5 | `src/modules/documents/DocumentsPage.tsx:517` | <OsButton> | low | R12 אישור לא דרך רשומות Approval | פעולת אישור ללא התייחסות נראית למנוע/רשומות אישור | Lead (integration-requests-w9a) | בדיקה ידנית / החלטת Lead | e2e/final-interactions (per-route control walk) + tests/final-interactions |
+| 6 | `src/app/commands/CommandPalette.tsx:95` | <div onClick> (overlay) | info | R08 אלמנט לחיץ ללא מקלדת | רקע לסגירה בלחיצה — סגירה במקלדת מטופלת ע"י ESC של הדיאלוג | Lead (integration-requests-w9a) | מקובל — מתועד | e2e/final-interactions (per-route control walk) + tests/final-interactions |
+| 7 | `src/design-system/Drawer.tsx:42` | <div onClick> (overlay) | info | R08 אלמנט לחיץ ללא מקלדת | רקע לסגירה בלחיצה — סגירה במקלדת מטופלת ע"י ESC של הדיאלוג | Lead (integration-requests-w9a) | מקובל — מתועד | e2e/final-interactions (per-route control walk) + tests/final-interactions |
+| 8 | `src/design-system/Modal.tsx:78` | <div onClick> (overlay) | info | R08 אלמנט לחיץ ללא מקלדת | רקע לסגירה בלחיצה — סגירה במקלדת מטופלת ע"י ESC של הדיאלוג | Lead (integration-requests-w9a) | מקובל — מתועד | e2e/final-interactions (per-route control walk) + tests/final-interactions |
 
 ## מקרא חוקים
 

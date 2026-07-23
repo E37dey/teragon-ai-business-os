@@ -250,7 +250,12 @@ function auditFile(rel, raw, push) {
       }
       const line = lineOf(text, index);
       const isOverlay = OVERLAY_RE.test(openTag);
-      const roleButton = /role=("|')button\1/.test(openTag);
+      // role may be static (role="button") or conditional
+      // (role={clickable ? "button" : "listitem"}) — both are genuine button
+      // emulation when a keyboard handler is present. Detection improvement,
+      // NOT a suppression: an element with no "button" role at all still fails.
+      const roleButton =
+        /role=("|')button\1/.test(openTag) || /role=\{[^}]*["']button["'][^}]*\}/.test(openTag);
       const hasKey = /onKeyDown|onKeyUp|onKeyPress/.test(openTag);
       const ariaHidden = /aria-hidden=("|')true\1/.test(openTag);
       if (isOverlay || ariaHidden) {
