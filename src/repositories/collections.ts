@@ -26,7 +26,24 @@ export const COLLECTIONS = [
   "activities",
   "documents",
   "knowledgeNotes",
+  // Wave 6 — knowledge governance
+  "knowledgeArticles",
+  "knowledgeSources",
+  "knowledgeVersions",
+  "knowledgeUsage",
+  "knowledgeConflicts",
+  "knowledgeQuestions",
+  "knowledgeReviews",
   "memoryRecords",
+  // Wave 6 — memory governance
+  "memoryProposals",
+  "memorySources",
+  "memoryLinks",
+  "memoryVersions",
+  "memoryUsage",
+  "memoryConflicts",
+  "memoryImportJobs",
+  "memoryExportJobs",
   "automations",
   "automationRuns",
   "agents",
@@ -51,6 +68,16 @@ export const COLLECTIONS = [
   "stageGates",
   "supportRequests",
   "notifications",
+  // Wave 6 — governed learning
+  "learningObservations",
+  "recommendationOutcomes",
+  "learningProposals",
+  "learningEvidence",
+  "learningRules",
+  "learningRuleVersions",
+  "learningRollbacks",
+  // Wave 6 — schema meta (migration bookkeeping)
+  "meta",
 ] as const;
 
 export type CollectionKey = (typeof COLLECTIONS)[number];
