@@ -1,0 +1,229 @@
+{
+  "generatedAt": "2026-07-23T22:31:42.016Z",
+  "totals": {
+    "minor": 2,
+    "moderate": 48,
+    "serious": 0,
+    "critical": 0
+  },
+  "byRule": {
+    "heading-order": {
+      "impact": "moderate",
+      "nodes": 12,
+      "routes": 12
+    },
+    "empty-table-header": {
+      "impact": "minor",
+      "nodes": 2,
+      "routes": 2
+    },
+    "page-has-heading-one": {
+      "impact": "moderate",
+      "nodes": 18,
+      "routes": 18
+    },
+    "landmark-unique": {
+      "impact": "moderate",
+      "nodes": 1,
+      "routes": 1
+    },
+    "landmark-one-main": {
+      "impact": "moderate",
+      "nodes": 1,
+      "routes": 1
+    },
+    "region": {
+      "impact": "moderate",
+      "nodes": 16,
+      "routes": 1
+    }
+  },
+  "perRoute": {
+    "/": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/crm": {
+      "minor": 1,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/customers": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/customers/cu-1": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/sales": {
+      "minor": 1,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/courses": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/service": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/printers": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/organizations": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/tasks": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/documents": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/automations": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/agents": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/agents/collaboration": {
+      "minor": 0,
+      "moderate": 0,
+      "serious": 0,
+      "critical": 0
+    },
+    "/memory": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/knowledge": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/learning": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/analytics": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/governance": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/implementation": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/personas": {
+      "minor": 0,
+      "moderate": 2,
+      "serious": 0,
+      "critical": 0
+    },
+    "/stage-gates": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/training-materials": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/quick-start": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/faq": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/support": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/administration": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/system-health": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/settings": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/submission": {
+      "minor": 0,
+      "moderate": 1,
+      "serious": 0,
+      "critical": 0
+    },
+    "/submission/presentation": {
+      "minor": 0,
+      "moderate": 18,
+      "serious": 0,
+      "critical": 0
+    }
+  }
+}

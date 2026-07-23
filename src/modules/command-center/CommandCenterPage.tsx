@@ -593,7 +593,12 @@ function CommandCenterInner(): ReactElement {
             {pendingEngineApprovals.length === 0 ? (
               <div style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-muted)" }}>
                 אין בקשות אישור ממתינות מריצות המנוע.{" "}
-                <Link to="/agents/collaboration" style={{ color: "var(--os-cyan)" }}>
+                {/* underline: links inside a text block must not rely on colour alone
+                    (axe link-in-text-block, W9-C a11y fix) */}
+                <Link
+                  to="/agents/collaboration"
+                  style={{ color: "var(--os-cyan)", textDecoration: "underline" }}
+                >
                   להרצת תרחיש בחדר התיאום ←
                 </Link>
               </div>
@@ -602,7 +607,11 @@ function CommandCenterInner(): ReactElement {
                 <div key={approval.id} style={stack("var(--os-space-2)")}>
                   <div style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-text-2)" }}>
                     ריצה: {run.goal} ·{" "}
-                    <Link to="/agents/collaboration" style={{ color: "var(--os-cyan)" }}>
+                    {/* underline: see a11y note above (axe link-in-text-block) */}
+                    <Link
+                      to="/agents/collaboration"
+                      style={{ color: "var(--os-cyan)", textDecoration: "underline" }}
+                    >
                       לריצה בחדר התיאום ←
                     </Link>
                   </div>
