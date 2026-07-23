@@ -57,6 +57,23 @@ export type TicketPriority = "גבוהה" | "בינונית" | "נמוכה";
 
 export type TaskStatus = "פתוחה" | "בתהליך" | "הושלמה" | "בוטלה";
 
+/** Wave 6 (m001): the 6 operational board states — persisted, not marker-encoded. */
+export type TaskWorkState = "לביצוע" | "בביצוע" | "ממתין ללקוח" | "ממתין לאישור" | "חסום" | "הושלם";
+
+export type TaskOwnership = "אנושית" | "משותפת";
+
+/** Wave 6 (m005): persisted approval workflow state (agentEvents stay secondary truth). */
+export type ApprovalExtendedState =
+  | "pending"
+  | "approved"
+  | "edited"
+  | "rejected"
+  | "expired"
+  | "cancelled"
+  | "executed"
+  | "execution-failed"
+  | "rolled-back";
+
 export type CourseStatus = "פעיל" | "פתוח להרשמה" | "הסתיים" | "מלא";
 
 export type EnrollmentPayment = "שולם" | "ממתין";
@@ -183,6 +200,8 @@ export interface Opportunity extends BaseEntity {
   expectedClose: ISODate;
   ownerId: string;
   notes: string;
+  /** Wave 6 m003 — fine journey step ("j1".."j10"); null ⇒ derived from stage */
+  journeyStepId?: string | null;
 }
 
 export interface QuotationLine {
@@ -206,6 +225,8 @@ export interface Quotation extends BaseEntity {
   validUntil: ISODate;
   status: QuotationStatus;
   ownerId: string;
+  /** Wave 6 m004 — edit counter, starts at 1 */
+  version?: number;
 }
 
 export interface Product extends BaseEntity {
@@ -238,6 +259,10 @@ export interface CustomerPrinter extends BaseEntity {
   purchasedAt: ISODate;
   underWarranty: boolean;
   notes: string;
+  /** Wave 6 m007 — null = unknown (module policy derivation stays the fallback) */
+  warrantyUntil?: ISODate | null;
+  lastMaintenanceAt?: ISODate | null;
+  maintenanceIntervalDays?: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -310,6 +335,8 @@ export interface CourseSession extends BaseEntity {
   durationMinutes: number;
   zoomUrl: string;
   notes: string;
+  /** Wave 6 m007 — structured attendance (W4 request #4); [] = not recorded */
+  attendance?: { studentId: string; present: boolean }[];
 }
 
 export interface Assignment extends BaseEntity {
@@ -335,6 +362,8 @@ export interface ServiceTicket extends BaseEntity {
   openedAt: ISODate;
   ownerId: string;
   solution: string;
+  /** Wave 6 m007 — set for closed tickets; null = not closed / unknown */
+  closedAt?: ISODate | null;
 }
 
 export interface RepairAction extends BaseEntity {
@@ -359,6 +388,12 @@ export interface Task extends BaseEntity {
   ownerId: string;
   /** "customer:cu-3" style entity ref, or null */
   relatedRef: string | null;
+  /** Wave 6 m001 — canonical operational state; absent ⇒ derived from status */
+  workState?: TaskWorkState;
+  /** Wave 6 m001 — canonical ownership; absent ⇒ אנושית */
+  ownership?: TaskOwnership;
+  /** Wave 6 m001 — original ⟦…⟧ description preserved for rollback */
+  legacyMarker?: string;
 }
 
 export interface Meeting extends BaseEntity {
@@ -391,6 +426,8 @@ export interface Document extends BaseEntity {
   stageId: string | null;
   visible: boolean;
   ownerId: string;
+  /** Wave 6 m007 — direct customer link (W3 request #4) */
+  customerId?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -538,6 +575,8 @@ export interface Approval extends BaseEntity {
   decidedById: string | null;
   decidedAt: ISODate | null;
   note: string;
+  /** Wave 6 m005 */
+  extendedState?: ApprovalExtendedState;
 }
 
 export interface AuditEvent extends BaseEntity {
@@ -643,6 +682,12 @@ export interface SupportRequest extends BaseEntity {
   status: "פתוחה" | "בטיפול" | "נסגרה";
   priority: TicketPriority;
   resolution: string;
+  /** Wave 6 m002 */
+  tier?: 1 | 2 | 3;
+  assigneeId?: string | null;
+  category?: string;
+  feedback?: "חיובי" | "שלילי" | null;
+  legacyMarker?: string;
 }
 
 // ---------------------------------------------------------------------------
