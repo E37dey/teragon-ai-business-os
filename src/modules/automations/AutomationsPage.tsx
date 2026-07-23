@@ -25,6 +25,11 @@ import type { AIResponseEnvelopeV2 } from "@/domain/ai/envelope";
 import { CEO_USER_ID } from "@/repositories/seed";
 import { EnvelopeCard, getAgentEngine } from "@/components/ai";
 import { ApprovalPanel } from "@/components/approval";
+import { useEmergencyFlags } from "@/administration";
+import {
+  automationExecutionGate,
+  evaluateAutomationExecutionGate,
+} from "@/integration/wave8/automationExecutionGuard";
 import { dateTimeHe } from "@/modules/quotations/fmt";
 import {
   classifyTriggerOp,
@@ -79,6 +84,13 @@ export default function AutomationsPage(): ReactElement {
   const runsQ = useCollection<AutomationRun>("automationRuns");
   const approvalsQ = useCollection<Approval>("approvals");
 
+  // W8-E: the W8-C emergency flag `automation-execution-disable` blocks the
+  // execute path (reactive for the buttons; re-checked freshly inside the handler)
+  const { flags: emergencyFlags } = useEmergencyFlags();
+  const executionGate = evaluateAutomationExecutionGate(
+    emergencyFlags.automationExecutionDisabled,
+  );
+
   const isLoading = [automationsQ, runsQ, approvalsQ].some((q) => q.isLoading);
   const isError = [automationsQ, runsQ, approvalsQ].some((q) => q.isError);
 
@@ -125,6 +137,12 @@ export default function AutomationsPage(): ReactElement {
 
   const requestExecution = async (draft?: string): Promise<void> => {
     if (!selected) return;
+    // W8-E: honest refusal under the emergency flag — fresh read at call time
+    const gate = automationExecutionGate();
+    if (!gate.allowed) {
+      toast(gate.reasonHe ?? "הרצת אוטומציות מושבתת במצב חירום", "warning");
+      return;
+    }
     setBusy(true);
     try {
       const engine = getAgentEngine().approvalEngine;
@@ -424,12 +442,14 @@ export default function AutomationsPage(): ReactElement {
                       envelope={envelope}
                       actions={
                         envelope.approval.required ? (
-                          busy ? (
+                          busy || !executionGate.allowed ? (
                             <OsButton
                               variant="violet"
                               size="sm"
                               disabled
-                              disabledReason="בקשה נשלחת…"
+                              disabledReason={
+                                executionGate.reasonHe ?? "בקשה נשלחת…"
+                              }
                             >
                               בקש אישור לביצוע
                             </OsButton>
@@ -467,8 +487,13 @@ export default function AutomationsPage(): ReactElement {
                 >
                   <div style={{ display: "flex", gap: "var(--os-space-2)", flexWrap: "wrap" }}>
                     {selected.requiresApproval || hasExternalStep(selected) ? (
-                      busy ? (
-                        <OsButton variant="primary" disabled disabledReason="בקשה נשלחת…">
+                      busy || !executionGate.allowed ? (
+                        <OsButton
+                          variant="primary"
+                          disabled
+                          disabledReason={executionGate.reasonHe ?? "בקשה נשלחת…"}
+                          data-testid="request-run-approval-blocked"
+                        >
                           בקש אישור להרצה
                         </OsButton>
                       ) : (

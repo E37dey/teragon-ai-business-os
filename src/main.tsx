@@ -6,6 +6,7 @@ import { queryClient } from "./app/queryClient";
 import { createAppRouter } from "./app/router";
 import { seedIfEmpty } from "./repositories";
 import { runMigrationsAtBoot } from "./migrations";
+import { applyUiSettingsAtBoot } from "./integration/wave8/applyUiSettings";
 import { syncNotifications } from "./app/notifications/syncNotifications";
 import "./index.css";
 
@@ -14,6 +15,8 @@ async function boot() {
     await seedIfEmpty();
     // Wave 6: schema migrations (m001-m007) — idempotent, audited, never throws
     await runMigrationsAtBoot();
+    // Wave 8: apply persisted UI settings (density, page size) — never throws
+    await applyUiSettingsAtBoot();
     // idempotent: stable ids ⇒ refresh never duplicates, read-state survives
     await syncNotifications();
   } catch (err) {

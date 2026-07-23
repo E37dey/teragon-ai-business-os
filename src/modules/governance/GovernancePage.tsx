@@ -67,6 +67,10 @@ import {
 } from "@/governance";
 import { dateTimeHe } from "@/modules/quotations/fmt";
 import { governanceMetrics, incidentRows, policyRows, riskRows } from "./lib";
+import {
+  closeHealthIncident,
+  splitGovernanceIncidents,
+} from "@/integration/wave8/healthIncidents";
 
 const stack = (gap = "var(--os-space-4)"): CSSProperties => ({ display: "grid", gap });
 
@@ -235,7 +239,12 @@ export default function GovernancePage(): ReactElement {
   const policies = policiesQ.data ?? [];
   const versions = versionsQ.data ?? [];
   const risks = risksQ.data ?? [];
-  const incidents = incidentsQ.data ?? [];
+  // W8-E (integration-requests-w8d #4): the collection also hosts /system-health
+  // HealthIncident records (source:"system-health") — split so each shape
+  // renders in its own honest section.
+  const { governance: incidents, health: healthIncidents } = splitGovernanceIncidents(
+    incidentsQ.data ?? [],
+  );
   const reviews = reviewsQ.data ?? [];
   const prompts = promptsQ.data ?? [];
   const approvals = approvalsQ.data ?? [];
@@ -1363,6 +1372,80 @@ export default function GovernancePage(): ReactElement {
             </div>
           </div>
         )}
+
+        {/* W8-E — system-health incidents (source:"system-health", W8-D writer) */}
+        <div
+          style={{ ...stack("var(--os-space-2)"), marginBlockStart: "var(--os-space-4)" }}
+          data-testid="zone-health-incidents"
+        >
+          <SectionTitle
+            title="אירועי בריאות המערכת"
+            subtitle="רשומות שנפתחו מעמוד בריאות המערכת (source: system-health) — סגירה נרשמת ביומן הביקורת"
+            icon="alert"
+          />
+          {healthIncidents.length === 0 ? (
+            <div style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-muted)" }}>
+              לא נפתחו אירועי בריאות — עמוד בריאות המערכת פותח אירוע רק מרכיב במצב הדורש טיפול
+            </div>
+          ) : (
+            healthIncidents.map((hi) => (
+              <div
+                key={hi.id}
+                data-testid="health-incident-row"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: "var(--os-space-3)",
+                  border: "1px solid var(--os-border)",
+                  borderRadius: "var(--os-radius-sm, 6px)",
+                  paddingBlock: "var(--os-space-2)",
+                  paddingInline: "var(--os-space-3)",
+                  fontSize: "var(--os-text-sm, 13px)",
+                }}
+              >
+                <div style={{ display: "grid", gap: 2 }}>
+                  <span>{hi.titleHe}</span>
+                  <span style={{ color: "var(--os-muted)", fontSize: "var(--os-text-2xs, 11px)" }}>
+                    {hi.descriptionHe}
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: "var(--os-space-2)", alignItems: "center" }}>
+                  <StatusChip
+                    status={hi.status === "פתוח" ? "אזהרה" : "מושבת"}
+                    label={hi.status}
+                  />
+                  {hi.status === "פתוח" &&
+                    (busy ? (
+                      <OsButton size="sm" disabled disabledReason="הפעולה נשמרת…">
+                        סגור אירוע
+                      </OsButton>
+                    ) : (
+                      <OsButton
+                        size="sm"
+                        data-testid="health-incident-close"
+                        onClick={() =>
+                          void runAction("אירוע הבריאות נסגר", () =>
+                            closeHealthIncident(
+                              stores,
+                              {
+                                incidentId: hi.id,
+                                byId: CURRENT_USER.id,
+                                byName: CURRENT_USER.name,
+                              },
+                              clock,
+                            ),
+                          )
+                        }
+                      >
+                        סגור אירוע
+                      </OsButton>
+                    ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </Panel>
 
       <Panel variant="raised" style={{ padding: "var(--os-space-4)" }}>

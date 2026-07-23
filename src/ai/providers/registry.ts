@@ -12,6 +12,9 @@ import {
   type AIProvider,
   type AIProviderHealth,
 } from "@/ai/contracts/AIProvider";
+import type { AuditEvent } from "@/domain/types";
+import { getRepository } from "@/repositories/factory";
+import { nextId } from "@/repositories/Repository";
 
 export interface RegistryConfig {
   /** Mode B flag — remote provider may be attempted at all */
@@ -36,6 +39,44 @@ export interface ProviderUnavailable {
   messageHe: string;
 }
 
+// ---------------------------------------------------------------------------
+// W8-E (integration-requests-w8a #3) — fallback is AUDITED, never silent:
+// every disclosed remote→local fallback writes an AuditEvent with
+// action "ai.fallback" so the ai_fallbacks metric counts REAL events.
+// ---------------------------------------------------------------------------
+
+/** Canonical audit action for a disclosed provider fallback. */
+export const FALLBACK_AUDIT_ACTION = "ai.fallback";
+
+/** Injectable audit seam — tests inject a memory sink; production writes to auditEvents. */
+export interface FallbackAuditSink {
+  record(disclosure: FallbackDisclosure): Promise<void>;
+}
+
+/** Production sink: one AuditEvent per disclosed fallback into auditEvents. */
+export function repositoryFallbackAuditSink(
+  now: () => string = () => new Date().toISOString(),
+): FallbackAuditSink {
+  return {
+    async record(disclosure) {
+      const repo = getRepository<AuditEvent>("auditEvents");
+      const existing = await repo.list();
+      const ts = now();
+      await repo.create({
+        id: nextId("ai-fb", existing.map((a) => a.id)),
+        createdAt: ts,
+        updatedAt: ts,
+        at: ts,
+        actor: "system",
+        action: FALLBACK_AUDIT_ACTION,
+        entityRef: null,
+        details: `${disclosure.messageHe} (סיבה: ${disclosure.reason})`,
+        correlationId: null,
+      });
+    },
+  };
+}
+
 export interface ProviderSelection {
   /** null ⇔ unavailable is non-null (structured unavailability, no fake success) */
   provider: AIProvider | null;
@@ -57,11 +98,17 @@ export class ProviderRegistry {
   private readonly config: RegistryConfig;
   private readonly remote: AIProvider;
   private readonly local: AIProvider;
+  private readonly auditSink: FallbackAuditSink;
 
-  constructor(config: RegistryConfig, providers: { remote: AIProvider; local: AIProvider }) {
+  constructor(
+    config: RegistryConfig,
+    providers: { remote: AIProvider; local: AIProvider },
+    auditSink: FallbackAuditSink = repositoryFallbackAuditSink(),
+  ) {
     this.config = config;
     this.remote = providers.remote;
     this.local = providers.local;
+    this.auditSink = auditSink;
   }
 
   /**
@@ -102,9 +149,21 @@ export class ProviderRegistry {
     }
 
     if (this.config.localFallbackPermitted) {
+      const fallback: FallbackDisclosure = {
+        from: "remote",
+        reason: health.state,
+        messageHe: FALLBACK_MESSAGE_HE,
+      };
+      // W8-E: the fallback is audited (action "ai.fallback"); audit failure
+      // must never break the selection itself — degradation stays served.
+      try {
+        await this.auditSink.record(fallback);
+      } catch {
+        // audit is best-effort here; the disclosure object itself is mandatory
+      }
       return {
         provider: this.local,
-        fallback: { from: "remote", reason: health.state, messageHe: FALLBACK_MESSAGE_HE },
+        fallback,
         unavailable: null,
         remoteHealth: health,
       };

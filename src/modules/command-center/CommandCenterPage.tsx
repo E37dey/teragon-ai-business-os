@@ -50,6 +50,7 @@ import { pendingApprovals } from "@/agents";
 import { ProviderStateBadge } from "@/components/ai";
 import { ApprovalPanel } from "@/components/approval";
 import { AgentNetworkLive } from "./AgentNetworkLive";
+import { ManagementBand } from "./ManagementBand";
 import { MemoryBand } from "./MemoryBand";
 import { useCopilot } from "@/modules/ai-copilot/copilotApi";
 import { dashboardKpis, salesFunnel, recentActivity } from "@/domain/selectors";
@@ -541,6 +542,9 @@ function CommandCenterInner(): ReactElement {
           icon="graduation"
         />
       </div>
+
+      {/* W8-E — management band (Phase 8.13): derived attention items, click-through */}
+      <ManagementBand />
 
       {/* decision center + funnel */}
       <div style={gridStyle("minmax(0, 2fr) minmax(0, 1fr)")}>
