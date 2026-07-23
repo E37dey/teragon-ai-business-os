@@ -59,7 +59,10 @@ const PERSONA_VISUALS: Record<string, PersonaVisual> = {
 const ACCENT_VAR: Record<OsAccent, string> = {
   blue: "var(--os-blue)",
   cyan: "var(--os-cyan)",
-  violet: "var(--os-violet)",
+  // W7-G trivial a11y fix: --os-violet fails WCAG AA as TEXT on panels (axe
+  // color-contrast, serious, per-3 lane) — the palette ships a readable text
+  // variant for exactly this case (docs/WAVE_7_VISUAL_QA.md §axe)
+  violet: "var(--os-violet-text)",
   success: "var(--os-success)",
   warning: "var(--os-warning)",
   danger: "var(--os-danger)",

@@ -44,3 +44,6 @@
 - **נגישות**: `--os-muted` הובהר #65758b→#75879f (axe AA); axe על / = 0 serious/critical.
 - **Gate (רץ בפועל)**: oxlint 0/0 · tsc 0 · **149/149 unit** (46 חדשות) · build נקי · **20/20 Playwright e2e** (persist, badges, חיפוש Bambu+Enter, Ctrl+K⇒ליד+toast, התראות+persist, מקלדת, קונסול נקי /,/crm,/agents, axe) · צילומי 1920/2560/3840 + חיפוש/palette/התראות ב-docs/screenshots/wave2/.
 - דוחות: WAVE_2_INTEGRATION_REPORT.md · WAVE_2_TEST_RESULTS.md · WAVE_2_VISUAL_QA.md · WAVE_2_INTERACTION_AUDIT.md.
+
+## Wave 7 — DONE (23.07.2026)
+8 ראוטים הופעלו: /implementation /personas /stage-gates /training-materials /quick-start /faq /submission /submission/presentation (מסך מלא). ספירות קנוניות: 7/6/6/13/12/5 עם registry guards. שערים: 1342/1342 unit · 227/227 e2e · axe 0 serious · scanner CLEAN.

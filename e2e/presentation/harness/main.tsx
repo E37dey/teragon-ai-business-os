@@ -1,13 +1,15 @@
-// W7-F e2e harness — boots the REAL app with the EXACT router wiring the
-// integration queue requests from the lead:
-//   1. /submission/presentation is a TOP-LEVEL route OUTSIDE OsShell
-//      (true full-screen, like /design);
-//   2. the floating <ReturnToPresentation/> control is mounted app-wide.
-// Everything else is the canonical appRouteObjects untouched. Same boot path
-// as src/main.tsx (seedIfEmpty → migrations → notifications).
-import { StrictMode, Suspense } from "react";
+// W7-F e2e harness — boots the REAL app router. Originally this harness ADDED
+// the requested wiring itself (top-level /submission/presentation outside
+// OsShell + app-wide <ReturnToPresentation/>) because the canonical router did
+// not have it yet. Since the W7-F integration landed on main (AppTopLayout in
+// src/app/router.tsx now carries BOTH), re-adding them here duplicated the
+// return control (Playwright strict-mode violation — 3 w7f tests red on final
+// main). W7-G fix (documented in docs/WAVE_7_TEST_RESULTS.md §5): the harness
+// now consumes appRouteObjects untouched — it boots exactly what ships.
+// Same boot path as src/main.tsx (seedIfEmpty → migrations → notifications).
+import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { createBrowserRouter, Outlet, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import type { RouteObject } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/app/queryClient";
@@ -15,41 +17,12 @@ import { appRouteObjects } from "@/app/router";
 import { seedIfEmpty } from "@/repositories";
 import { runMigrationsAtBoot } from "@/migrations";
 import { syncNotifications } from "@/app/notifications/syncNotifications";
-import PresentationPage from "@/modules/presentation/PresentationPage";
-import { ReturnToPresentation } from "@/modules/presentation/ReturnToPresentation";
 import "@/index.css";
 
 function buildRoutes(): RouteObject[] {
-  const [shellRoute, ...rest] = appRouteObjects;
-  if (!shellRoute) throw new Error("appRouteObjects is empty");
-  // remove the nested placeholder — the top-level route below replaces it
-  const shellWithoutPresentation: RouteObject = {
-    ...shellRoute,
-    children: (shellRoute.children ?? []).filter((c) => c.path !== "submission/presentation"),
-  };
-  return [
-    {
-      // shared layout: every route renders + the app-wide floating return control
-      element: (
-        <>
-          <Outlet />
-          <ReturnToPresentation />
-        </>
-      ),
-      children: [
-        {
-          path: "/submission/presentation",
-          element: (
-            <Suspense fallback={<div className="os-route-loading" aria-busy="true" />}>
-              <PresentationPage />
-            </Suspense>
-          ),
-        },
-        shellWithoutPresentation,
-        ...rest,
-      ],
-    },
-  ];
+  // the canonical router already mounts the top-level presentation route and
+  // the app-wide floating return control (W7-F wiring, integrated on main)
+  return appRouteObjects;
 }
 
 async function boot(): Promise<void> {

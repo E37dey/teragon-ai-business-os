@@ -422,11 +422,13 @@ function DeliverablesGrid({
             <span>אישור: {ev.approvalStatusHe}</span>
             <span>מצגת: {ev.presentationStatusHe}</span>
             <span>
+              {/* W7-G trivial a11y fix: links inside text need underline, not
+                  color alone (axe link-in-text-block, serious) */}
               מסך תפעולי:{" "}
-              <Link to={ev.route} style={{ color: "var(--os-cyan)" }}>
+              <Link to={ev.route} style={{ color: "var(--os-cyan)", textDecoration: "underline" }}>
                 {ev.route}
               </Link>{" "}
-              · <Link to="/submission?print=1" style={{ color: "var(--os-cyan)" }}>הדפסה</Link>
+              · <Link to="/submission?print=1" style={{ color: "var(--os-cyan)", textDecoration: "underline" }}>הדפסה</Link>
             </span>
           </div>
           <div style={{ fontSize: "var(--os-text-xs)", color: "var(--os-text-2)" }}>
@@ -635,7 +637,12 @@ function SupportArtefactView({ sources }: { sources: SubmissionSources }): React
         </span>
         <span style={{ fontSize: "var(--os-text-xs)" }}>
           {artefact.links.map((l) => (
-            <Link key={l.route} to={l.route} style={{ color: "var(--os-cyan)", marginInlineEnd: 12 }}>
+            <Link
+              key={l.route}
+              to={l.route}
+              /* W7-G trivial a11y fix: underline — see axe link-in-text-block */
+              style={{ color: "var(--os-cyan)", marginInlineEnd: 12, textDecoration: "underline" }}
+            >
               {l.labelHe}
             </Link>
           ))}

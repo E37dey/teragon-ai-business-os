@@ -45,3 +45,17 @@
 | UI-wiring | C360 tab + CC band + 8 Copilot commands | main             | ✅        | 24 tests                                                          |
 | W6-F      | QA/Security/Visual                      | main             | ✅        | 11 security tests + 27 e2e + 39 screenshots + axe clean           |
 | Lead      | Integration                             | main             | ✅        | collections v4, routes, types diff, boot migrations, defect fixes |
+
+## Wave 7 (23.07.2026)
+
+| # | Agent | Role | State | Result |
+|---|-------|------|-------|--------|
+| INV | Content Inventory | donor matrix + C1-C13 contradictions | ✅ | הכרעות D-009/D-010 |
+| W7-A | Implementation | worktree fb407c3 → merge | ✅ | 66 tests |
+| W7-B | Personas + Matrix | worktree d076ec4 → merge | ✅ | 42 tests, C1 applied |
+| W7-C | Stage Gates | worktree 2b685b8 → merge | ✅ | 40 tests, G4 honest-block |
+| W7-D | Materials/QS/FAQ | worktree 9c40bd5 → merge | ✅ | 51 tests |
+| W7-E | Measurement + Submission | worktree f8c58fc → merge | ✅ | 60 tests, 0/12 honest |
+| W7-F | Presentation | worktree 9d6822b → merge | ✅ | 48 tests + 10 e2e |
+| W7-G | QA/Visual/Print | main | ✅ | 22 security tests + 84 e2e + 51 screenshots + axe clean |
+| Lead | Integration | main | ✅ | collections v5, 8 routes, top-level presentation, decisions |

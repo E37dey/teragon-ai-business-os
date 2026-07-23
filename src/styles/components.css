@@ -185,7 +185,10 @@
   border-color: rgba(236, 93, 104, 0.28);
 }
 .os-chip--muted {
-  color: var(--os-muted);
+  /* W7-G trivial a11y fix: --os-muted fails WCAG AA (axe color-contrast,
+     serious) on the lightened chip background over raised panels — use the
+     panel-safe secondary text token instead (docs/WAVE_7_VISUAL_QA.md §axe) */
+  color: var(--os-text-2);
   background: rgba(101, 117, 139, 0.12);
   border-color: rgba(101, 117, 139, 0.28);
 }
