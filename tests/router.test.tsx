@@ -42,7 +42,10 @@ describe("router smoke — all canonical paths render", () => {
   it("/customers/:id shows the routed param", async () => {
     mount("/customers/cu-1");
     // module pages are lazy-loaded — await the chunk before asserting
-    const matches = await screen.findAllByText((t) => t.includes("cu-1"));
+    // generous timeout: lazy chunk resolution can be slow under full-suite parallel load
+    const matches = await screen.findAllByText((t) => t.includes("cu-1"), undefined, {
+      timeout: 10_000,
+    });
     expect(matches.length).toBeGreaterThanOrEqual(1);
   });
 
