@@ -54,9 +54,13 @@ describe("router smoke — all canonical paths render", () => {
     expect(screen.getByText("העמוד לא נמצא")).toBeTruthy();
   });
 
-  it("placeholder pages state their wave honestly", () => {
-    // W6-A built /memory — the wave-9 system-health screen is still a placeholder
+  it("no placeholder pages remain — every canonical route is operational (Wave 8)", async () => {
+    // /system-health was the last placeholder; W8-D built it. Assert real content
+    // renders and the honest-placeholder marker is gone.
     mount("/system-health");
-    expect(screen.getByText((t) => t.includes("המסך ייבנה בגל 9"))).toBeTruthy();
+    await screen.findAllByText((t) => t.includes("בריאות המערכת"), undefined, {
+      timeout: 10_000,
+    });
+    expect(screen.queryByText((t) => t.includes("המסך ייבנה בגל"))).toBeNull();
   });
 });
