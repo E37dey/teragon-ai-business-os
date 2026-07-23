@@ -45,13 +45,18 @@ function seriesWithMaliciousTitle(titleHe: string): MetricSeries {
   };
 }
 
-describe("W9-B 9.6 — FINDING: current CSV exporter does not neutralize formulas", () => {
-  it("exports a =formula title verbatim (the vulnerability, pinned honestly)", () => {
+describe("W9-B 9.6 — RESOLVED: the analytics CSV exporter neutralizes formulas", () => {
+  // The W9-B finding was real: seriesToCsv() emitted a leading "=" verbatim.
+  // The Lead adopted csvSafeCell() inside src/analytics/csv.ts row(); this test
+  // now guards the FIX (a regression would flip it red again).
+  it("text-guards a =formula title so a spreadsheet cannot execute it", () => {
     const csv = seriesToCsv([seriesWithMaliciousTitle(INJECTION_TITLE)]);
-    // the raw formula reaches the cell — a spreadsheet would EXECUTE it
-    expect(csv).toContain(INJECTION_TITLE);
-    // and it is NOT text-guarded (no leading single quote)
-    expect(csv).not.toContain(`'${INJECTION_TITLE}`);
+    // the value is present but defused with a leading single quote
+    expect(csv).toContain(`'${INJECTION_TITLE}`);
+    // and it never appears as a bare formula at a cell boundary
+    expect(csv).not.toMatch(
+      new RegExp(`(^|,)"?${INJECTION_TITLE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "m"),
+    );
   });
 });
 

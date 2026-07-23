@@ -3,6 +3,7 @@
 // Only whitelisted metric fields are exported (no emails/phones/keys).
 import type { MetricSeries, ReportRun } from "@/domain/analytics";
 import { NOT_MEASURED_HE } from "@/domain/analytics";
+import { csvSafeCell } from "@/security";
 
 function esc(cell: string): string {
   if (/[",\n\r]/.test(cell)) return `"${cell.replaceAll('"', '""')}"`;
@@ -10,7 +11,14 @@ function esc(cell: string): string {
 }
 
 function row(cells: readonly (string | number | null)[]): string {
-  return cells.map((c) => (c === null ? "" : esc(String(c)))).join(",");
+  // W9-B finding: neutralize spreadsheet formula injection (= + - @ leading
+  // cells) BEFORE structural escaping. null still exports as an empty cell.
+  return cells
+    .map((c) => {
+      const safe = csvSafeCell(c);
+      return safe === null ? "" : esc(String(safe));
+    })
+    .join(",");
 }
 
 export const SERIES_CSV_HEADER = [
