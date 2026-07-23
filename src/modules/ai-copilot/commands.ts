@@ -10,6 +10,9 @@ import type { Course, Customer, Enrollment, Lead, Quotation, ServiceTicket } fro
 import type { AgentStores } from "@/repositories/agentStores";
 import { CEO_USER_ID } from "@/repositories/seed";
 import { selectProvider } from "@/components/ai/engine";
+import { wikiOps } from "@/agents/wiki";
+import { getMemoryEngine } from "@/memory/core/engine";
+import { CEO_NAME_HE } from "@/memory/adapters/legacyBridge";
 import {
   courseFitScanOp,
   quotationsNoResponseOp,
@@ -17,6 +20,17 @@ import {
   stuckStudentsOp,
   unansweredCustomersOp,
 } from "./ops";
+import {
+  customerMemorySummaryOp,
+  knowledgeContradictionsOp,
+  pendingLearningProposalsOp,
+  pendingMemoryProposalsOp,
+  proposeMemoryFromConversationOp,
+  recommendationEvidenceOp,
+  rejectedRecommendationsOp,
+  searchApprovedKnowledgeOp,
+  type MemoryOpResult,
+} from "./memoryOps";
 
 export const UNSUPPORTED_COMMAND_HE = "הפקודה אינה נתמכת עדיין";
 
@@ -33,12 +47,18 @@ export interface CommandExecContext {
   chips: CopilotContextChips;
   todayIso: string;
   signal?: AbortSignal;
+  /** the raw (normalized) user input — parameterized commands parse it (W6) */
+  inputText?: string;
+  /** derived summary of the current conversation (user messages) — W6 */
+  conversationSummaryHe?: string;
 }
 
 export interface AffectedRecord {
   type: string;
   id: string;
   labelHe: string;
+  /** navigable route to the actual record/module (W6 — evidence links) */
+  route?: string;
 }
 
 /** A draft that may proceed to the human approval gate. */
@@ -65,6 +85,8 @@ export interface CopilotCommand {
   /** where the operation runs — for the registry table + tests */
   binding: "provider" | "local" | "provider-or-local";
   operation: string;
+  /** extra deterministic matcher for parameterized commands (W6) */
+  matchesInput?(normalized: string): boolean;
   execute(ctx: CommandExecContext): Promise<CommandOutcome>;
 }
 
@@ -292,8 +314,138 @@ export const COPILOT_COMMANDS: readonly CopilotCommand[] = [
   },
 ] as const;
 
-/** Deterministic matcher — exact match after normalization, else null. */
+// ---------------------------------------------------------------------------
+// W6 WIRING (Phase 6.19) — 8 cross-domain commands over the governed
+// memory/knowledge/learning domains. Each maps to a DEFINED op in
+// memoryOps.ts (no free forwarding); Wiki answers pass the exact
+// NO_APPROVED_SOURCE_HE string through when no approved source exists.
+// ---------------------------------------------------------------------------
+
+const KNOWLEDGE_SEARCH_PREFIX_HE = "מצא ידע מאושר על";
+const KNOWLEDGE_SEARCH_CANONICAL_HE = `${KNOWLEDGE_SEARCH_PREFIX_HE} Warping`;
+
+function w6Outcome(result: MemoryOpResult): CommandOutcome {
+  return {
+    envelope: result.envelope,
+    fallback: null,
+    affected: result.affected,
+    proposedAction: null,
+  };
+}
+
+export const W6_MEMORY_COMMANDS: readonly CopilotCommand[] = [
+  {
+    id: "customer-memory",
+    textHe: "מה אנחנו יודעים על הלקוח הזה?",
+    descriptionHe:
+      "סיכום זיכרון הלקוח המאושר (מחייב צ'יפ לקוח) — פריטים רגישים נשארים מוסתרים",
+    binding: "local",
+    operation: "copilot.customer-memory",
+    async execute(ctx) {
+      return w6Outcome(await customerMemorySummaryOp(ctx.chips.customerId, ctx.stores));
+    },
+  },
+  {
+    id: "recommendation-evidence",
+    textHe: "אילו מקורות תומכים בהמלצה?",
+    descriptionHe: "רשומות הראיה המקושרות להמלצה (לפי צ'יפ ההקשר, אחרת העדכנית)",
+    binding: "local",
+    operation: "copilot.recommendation-evidence",
+    async execute(ctx) {
+      return w6Outcome(await recommendationEvidenceOp(ctx.chips, ctx.stores));
+    },
+  },
+  {
+    id: "knowledge-search",
+    textHe: KNOWLEDGE_SEARCH_CANONICAL_HE,
+    descriptionHe: 'חיפוש במאמרי ידע מאושרים בלבד — "מצא ידע מאושר על <נושא>"',
+    binding: "local",
+    operation: "wiki.search-approved",
+    matchesInput: (normalized) => normalized.startsWith(`${KNOWLEDGE_SEARCH_PREFIX_HE} `),
+    async execute(ctx) {
+      const raw = normalizeCommandText(ctx.inputText ?? KNOWLEDGE_SEARCH_CANONICAL_HE);
+      const topic = raw.startsWith(KNOWLEDGE_SEARCH_PREFIX_HE)
+        ? raw.slice(KNOWLEDGE_SEARCH_PREFIX_HE.length).trim()
+        : raw;
+      return w6Outcome(await searchApprovedKnowledgeOp(topic, wikiOps));
+    },
+  },
+  {
+    id: "knowledge-contradictions",
+    textHe: "הצג סתירות במאגר הידע",
+    descriptionHe: "סתירות פתוחות + זיהוי דטרמיניסטי של טענות חופפות במאמרים מאושרים",
+    binding: "local",
+    operation: "wiki.show-contradictions",
+    async execute() {
+      return w6Outcome(await knowledgeContradictionsOp(wikiOps));
+    },
+  },
+  {
+    id: "memory-propose-from-conversation",
+    textHe: "הצע פריט זיכרון מהשיחה",
+    descriptionHe: "בונה הצעת זיכרון מסיכום השיחה — נכנסת לתור האישורים (ללא כתיבה ישירה)",
+    binding: "local",
+    operation: "memory.propose-from-conversation",
+    async execute(ctx) {
+      const { stores, workflow } = getMemoryEngine();
+      return w6Outcome(
+        await proposeMemoryFromConversationOp(
+          ctx.conversationSummaryHe ?? "",
+          {
+            sources: stores.sources,
+            submitProposal: (input) => workflow.submitProposal(input),
+          },
+          { id: CEO_USER_ID, name: CEO_NAME_HE },
+        ),
+      );
+    },
+  },
+  {
+    id: "memory-pending-proposals",
+    textHe: "הצג הצעות זיכרון שממתינות לאישור",
+    descriptionHe: "הצעות הזיכרון הפתוחות בתור האישורים, עם קישורים",
+    binding: "local",
+    operation: "copilot.memory-pending-proposals",
+    async execute(ctx) {
+      return w6Outcome(await pendingMemoryProposalsOp(ctx.stores));
+    },
+  },
+  {
+    id: "learning-rejected-recommendations",
+    textHe: "אילו המלצות נדחו לאחרונה ולמה?",
+    descriptionHe: "המלצות שנדחו + הנימוק מרשומת האישור (נגזר מרשומות)",
+    binding: "local",
+    operation: "copilot.learning-rejected-recommendations",
+    async execute(ctx) {
+      return w6Outcome(await rejectedRecommendationsOp(ctx.stores));
+    },
+  },
+  {
+    id: "learning-pending-proposals",
+    textHe: "אילו תובנות ממתינות לבדיקת מנהל?",
+    descriptionHe: "הצעות למידה במצב ממתין — תובנה, מדגם, מאשר בשם וקישור",
+    binding: "local",
+    operation: "copilot.learning-pending-proposals",
+    async execute(ctx) {
+      return w6Outcome(await pendingLearningProposalsOp(ctx.stores));
+    },
+  },
+] as const;
+
+/** the full registry the workspace renders/matches (W5 + W6) */
+export const ALL_COPILOT_COMMANDS: readonly CopilotCommand[] = [
+  ...COPILOT_COMMANDS,
+  ...W6_MEMORY_COMMANDS,
+];
+
+/** Deterministic matcher — exact match after normalization, then declared
+ *  parameterized matchers (still deterministic); unmapped input ⇒ null. */
 export function matchCommand(input: string): CopilotCommand | null {
   const normalized = normalizeCommandText(input);
-  return COPILOT_COMMANDS.find((c) => normalizeCommandText(c.textHe) === normalized) ?? null;
+  if (normalized.length === 0) return null;
+  return (
+    ALL_COPILOT_COMMANDS.find((c) => normalizeCommandText(c.textHe) === normalized) ??
+    ALL_COPILOT_COMMANDS.find((c) => c.matchesInput?.(normalized) === true) ??
+    null
+  );
 }

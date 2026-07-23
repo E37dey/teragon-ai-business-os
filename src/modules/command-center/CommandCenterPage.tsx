@@ -40,7 +40,6 @@ import type {
   Evidence,
   Lead,
   Meeting,
-  MemoryRecord,
   Quotation,
   ServiceTicket,
   Task,
@@ -51,6 +50,7 @@ import { pendingApprovals } from "@/agents";
 import { ProviderStateBadge } from "@/components/ai";
 import { ApprovalPanel } from "@/components/approval";
 import { AgentNetworkLive } from "./AgentNetworkLive";
+import { MemoryBand } from "./MemoryBand";
 import { useCopilot } from "@/modules/ai-copilot/copilotApi";
 import { dashboardKpis, salesFunnel, recentActivity } from "@/domain/selectors";
 import {
@@ -295,7 +295,6 @@ function CommandCenterInner(): ReactElement {
   const recsQ = useCollection<AIRecommendation>("aiRecommendations");
   const evidenceQ = useCollection<Evidence>("evidence");
   const usersQ = useCollection<User>("users");
-  const memoryQ = useCollection<MemoryRecord>("memoryRecords");
   const agentRunsQ = useCollection<AgentRun>("agentRuns");
   const agentMessagesQ = useCollection<AgentMessage>("agentMessages");
   const agentConflictsQ = useCollection<AgentConflict>("agentConflicts");
@@ -317,7 +316,6 @@ function CommandCenterInner(): ReactElement {
     recsQ,
     evidenceQ,
     usersQ,
-    memoryQ,
     agentRunsQ,
     agentMessagesQ,
     agentConflictsQ,
@@ -341,7 +339,6 @@ function CommandCenterInner(): ReactElement {
   const recs = recsQ.data ?? [];
   const evidence = evidenceQ.data ?? [];
   const users = usersQ.data ?? [];
-  const memoryRecords = memoryQ.data ?? [];
   const agentRuns = agentRunsQ.data ?? [];
   const agentMessages = agentMessagesQ.data ?? [];
   const agentConflicts = agentConflictsQ.data ?? [];
@@ -428,9 +425,6 @@ function CommandCenterInner(): ReactElement {
       ? Math.round(((lastMonth.approved - prevMonth.approved) / prevMonth.approved) * 100)
       : null;
 
-  const memorySorted = [...memoryRecords].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
-  const lastMemory = memorySorted[0];
-
   return (
     <div style={stack("var(--os-space-5)")} data-testid="command-center">
       <PageRail>
@@ -461,23 +455,8 @@ function CommandCenterInner(): ReactElement {
               ))}
             </div>
           </SidePanel>
-          <SidePanel title="זיכרון ארגוני · Obsidian">
-            <div style={{ fontSize: "var(--os-text-sm, 13px)", color: "var(--os-text-2)" }}>
-              <div>
-                <span className="os-num">{memoryRecords.length}</span> רשומות זיכרון
-              </div>
-              {lastMemory ? (
-                <div style={{ marginBlockStart: 4 }}>
-                  עודכן לאחרונה: {lastMemory.title}
-                  <span style={{ color: "var(--os-muted)" }}>
-                    {" "}
-                    · {dateHe(lastMemory.updatedAt)}
-                  </span>
-                </div>
-              ) : (
-                <div>אין רשומות זיכרון עדיין</div>
-              )}
-            </div>
+          <SidePanel title="זיכרון · ידע · למידה">
+            <MemoryBand />
           </SidePanel>
           <SidePanel title="בריאות המערכת">
             <div

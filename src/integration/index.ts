@@ -3,6 +3,7 @@ export * from "./domainExtensions";
 export * from "./defensive";
 export * from "./quotationVersions";
 export * from "./customer360Memory";
+export * from "./customer360MemoryExtras";
 export * from "./serviceMemoryHooks";
 export * from "./trainingHooks";
 export * from "./commandCenterMemory";

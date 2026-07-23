@@ -26,7 +26,6 @@ import type {
   Customer,
   CustomerPrinter,
   Document,
-  MemoryRecord,
   Opportunity,
   Organization,
   PrinterModel,
@@ -38,12 +37,8 @@ import type {
 import { CEO_USER_ID } from "@/repositories/seed";
 import { quoteTotals } from "@/modules/quotations/quoteMath";
 import { ils, dateHe, dateTimeHe } from "@/modules/quotations/fmt";
-import {
-  customerOpenItems,
-  customerTimeline,
-  memoryForCustomer,
-  tasksForCustomer,
-} from "./selectors";
+import { customerOpenItems, customerTimeline, tasksForCustomer } from "./selectors";
+import { Customer360MemoryTab } from "./Customer360MemoryTab";
 
 const railTitle: CSSProperties = {
   fontSize: "var(--os-text-2xs, 11px)",
@@ -113,7 +108,6 @@ export default function CustomerDetailPage(): ReactElement {
   const ticketsQ = useCollection<ServiceTicket>("serviceTickets");
   const documentsQ = useCollection<Document>("documents");
   const tasksQ = useCollection<Task>("tasks");
-  const memoryQ = useCollection<MemoryRecord>("memoryRecords");
   const activitiesQ = useCollection<Activity>("activities");
   const usersQ = useCollection<User>("users");
   const oppsQ = useCollection<Opportunity>("opportunities");
@@ -129,7 +123,6 @@ export default function CustomerDetailPage(): ReactElement {
   const tickets = (ticketsQ.data ?? []).filter((t) => t.customerId === id);
   const documents = documentsQ.data ?? [];
   const tasks = tasksQ.data ?? [];
-  const memoryRecords = memoryQ.data ?? [];
   const activities = activitiesQ.data ?? [];
   const users = usersQ.data ?? [];
   const opps = (oppsQ.data ?? []).filter((o) => o.customerId === id);
@@ -144,7 +137,6 @@ export default function CustomerDetailPage(): ReactElement {
   const customerTasks = customer
     ? tasksForCustomer(customer, tasks, allTickets, allQuotations)
     : [];
-  const memory = customer ? memoryForCustomer(customer, memoryRecords) : [];
   const openItems = customer
     ? customerOpenItems(customer, allTickets, allQuotations, tasks)
     : { openTickets: 0, openQuotes: 0, openTasks: 0 };
@@ -769,51 +761,7 @@ export default function CustomerDetailPage(): ReactElement {
         </Panel>
       )}
 
-      {tab === "memory" && (
-        <Panel variant="panel" style={{ padding: "var(--os-space-5)" }}>
-          <SectionTitle title="זיכרון לקוח" subtitle="רשומות זיכרון ארגוני שמזכירות את הלקוח" />
-          {memory.length === 0 ? (
-            <EmptyState
-              icon="memory"
-              title="אין רשומות זיכרון"
-              reason="אף רשומת זיכרון ארגוני אינה מתייחסת ללקוח זה."
-            />
-          ) : (
-            <div
-              style={{
-                display: "grid",
-                gap: "var(--os-space-3)",
-                marginBlockStart: "var(--os-space-3)",
-              }}
-            >
-              {memory.map((m) => (
-                <Panel key={m.id} variant="raised" style={{ padding: "var(--os-space-4)" }}>
-                  <div style={{ fontWeight: 600 }}>{m.title}</div>
-                  <div
-                    style={{
-                      fontSize: "var(--os-text-2xs, 11px)",
-                      color: "var(--os-muted)",
-                      marginBlock: 4,
-                    }}
-                  >
-                    תיקייה: {m.folder} · תגיות: {m.tags.join(", ") || "—"} · עודכן{" "}
-                    <span className="os-num">{dateHe(m.updatedAt)}</span>
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "var(--os-text-sm, 13px)",
-                      color: "var(--os-text-2)",
-                      whiteSpace: "pre-wrap",
-                    }}
-                  >
-                    {m.markdown}
-                  </div>
-                </Panel>
-              ))}
-            </div>
-          )}
-        </Panel>
-      )}
+      {tab === "memory" && <Customer360MemoryTab customer={customer} />}
     </div>
   );
 }

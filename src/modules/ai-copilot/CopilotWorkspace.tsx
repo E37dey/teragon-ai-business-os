@@ -25,8 +25,9 @@ import {
   startGuardedRun,
 } from "@/components/ai";
 import { ApprovalPanel } from "@/components/approval";
+import { Link } from "react-router-dom";
 import {
-  COPILOT_COMMANDS,
+  ALL_COPILOT_COMMANDS,
   EMPTY_CHIPS,
   matchCommand,
   UNSUPPORTED_COMMAND_HE,
@@ -178,12 +179,32 @@ export default function CopilotWorkspace(): ReactElement {
       const controller = new AbortController();
       abortRef.current = controller;
       try {
+        // conversation summary for the governed memory-proposal command —
+        // derived from the REAL user messages of this session (never invented)
+        const conversationSummaryHe = messages
+          .filter((m) => m.role === "user" && m.text)
+          .slice(-6)
+          .map((m) => m.text as string)
+          .concat(trimmed)
+          .join(" · ");
         const outcome = await command.execute({
           stores: getAgentEngine().stores,
           chips,
           todayIso: localTodayIso(),
           signal: controller.signal,
+          inputText: trimmed,
+          conversationSummaryHe,
         });
+        if (command.id === "memory-propose-from-conversation") {
+          toast("נוצרה הצעת זיכרון — ממתינה לאישור אנושי בתור", "info");
+          await invalidateCollections([
+            "memoryProposals",
+            "memorySources",
+            "memoryConflicts",
+            "approvals",
+            "auditEvents",
+          ]);
+        }
         append({
           id: nextMsgId(),
           role: "assistant",
@@ -208,7 +229,7 @@ export default function CopilotWorkspace(): ReactElement {
         abortRef.current = null;
       }
     },
-    [append, busy, chips],
+    [append, busy, chips, messages, toast],
   );
 
   const cancelInFlight = useCallback(() => {
@@ -425,7 +446,7 @@ export default function CopilotWorkspace(): ReactElement {
                       <strong style={{ color: "var(--os-text)" }}>{UNSUPPORTED_COMMAND_HE}</strong>
                       <span>הפקודות הנתמכות כרגע:</span>
                       <ul style={{ margin: 0, paddingInlineStart: "1.2em" }}>
-                        {COPILOT_COMMANDS.map((c) => (
+                        {ALL_COPILOT_COMMANDS.map((c) => (
                           <li key={c.id}>{c.textHe}</li>
                         ))}
                       </ul>
@@ -476,7 +497,18 @@ export default function CopilotWorkspace(): ReactElement {
                               }}
                             >
                               רשומות רלוונטיות:{" "}
-                              {m.affected.map((a) => `${a.labelHe} (${a.id})`).join(" · ")}
+                              {m.affected.map((a, i) => (
+                                <span key={a.id + String(i)}>
+                                  {i > 0 && " · "}
+                                  {a.route ? (
+                                    <Link to={a.route} style={{ color: "var(--os-cyan)" }}>
+                                      {a.labelHe} ({a.id})
+                                    </Link>
+                                  ) : (
+                                    `${a.labelHe} (${a.id})`
+                                  )}
+                                </span>
+                              ))}
                             </div>
                           )}
                           {m.proposedAction &&
@@ -535,7 +567,7 @@ export default function CopilotWorkspace(): ReactElement {
 
         {/* supported commands */}
         <div style={{ display: "flex", gap: "var(--os-space-2)", flexWrap: "wrap" }}>
-          {COPILOT_COMMANDS.map((c) =>
+          {ALL_COPILOT_COMMANDS.map((c) =>
             busy ? (
               <OsButton key={c.id} variant="ghost" size="sm" disabled disabledReason="פקודה רצה…">
                 {c.textHe}
