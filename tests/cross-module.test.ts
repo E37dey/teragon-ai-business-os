@@ -30,7 +30,9 @@ beforeEach(async () => {
   await seedIfEmpty();
 });
 
-async function list<T extends { id: string }>(collection: string): Promise<T[]> {
+async function list<T extends { id: string }>(
+  collection: Parameters<typeof getRepository>[0],
+): Promise<T[]> {
   return (await getRepository(collection).list()) as unknown as T[];
 }
 
@@ -68,31 +70,31 @@ describe("cross-module workflows (10 mandated flows)", () => {
     await getRepository("activities").create({
       ...base("ac-xm-1"),
       kind: "ליד",
-      title: "המרת ליד ללקוח: לקוח מהמרה",
-      entityType: "customer",
-      entityId: customer.id,
+      text: "המרת ליד ללקוח: לקוח מהמרה",
+      actorId: "u-tzachi",
+      entityRef: `customer:${customer.id}`,
       at: iso(),
     } as never);
 
     const acts = await list<Activity>("activities");
-    const timeline = acts.filter((a) => a.entityId === "cu-xm-1");
+    const timeline = acts.filter((a) => a.entityRef === "customer:cu-xm-1");
     expect(timeline).toHaveLength(1);
-    expect(recentActivity(acts)[0]?.title).toContain("לקוח מהמרה");
+    expect(recentActivity(acts)[0]?.text).toContain("לקוח מהמרה");
   });
 
   it("3. create quotation → visible in Customer 360 data slice", async () => {
     await getRepository("quotations").create({
       ...base("q-xm-1"),
-      number: "Q-2026-900",
+      title: "Q-2026-900 — מדפסת לדוגמה",
       customerId: "cu-1",
       status: "טיוטה",
       lines: [{ id: "ql-1", description: "מדפסת", quantity: 1, unitPrice: 1000 }],
       validUntil: "2026-08-30",
     } as never);
     const quotes = await list<Quotation>("quotations");
-    expect(quotes.filter((q) => q.customerId === "cu-1").map((q) => q.number)).toContain(
-      "Q-2026-900",
-    );
+    expect(
+      quotes.filter((q) => q.customerId === "cu-1").some((q) => q.title.includes("Q-2026-900")),
+    ).toBe(true);
   });
 
   it("4. register printer → appears in customer assets", async () => {
@@ -122,15 +124,15 @@ describe("cross-module workflows (10 mandated flows)", () => {
     await getRepository("activities").create({
       ...base("ac-xm-2"),
       kind: "שירות",
-      title: "נפתחה קריאה: תקלת חימום",
-      entityType: "serviceTicket",
-      entityId: "tk-xm-1",
+      text: "נפתחה קריאה: תקלת חימום",
+      actorId: "u-tzachi",
+      entityRef: "serviceTicket:tk-xm-1",
       at: iso(),
     } as never);
     const tickets = await list<ServiceTicket>("serviceTickets");
     const acts = await list<Activity>("activities");
     expect(tickets.some((t) => t.id === "tk-xm-1" && t.customerId === "cu-2")).toBe(true);
-    expect(acts.some((a) => a.entityId === "tk-xm-1")).toBe(true);
+    expect(acts.some((a) => a.entityRef === "serviceTicket:tk-xm-1")).toBe(true);
   });
 
   it("6. enroll student → course progress reflects it", async () => {
@@ -178,13 +180,13 @@ describe("cross-module workflows (10 mandated flows)", () => {
     await getRepository("activities").create({
       ...base("ac-xm-3"),
       kind: "משימה",
-      title: "הושלמה משימה: משימה להשלמה",
-      entityType: "task",
-      entityId: "ts-xm-2",
+      text: "הושלמה משימה: משימה להשלמה",
+      actorId: "u-tzachi",
+      entityRef: "task:ts-xm-2",
       at: iso(),
     } as never);
     const acts = await list<Activity>("activities");
-    expect(recentActivity(acts)[0]?.entityId).toBe("ts-xm-2");
+    expect(recentActivity(acts)[0]?.entityRef).toBe("task:ts-xm-2");
   });
 
   it("9. overdue record → creates a notification (derived, idempotent id)", async () => {

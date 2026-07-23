@@ -81,7 +81,7 @@ describe("anthropic adapter — genuine HTTP path with injected fetch", () => {
       totalTokens: 19,
     });
     // request carried the env model, key in header (server-side only)
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toContain("/v1/messages");
     expect(JSON.parse(String(init.body)).model).toBe("model-from-env");
   });
