@@ -1,32 +1,19 @@
-# e2e/ai — STAGED (waiting on W5-D UI integration)
+# e2e/ai — W5-E stage 2 (real UI specs)
 
-**Status: skeletons only. No UI e2e tests run from this directory yet — honestly.**
+Stage-1 note: this directory shipped as an honest skeleton (README only)
+because W5-E ran in parallel with W5-D and the AI screens did not exist yet.
+Stage 2 (this state) replaced it with real Playwright specs, now that the
+integrated app (W5-D UI + app-wide OsShell Copilot) is on main.
 
-W5-E (server/engine QA) was built in parallel with W5-D (product UI). The AI
-screens these specs need (`/ai` surfaces, copilot input, health/capabilities
-indicators, fallback disclosure banner, Hebrew error toasts) did not exist in
-this worktree at authoring time, and writing UI selectors against screens we
-cannot see would produce fake coverage.
+Run: `npx playwright test -c e2e/w5e.config.ts` (vite preview, port 4673).
 
-## What runs TODAY instead
-
-Server/engine behavior is fully covered headlessly (no browser, no real keys):
-
-- `tests/ai/server/**` — handler pipeline (DTO validation, guards, rate limit,
-  budget, concurrency, timeout, malformed output, streaming, CORS, auth shape)
-- `tests/ai/security/**` — W5-E gap-fill (auth claims, injection surfaces,
-  secret/policy leakage, duplicate-request behavior)
-- `tests/ai/integration/**` — W5-E functional flows 1/4/5/7/8
-
-## Planned specs (to be written AFTER W5-D lands, as stage 2)
-
-| Planned file | Covers |
+| Spec | Covers |
 |---|---|
-| `ai-health-status.spec.ts` | health states rendered honestly: מחובר / לא הוגדר / מושבת |
-| `ai-copilot-flow.spec.ts` | prompt → streamed reply → envelope fields (evidence, limitations, confidence "טרם נמדד") |
-| `ai-fallback-disclosure.spec.ts` | remote down ⇒ the exact Hebrew fallback sentence is VISIBLE |
-| `ai-error-states.spec.ts` | rate-limit / budget / cancelled — Hebrew messages, no raw errors |
-| `ai-approval-gate.spec.ts` | outbound draft shows approval-pending UI, never auto-sends |
+| `w5e-copilot.spec.ts` | shell-card open from /crm (app-wide mount), local command → envelope + local badge, in-flight cancel button (deterministic IDB write-lock), unmapped refusal, keyboard Tab+Enter open / ESC close |
+| `w5e-provider-state.spec.ts` | Mode A provider honesty on /agents + copilot: local badge + local health detail; no fabricated "ספק AI מרוחק מחובר"; no invented fallback notice |
+| `w5e-screens.spec.ts` | Phase 5.17 screenshots (suffix `-e2`, 1920/2560/3840) — copilot-open, approval-drawer edit mode, provider-state, collaboration selected conflict |
 
-All will run against the Vite preview server with `AI_PROVIDER=test` semantics
-(TestAdapter / LocalRulesProvider) — never a real provider key.
+Honest scoping: a remote-connected / remote-outage UI state is not e2e-testable
+without a real provider; the TestAdapter covers it headlessly in
+`tests/ai/integration/fallbackFlow.test.ts`. The fallback-notice screenshot is
+therefore N/A in Mode A (see docs/WAVE_5_VISUAL_QA.md).

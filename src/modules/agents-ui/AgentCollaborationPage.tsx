@@ -661,7 +661,8 @@ export default function AgentCollaborationPage(): ReactElement {
                       <span
                         style={{
                           fontSize: "10px",
-                          color: NODE_COLOR[n.kind],
+                          // axe: kind label uses readable text-2; node identity stays in the colored border
+                          color: "var(--os-text-2)",
                           lineHeight: 1,
                         }}
                       >
@@ -726,7 +727,7 @@ export default function AgentCollaborationPage(): ReactElement {
                 maxBlockSize: 520,
                 overflowY: "auto",
               }}
-              data-testid="run-timeline"
+              data-testid="run-timeline" tabIndex={0} role="region" aria-label="ציר הזמן של הריצה"
             >
               {records && records.messages.length > 0 && (
                 <div style={stack("var(--os-space-2)")}>

@@ -1,27 +1,18 @@
-# e2e/agents — STAGED (waiting on W5-D UI integration)
+# e2e/agents — W5-E stage 2 (real UI specs)
 
-**Status: skeletons only. No UI e2e tests run from this directory yet — honestly.**
+Stage-1 note: this directory shipped as an honest skeleton (README only)
+because `/agents`, `/agents/collaboration` and `/automations` were placeholder
+stubs while W5-E ran in parallel with W5-D. Stage 2 (this state) replaced it
+with real Playwright specs against the integrated app on main.
 
-W5-E ran in parallel with W5-D. `/agents`, `/agents/collaboration` and
-`/automations` were lazy PLACEHOLDER stubs in this worktree (commit `0f41cc0`),
-so there is no real agents UI to drive. Selectors invented against placeholders
-would be fake coverage; the engine is instead verified headlessly.
+Run: `npx playwright test -c e2e/w5e.config.ts` (vite preview, port 4673).
 
-## What runs TODAY instead
-
-- `tests/agents/**` — orchestrator bounds, 19-event catalog, approval engine
-  (bypass blocked, rollback, retry), conflicts, deterministic demo scenario
-- `tests/agents/integration/**` — W5-E flows 2/3/6: approve→execute→Task,
-  reject→no-mutation+audit, Hunter+Wiki+Fixer conflict → human resolution
-
-## Planned specs (stage 2, after W5-D)
-
-| Planned file | Covers |
+| Spec | Covers |
 |---|---|
-| `agents-run-lifecycle.spec.ts` | start demo run from UI → timeline renders the persisted 19-event trail |
-| `agents-collaboration-graph.spec.ts` | graph nodes/edges derive from records; conflict node "ממתין להחלטה" |
-| `agents-approval-gate.spec.ts` | approve / edit / reject from the UI; execution only after approval; rejected leaves no mutation |
-| `agents-conflict-resolution.spec.ts` | the 5 human resolution actions; decided conflict shows "הוחלט" |
-| `agents-cancellation.spec.ts` | user cancel from UI ⇒ run "בוטל" with the cancellation event |
+| `w5e-approvals.spec.ts` | "ערוך ואשר" (edited payload IS what executes — asserted in the panel + command-center activity feed), "דחה" with mandated reason → no mutation, "בקש תיקון" reasoned-rejection path, demo approval = recommendation-only (edit honestly disabled), keyboard Tab/Enter over all 6 approval actions |
+| `w5e-command-center.spec.ts` | demo run → command-center pending-approval/conflict counts, IndexedDB persistence across browser refresh, collaboration selected-conflict rail state |
+| `w5e-a11y.spec.ts` | axe (@axe-core/playwright): /agents, collaboration (post-demo), /automations, copilot-open — zero serious/critical gate |
 
-Visual QA (Phase 5.17 screenshots) is also deferred to stage 2 with these.
+Not duplicated here: w5d.config.ts already covers the fleet drawer (7 tabs),
+the happy-path demo→resolve→approve→complete flow, the copilot quick-command
+happy path and the automations plan→approve happy path.

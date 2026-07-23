@@ -422,7 +422,7 @@ export default function AgentsPage(): ReactElement {
             <div style={{ fontSize: "var(--os-text-sm, 13px)" }}>
               <span className="os-num">{summary.pendingApprovals}</span> בקשות ממתינות להחלטה אנושית
               ·{" "}
-              <Link to="/agents/collaboration" style={{ color: "var(--os-cyan)" }}>
+              <Link to="/agents/collaboration" style={{ color: "var(--os-cyan)", textDecoration: "underline" }}>
                 לחדר התיאום ←
               </Link>
             </div>

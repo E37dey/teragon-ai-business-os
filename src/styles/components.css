@@ -160,7 +160,7 @@
   border-color: rgba(33, 201, 129, 0.28);
 }
 .os-chip--blue {
-  color: var(--os-blue);
+  color: #4d93ff; /* lightened from --os-blue for WCAG contrast on dark chips (axe) */
   background: var(--os-blue-soft);
   border-color: rgba(40, 123, 255, 0.28);
 }
@@ -378,7 +378,8 @@
 }
 
 .os-btn--primary {
-  background: var(--os-blue);
+  /* action-blue: darker than --os-blue for WCAG 4.5:1 with white text (axe) */
+  background: #1f63d6;
   color: #ffffff;
 }
 .os-btn--primary:hover:not(:disabled) {
@@ -1670,7 +1671,7 @@
   min-inline-size: 15px;
   block-size: 15px;
   border-radius: var(--os-radius-full);
-  background: var(--os-danger);
+  background: #c1313d; /* darkened from --os-danger for WCAG 4.5:1 with white 9px text (axe) */
   color: #ffffff;
   font-size: 9px;
   font-weight: var(--os-weight-bold);
