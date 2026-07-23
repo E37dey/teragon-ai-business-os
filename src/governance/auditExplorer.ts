@@ -11,7 +11,7 @@ import type {
   RedactedAuditEventExport,
 } from "@/domain/governance";
 import { AGENT_IDS } from "@/agents/definitions";
-import { redact } from "@/server/redact";
+import { redact } from "@/lib/redact";
 
 /** Max exported detail length — exports carry summaries, never full payloads. */
 export const EXPORT_DETAIL_MAX_CHARS = 160;

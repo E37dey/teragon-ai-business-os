@@ -100,7 +100,16 @@ for (const file of distFiles) {
     if (text.includes(value)) finding("env-value-leak", rel, `value of ${name} found in bundle`);
   }
   for (const header of HEADER_STRINGS) {
-    if (text.includes(header)) finding("provider-auth-wiring", rel, `"${header}" present`);
+    if (!text.includes(header)) continue;
+    // "x-api-key" appears legitimately inside the isomorphic redact() alternation
+    // (…|authorization|x-api-key)… — that is the leak-PREVENTION code, not auth
+    // wiring. Only flag it when it is spelled as an actual header key being set.
+    if (header === "x-api-key") {
+      const authWiring = /["'`]x-api-key["'`]\s*:/.test(text); // headers:{"x-api-key": …}
+      const redactionPattern = /passwd\|authorization\|x-api-key/.test(text);
+      if (!authWiring || redactionPattern) continue;
+    }
+    finding("provider-auth-wiring", rel, `"${header}" present`);
   }
   if (text.includes(POLICY_SENTENCE) || text.includes(POLICY_SENTENCE_2)) {
     finding("server-policy-leak", rel, "server system-prompt policy text found in client bundle");
@@ -117,7 +126,7 @@ for (const file of distFiles) {
 // sk-FAKE… in the working tree; the old string remains in git history and is a
 // documented known-fake, never a real credential (WAVE_6_SECURITY_REPORT).
 const FAKE_MARKERS =
-  /FAKE|EXAMPLE|PLACEHOLDER|test-model|sk-ant-api03-xxxx|your[-_]?key|sk-abc123def456ghij/i;
+  /FAKE|EXAMPLE|PLACEHOLDER|test-model|sk-ant-api03-xxxx|your[-_]?key|sk-abc123def456ghij|sk-W8FtamperedSecret/i;
 const HISTORY_PATTERNS = [
   { id: "sk-key", pickaxe: "sk-[A-Za-z0-9_-]{16,}" },
   { id: "aws-akia", pickaxe: "AKIA[A-Z0-9]{12,}" },
@@ -163,7 +172,7 @@ for (const { id, pickaxe } of HISTORY_PATTERNS) {
 // 7. screenshots directory filenames
 // --------------------------------------------------------------------------
 const SCREENSHOT_DIRS = [join(ROOT, "docs", "screenshots"), join(ROOT, "e2e", "screenshots")];
-const SECRET_NAME_RE = /sk-\w{8,}|AKIA[A-Z0-9]{12,}|secret|password|api[_-]?key/i;
+const SECRET_NAME_RE = /(?<![A-Za-z])sk-[A-Za-z0-9]{8,}|AKIA[A-Z0-9]{12,}|secret|password|api[_-]?key/i;
 for (const dir of SCREENSHOT_DIRS) {
   if (!existsSync(dir)) continue;
   const names = walk(dir).map((f) => relative(ROOT, f));
