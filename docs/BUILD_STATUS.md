@@ -47,3 +47,6 @@
 
 ## Wave 7 — DONE (23.07.2026)
 8 ראוטים הופעלו: /implementation /personas /stage-gates /training-materials /quick-start /faq /submission /submission/presentation (מסך מלא). ספירות קנוניות: 7/6/6/13/12/5 עם registry guards. שערים: 1342/1342 unit · 227/227 e2e · axe 0 serious · scanner CLEAN.
+
+## Wave 8 — DONE (24.07.2026)
+5 ראוטים אחרונים הופעלו: /analytics /governance /administration /system-health /settings. **כל 31 הראוטים מבצעיים — אפס placeholders.** שערים: 1639/1639 unit · 329/329 e2e · axe 0 serious · scanner CLEAN. 12 deliverables נשארים "ממתין לאישור אנושי בשם".

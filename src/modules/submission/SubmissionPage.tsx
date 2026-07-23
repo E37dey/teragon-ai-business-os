@@ -64,6 +64,7 @@ import {
   METRIC_GROUP_TITLES,
   ONE_PAGER,
   overallReadiness,
+  WAVE8_PENDING_APPROVAL_HE,
   type DeliverableEvaluation,
   type MetricGroupKey,
   type PresentationSectionLike,
@@ -417,6 +418,14 @@ function DeliverablesGrid({
             </strong>
             <StatusChip status={STATE_TONE[ev.state] ?? "ממתין"} label={ev.state} />
           </div>
+          {ev.state !== "מלא" ? (
+            <div
+              style={{ fontSize: "var(--os-text-xs)", color: "var(--os-amber, #E8B93E)" }}
+              data-testid="deliverable-pending-approval"
+            >
+              {WAVE8_PENDING_APPROVAL_HE}
+            </div>
+          ) : null}
           <div style={{ fontSize: "var(--os-text-xs)", color: "var(--os-text-2)", display: "grid", gap: 4 }}>
             <span>בעלים: {ev.ownerNameHe ?? "לא הוקצה אחראי"}</span>
             <span>אישור: {ev.approvalStatusHe}</span>

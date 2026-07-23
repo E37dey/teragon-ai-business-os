@@ -61,7 +61,18 @@ export function LeftIntelligenceRail({
           </button>
         )}
       </div>
-      <div className="os-rail__body">{children}</div>
+      {/* tabIndex + role/label: the rail body scrolls (overflow-y) when the
+          page's rail content is tall — a scrollable region must be keyboard
+          reachable or axe flags scrollable-region-focusable (serious).
+          [W8-F a11y fix] */}
+      <div
+        className="os-rail__body"
+        tabIndex={0}
+        role="region"
+        aria-label="סרגל התובנות"
+      >
+        {children}
+      </div>
     </aside>
   );
 }

@@ -42,7 +42,11 @@ export function MetricChart({ points, accent, unit, onPointClick }: MetricChartP
     <svg
       viewBox={`0 0 ${W} ${H}`}
       style={{ inlineSize: "100%", blockSize: "auto", display: "block" }}
-      role="img"
+      // role="group" (not "img"): the chart CONTAINS focusable point controls
+      // (role="button" circles). An atomic role="img" nesting interactive
+      // children is an axe nested-interactive violation — a group legitimately
+      // groups the interactive points under one accessible name. [W8-F a11y fix]
+      role="group"
       aria-label={`גרף מגמה — ${measured.length} נקודות מדודות מתוך ${points.length}`}
     >
       {segments.map((seg) => {

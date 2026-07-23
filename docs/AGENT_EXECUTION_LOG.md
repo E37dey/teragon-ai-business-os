@@ -59,3 +59,15 @@
 | W7-F | Presentation | worktree 9d6822b → merge | ✅ | 48 tests + 10 e2e |
 | W7-G | QA/Visual/Print | main | ✅ | 22 security tests + 84 e2e + 51 screenshots + axe clean |
 | Lead | Integration | main | ✅ | collections v5, 8 routes, top-level presentation, decisions |
+
+## Wave 8 (23-24.07.2026)
+
+| # | Agent | Role | State | Result |
+|---|-------|------|-------|--------|
+| W8-A | Analytics | worktree 54e0c81 → merge (חודש אחרי מגבלת סשן) | ✅ | 53 tests, 34 metrics |
+| W8-B | Governance | worktree e6fc851 → merge (חודש) | ✅ | 76 tests, 10 draft policies |
+| W8-C | Administration | worktree 04b73aa → merge (חודש) | ✅ | 63 tests, HumanUserId branded |
+| W8-D | Health+Settings | worktree 932e290 → merge (חודש) | ✅ | 61 tests, 15 real checks |
+| W8-E | Cross-Module | main | ✅ | 22 tests, 10 flows + wiring |
+| W8-F | QA/Security/Visual | main | ✅ | 22 security tests + 102 e2e + 68 screenshots + axe clean |
+| Lead | Integration | main | ✅ | P-1/P-2 fixed, collections v6, 5 routes, D8F-3 fix, GATE-RED guard |
