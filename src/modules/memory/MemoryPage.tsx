@@ -42,6 +42,10 @@ import {
   foldersForLayer,
   pendingProposals,
 } from "./selectors";
+import { ImportPanel } from "@/memory/import/ui/ImportPanel";
+import { ExportPanel } from "@/memory/export/ui/ExportPanel";
+import { obsidianStatus } from "@/memory/export/status";
+import { recomputeBacklinks } from "@/memory/markdown/wikilinks";
 import { LinkGraphView } from "./components/LinkGraph";
 import { NoteView } from "./components/NoteView";
 import { ProposalQueue, type ProposalControls } from "./components/ProposalQueue";
@@ -56,6 +60,8 @@ const MEMORY_COLLECTIONS = [
   "memoryVersions",
   "memoryUsage",
   "memoryConflicts",
+  "memoryImportJobs",
+  "memoryExportJobs",
   "approvals",
   "agentEvents",
   "auditEvents",
@@ -73,7 +79,13 @@ const inputStyle: CSSProperties = {
 };
 
 /** small governed form: observation → source (real entity) → proposal */
-function NewProposalForm({ customers, onSubmitted }: { customers: readonly Customer[]; onSubmitted: () => void }): ReactElement {
+function NewProposalForm({
+  customers,
+  onSubmitted,
+}: {
+  customers: readonly Customer[];
+  onSubmitted: () => void;
+}): ReactElement {
   const { toast } = useToast();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -138,7 +150,13 @@ function NewProposalForm({ customers, onSubmitted }: { customers: readonly Custo
         icon="plus"
       />
       <div style={{ ...stack("var(--os-space-2)"), marginBlockStart: "var(--os-space-3)" }}>
-        <input aria-label="כותרת" placeholder="כותרת" value={title} onChange={(e) => setTitle(e.target.value)} style={inputStyle} />
+        <input
+          aria-label="כותרת"
+          placeholder="כותרת"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          style={inputStyle}
+        />
         <textarea
           aria-label="תוכן (Markdown)"
           placeholder="תוכן ההצעה (Markdown, [[קישורי-ויקי]] נתמכים)"
@@ -148,14 +166,24 @@ function NewProposalForm({ customers, onSubmitted }: { customers: readonly Custo
           style={{ ...inputStyle, resize: "vertical" }}
         />
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <select aria-label="שכבת זיכרון" value={layer} onChange={(e) => setLayer(e.target.value as MemoryLayer)} style={inputStyle}>
+          <select
+            aria-label="שכבת זיכרון"
+            value={layer}
+            onChange={(e) => setLayer(e.target.value as MemoryLayer)}
+            style={inputStyle}
+          >
             {MEMORY_LAYERS.map((l) => (
               <option key={l} value={l}>
                 {MEMORY_LAYER_LABELS_HE[l]}
               </option>
             ))}
           </select>
-          <select aria-label="מקור: לקוח" value={customerId} onChange={(e) => setCustomerId(e.target.value)} style={inputStyle}>
+          <select
+            aria-label="מקור: לקוח"
+            value={customerId}
+            onChange={(e) => setCustomerId(e.target.value)}
+            style={inputStyle}
+          >
             <option value="">מקור: בחרו לקוח מהמאגר…</option>
             {customers.map((c) => (
               <option key={c.id} value={c.id}>
@@ -164,7 +192,13 @@ function NewProposalForm({ customers, onSubmitted }: { customers: readonly Custo
             ))}
           </select>
           {canSubmit && !busy ? (
-            <OsButton variant="primary" size="sm" icon="plus" onClick={() => void submit()} data-testid="submit-proposal">
+            <OsButton
+              variant="primary"
+              size="sm"
+              icon="plus"
+              onClick={() => void submit()}
+              data-testid="submit-proposal"
+            >
               שלח לתור האישורים
             </OsButton>
           ) : (
@@ -172,7 +206,9 @@ function NewProposalForm({ customers, onSubmitted }: { customers: readonly Custo
               variant="primary"
               size="sm"
               disabled
-              disabledReason={busy ? "ההצעה נשלחת…" : "נדרשים כותרת, תוכן ומקור (לקוח) — זיכרון קבוע מחייב מקור"}
+              disabledReason={
+                busy ? "ההצעה נשלחת…" : "נדרשים כותרת, תוכן ומקור (לקוח) — זיכרון קבוע מחייב מקור"
+              }
             >
               שלח לתור האישורים
             </OsButton>
@@ -202,7 +238,17 @@ export default function MemoryPage(): ReactElement {
   const auditQ = useCollection<AuditEvent>("auditEvents");
   const customersQ = useCollection<Customer>("customers");
 
-  const queries = [recordsQ, proposalsQ, linksQ, versionsQ, usageQ, conflictsQ, importJobsQ, auditQ, customersQ];
+  const queries = [
+    recordsQ,
+    proposalsQ,
+    linksQ,
+    versionsQ,
+    usageQ,
+    conflictsQ,
+    importJobsQ,
+    auditQ,
+    customersQ,
+  ];
   const isLoading = queries.some((q) => q.isLoading);
   const isError = queries.some((q) => q.isError);
 
@@ -216,7 +262,10 @@ export default function MemoryPage(): ReactElement {
   const audit = auditQ.data ?? [];
 
   const todayISO = new Date().toISOString();
-  const metrics = computeMemoryMetrics({ records, proposals, links, conflicts, usage, importJobs }, todayISO);
+  const metrics = computeMemoryMetrics(
+    { records, proposals, links, conflicts, usage, importJobs },
+    todayISO,
+  );
   const layerCounts = countByLayer(records);
   const visible = filterRecords(records, { query, layer, folder });
   const graph = useMemo(() => buildLinkGraph(records, linksQ.data ?? []), [records, linksQ.data]);
@@ -225,6 +274,11 @@ export default function MemoryPage(): ReactElement {
 
   const refresh = (): void => {
     void invalidate([...MEMORY_COLLECTIONS]);
+  };
+
+  const [obsLine1, obsLine2] = obsidianStatus();
+  const refreshAfterJobs = (): void => {
+    void recomputeBacklinks(getMemoryEngine().stores).finally(refresh);
   };
 
   const runControl = async (fn: () => Promise<unknown>, okHe: string): Promise<void> => {
@@ -243,13 +297,19 @@ export default function MemoryPage(): ReactElement {
   const who = { deciderId: CEO_USER_ID, deciderName: CEO_NAME_HE };
   const controls: ProposalControls = {
     approve: (id) =>
-      runControl(() => getMemoryEngine().workflow.approve(id, who), "ההצעה אושרה ונכתבה לזיכרון (גרסה חתומה)"),
+      runControl(
+        () => getMemoryEngine().workflow.approve(id, who),
+        "ההצעה אושרה ונכתבה לזיכרון (גרסה חתומה)",
+      ),
     editAndApprove: async (id, editedBody) => {
       const proposal = await getMemoryEngine().stores.proposals.get(id);
       if (!proposal) return;
       await runControl(
         () =>
-          getMemoryEngine().workflow.editAndApprove(id, who, { ...proposal.draft, bodyMarkdown: editedBody }),
+          getMemoryEngine().workflow.editAndApprove(id, who, {
+            ...proposal.draft,
+            bodyMarkdown: editedBody,
+          }),
         "ההצעה אושרה עם עריכה אנושית",
       );
     },
@@ -259,16 +319,32 @@ export default function MemoryPage(): ReactElement {
         "בקשת מקור נוסף נרשמה — ההצעה נותרה ממתינה",
       ),
     merge: (id, targetId) =>
-      runControl(() => getMemoryEngine().workflow.mergeWithExisting(id, targetId, who), "ההצעה מוזגה — נוצרה גרסה חדשה על הפריט הקיים"),
+      runControl(
+        () => getMemoryEngine().workflow.mergeWithExisting(id, targetId, who),
+        "ההצעה מוזגה — נוצרה גרסה חדשה על הפריט הקיים",
+      ),
     reject: (id, reasonHe) =>
-      runControl(() => getMemoryEngine().workflow.reject(id, who, reasonHe), "ההצעה נדחתה עם נימוק"),
+      runControl(
+        () => getMemoryEngine().workflow.reject(id, who, reasonHe),
+        "ההצעה נדחתה עם נימוק",
+      ),
     markSensitive: (id, sensitivity: MemorySensitivity) =>
-      runControl(() => getMemoryEngine().workflow.markSensitive(id, CEO_USER_ID, sensitivity), "הרגישות עודכנה בהצעה"),
-    cancel: (id) => runControl(() => getMemoryEngine().workflow.cancelProposal(id, CEO_USER_ID), "ההצעה בוטלה"),
+      runControl(
+        () => getMemoryEngine().workflow.markSensitive(id, CEO_USER_ID, sensitivity),
+        "הרגישות עודכנה בהצעה",
+      ),
+    cancel: (id) =>
+      runControl(() => getMemoryEngine().workflow.cancelProposal(id, CEO_USER_ID), "ההצעה בוטלה"),
   };
 
   if (isError) {
-    return <EmptyState icon="alert" title="טעינת הזיכרון נכשלה" reason="קריאת הנתונים מהמאגר המקומי נכשלה. רעננו את הדף." />;
+    return (
+      <EmptyState
+        icon="alert"
+        title="טעינת הזיכרון נכשלה"
+        reason="קריאת הנתונים מהמאגר המקומי נכשלה. רעננו את הדף."
+      />
+    );
   }
   if (isLoading) {
     return (
@@ -283,27 +359,36 @@ export default function MemoryPage(): ReactElement {
       <PageRail>
         <div style={stack("var(--os-space-4)")}>
           <div style={stack("var(--os-space-2)")}>
-            <div style={{ fontSize: "var(--os-text-2xs, 11px)", fontWeight: 600, color: "var(--os-text-2)" }}>
+            <div
+              style={{
+                fontSize: "var(--os-text-2xs, 11px)",
+                fontWeight: 600,
+                color: "var(--os-text-2)",
+              }}
+            >
               מצב סנכרון
             </div>
-            <div style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-text-2)", display: "grid", gap: 3 }}>
+            <div
+              style={{
+                fontSize: "var(--os-text-2xs, 11px)",
+                color: "var(--os-text-2)",
+                display: "grid",
+                gap: 3,
+              }}
+            >
               <div>מאגר מקומי (IndexedDB) — פעיל</div>
-              <div>ייבוא וייצוא: בבנייה (גל 6)</div>
-              <div>גישה מקומית ישירה אינה פעילה</div>
+              <div>{obsLine1}</div>
+              <div>{obsLine2}</div>
               <div>ענן: לא זמין במצב הדגמה המקומי</div>
             </div>
           </div>
           <div style={stack("var(--os-space-2)")}>
-            <OsButton variant="ghost" size="sm" disabled disabledReason="ייבוא/ייצוא יחוברו עם רכיב ה-Import של הגל (W6-B)">
-              ייבוא כספת Obsidian
-            </OsButton>
-            <OsButton variant="ghost" size="sm" disabled disabledReason="ייבוא/ייצוא יחוברו עם רכיב ה-Import של הגל (W6-B)">
-              ייצוא ל-Markdown
-            </OsButton>
+            <ImportPanel onImported={refreshAfterJobs} />
+            <ExportPanel onExported={refreshAfterJobs} />
           </div>
           <div style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-muted)" }}>
-            כל כתיבה לזיכרון הקבוע מחייבת אישור אנושי בשם ({CEO_NAME_HE}) דרך מנוע האישורים. אין אנימציית
-            סנכרון מדומה — הסטטוסים למעלה משקפים מצב אמיתי.
+            כל כתיבה לזיכרון הקבוע מחייבת אישור אנושי בשם ({CEO_NAME_HE}) דרך מנוע האישורים. אין
+            אנימציית סנכרון מדומה — הסטטוסים למעלה משקפים מצב אמיתי.
           </div>
         </div>
       </PageRail>
@@ -317,15 +402,44 @@ export default function MemoryPage(): ReactElement {
 
       {/* metrics — ALL derived */}
       <div
-        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "var(--os-space-3)" }}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+          gap: "var(--os-space-3)",
+        }}
         data-testid="memory-metrics"
       >
-        <KpiCard title="פריטים מאושרים" value={metrics.approvedRecords} accent="cyan" icon="memory" />
-        <KpiCard title="הצעות ממתינות" value={metrics.pendingProposals} accent="violet" icon="shield" />
+        <KpiCard
+          title="פריטים מאושרים"
+          value={metrics.approvedRecords}
+          accent="cyan"
+          icon="memory"
+        />
+        <KpiCard
+          title="הצעות ממתינות"
+          value={metrics.pendingProposals}
+          accent="violet"
+          icon="shield"
+        />
         <KpiCard title="קישורים" value={metrics.totalLinks} accent="blue" icon="network" />
-        <KpiCard title="קישורים לא פתורים" value={metrics.unresolvedLinks} accent={metrics.unresolvedLinks > 0 ? "warning" : "success"} icon="alert" />
-        <KpiCard title="סתירות פתוחות" value={metrics.openConflicts} accent={metrics.openConflicts > 0 ? "danger" : "success"} icon="alert" />
-        <KpiCard title="סקירות שהגיע זמנן" value={metrics.reviewsDue} accent="warning" icon="clock" />
+        <KpiCard
+          title="קישורים לא פתורים"
+          value={metrics.unresolvedLinks}
+          accent={metrics.unresolvedLinks > 0 ? "warning" : "success"}
+          icon="alert"
+        />
+        <KpiCard
+          title="סתירות פתוחות"
+          value={metrics.openConflicts}
+          accent={metrics.openConflicts > 0 ? "danger" : "success"}
+          icon="alert"
+        />
+        <KpiCard
+          title="סקירות שהגיע זמנן"
+          value={metrics.reviewsDue}
+          accent="warning"
+          icon="clock"
+        />
         <KpiCard title="ייבואים היום" value={metrics.importsToday} accent="blue" icon="inbox" />
         <KpiCard title="שימושי AI היום" value={metrics.aiUsesToday} accent="success" icon="brain" />
       </div>
@@ -342,7 +456,10 @@ export default function MemoryPage(): ReactElement {
         {/* browser */}
         <Panel variant="panel" style={{ padding: "var(--os-space-4)" }}>
           <SectionTitle title="שכבות ותיקיות" icon="book" />
-          <div style={{ ...stack("var(--os-space-2)"), marginBlockStart: "var(--os-space-3)" }} data-testid="memory-layer-browser">
+          <div
+            style={{ ...stack("var(--os-space-2)"), marginBlockStart: "var(--os-space-3)" }}
+            data-testid="memory-layer-browser"
+          >
             <button
               type="button"
               onClick={() => {
@@ -362,7 +479,10 @@ export default function MemoryPage(): ReactElement {
                 fontSize: "var(--os-text-sm, 13px)",
               }}
             >
-              כל השכבות <span className="os-num">({records.filter((r) => r.archivedAt === null).length})</span>
+              כל השכבות{" "}
+              <span className="os-num">
+                ({records.filter((r) => r.archivedAt === null).length})
+              </span>
             </button>
             {MEMORY_LAYERS.map((l) => (
               <div key={l} style={{ display: "grid", gap: 2 }}>
@@ -420,7 +540,11 @@ export default function MemoryPage(): ReactElement {
           <Panel variant="panel" style={{ padding: "var(--os-space-4)" }}>
             <SectionTitle title={`פריטי זיכרון (${visible.length})`} icon="memory" />
             <div style={{ marginBlockStart: "var(--os-space-3)", ...stack("var(--os-space-2)") }}>
-              <SearchInput value={query} onChange={setQuery} placeholder="חיפוש בכותרת, בתוכן ובתגיות…" />
+              <SearchInput
+                value={query}
+                onChange={setQuery}
+                placeholder="חיפוש בכותרת, בתוכן ובתגיות…"
+              />
               <div style={stack("var(--os-space-1, 4px)")} data-testid="memory-note-list">
                 {visible.map((r) => (
                   <button
@@ -442,15 +566,23 @@ export default function MemoryPage(): ReactElement {
                       cursor: "pointer",
                     }}
                   >
-                    <span style={{ fontWeight: 600, fontSize: "var(--os-text-sm, 13px)" }}>{r.title}</span>
-                    <span style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-muted)" }}>
+                    <span style={{ fontWeight: 600, fontSize: "var(--os-text-sm, 13px)" }}>
+                      {r.title}
+                    </span>
+                    <span
+                      style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-muted)" }}
+                    >
                       {MEMORY_LAYER_LABELS_HE[r.memoryLayer]} · {r.folder} · גרסה{" "}
                       <span className="os-num">{r.version}</span>
                     </span>
                   </button>
                 ))}
                 {visible.length === 0 && (
-                  <EmptyState icon="search" title="אין פריטים" reason="אין פריטי זיכרון שתואמים לסינון הנוכחי." />
+                  <EmptyState
+                    icon="search"
+                    title="אין פריטים"
+                    reason="אין פריטי זיכרון שתואמים לסינון הנוכחי."
+                  />
                 )}
               </div>
             </div>
@@ -463,7 +595,11 @@ export default function MemoryPage(): ReactElement {
               icon="network"
             />
             <div style={{ marginBlockStart: "var(--os-space-3)" }}>
-              <LinkGraphView graph={graph} selectedId={selected?.id ?? null} onSelect={setSelectedId} />
+              <LinkGraphView
+                graph={graph}
+                selectedId={selected?.id ?? null}
+                onSelect={setSelectedId}
+              />
             </div>
           </Panel>
         </div>
@@ -473,7 +609,11 @@ export default function MemoryPage(): ReactElement {
           {selected ? (
             <NoteView record={selected} versions={versions} usage={usage} audit={audit} />
           ) : (
-            <EmptyState icon="memory" title="לא נבחר פריט" reason="בחרו פריט זיכרון מהרשימה או מהגרף." />
+            <EmptyState
+              icon="memory"
+              title="לא נבחר פריט"
+              reason="בחרו פריט זיכרון מהרשימה או מהגרף."
+            />
           )}
         </Panel>
       </div>
