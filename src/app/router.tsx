@@ -33,6 +33,7 @@ const MODULE_PAGES: Record<string, LazyExoticComponent<ComponentType>> = {
   "/submission": lazy(() => import("@/modules/submission/SubmissionPage")),
   "/analytics": lazy(() => import("@/modules/analytics/AnalyticsPage")),
   "/governance": lazy(() => import("@/modules/governance/GovernancePage")),
+  "/administration": lazy(() => import("@/modules/administration/AdministrationPage")),
   "/courses": lazy(() => import("@/modules/courses/CoursesPage")),
   "/service": lazy(() => import("@/modules/service/ServicePage")),
   "/printers": lazy(() => import("@/modules/printers/PrintersPage")),
