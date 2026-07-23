@@ -132,8 +132,7 @@ const MENTOR: AgentDefinition = {
   id: "ag-mentor",
   nameHe: "סוכן הדרכה",
   codeName: "Mentor",
-  purposeHe:
-    "קורא קורסים, תלמידים, התקדמות ותוכן לימודי; ממליץ על תרגילים. אינו מאשר השלמת שלבים.",
+  purposeHe: "קורא קורסים, תלמידים, התקדמות ותוכן לימודי; ממליץ על תרגילים. אינו מאשר השלמת שלבים.",
   allowedOperations: ["read", "search", "summarize", "classify", "explain", "recommend"],
   allowedDomains: [
     "courses",
@@ -200,7 +199,24 @@ const WIKI: AgentDefinition = {
     "flag-contradiction",
     "propose-update",
   ],
-  allowedDomains: ["knowledgeNotes", "memoryRecords", "aiRecommendations", "evidence", "documents"],
+  allowedDomains: [
+    "knowledgeNotes",
+    "memoryRecords",
+    "aiRecommendations",
+    "evidence",
+    "documents",
+    // Wave 6 governance collections (integration-lead extension per W6-C request #5)
+    "knowledgeArticles",
+    "knowledgeSources",
+    "knowledgeVersions",
+    "knowledgeUsage",
+    "knowledgeConflicts",
+    "knowledgeQuestions",
+    "knowledgeReviews",
+    "memoryLinks",
+    "memoryVersions",
+    "memoryUsage",
+  ],
   prohibitedDomains: ["approvals", "auditEvents", "users", "roles", "quotations"],
   prohibitedActionsHe: ["אישור רשומת ידע", "שינוי קבוע במאגר", "מחיקת רשומות"],
   tools: ["חיפוש בידע מאושר", "סימון סתירות", "הצעת עדכון"],
@@ -265,7 +281,11 @@ export function getAgentDefinition(agentId: string): AgentDefinition | undefined
  * - the domain is explicitly in allowedDomains.
  * Unknown agent / operation / domain ⇒ false. No exceptions.
  */
-export function canAgent(agentId: string, operation: AgentOperation, domain: CollectionKey): boolean {
+export function canAgent(
+  agentId: string,
+  operation: AgentOperation,
+  domain: CollectionKey,
+): boolean {
   const def = AGENT_DEFINITIONS[agentId];
   if (!def) return false;
   if (!def.allowedOperations.includes(operation)) return false;
