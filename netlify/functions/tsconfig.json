@@ -1,0 +1,10 @@
+{
+  "//": "Used by Netlify's esbuild bundler so the '@/*' alias inside src/ai contracts resolves at deploy. The repo tsc gate covers these files via tsconfig.app.json.",
+  "compilerOptions": {
+    "target": "es2023",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "paths": { "@/*": ["../../src/*"] }
+  }
+}
