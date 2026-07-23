@@ -1,0 +1,25 @@
+{
+  "generatedAt": "2026-07-23T22:30:28.214Z",
+  "multipleH1": [],
+  "missingH1": [
+    "/courses",
+    "/service",
+    "/printers",
+    "/organizations",
+    "/tasks",
+    "/knowledge",
+    "/learning",
+    "/analytics",
+    "/governance",
+    "/implementation",
+    "/personas",
+    "/stage-gates",
+    "/training-materials",
+    "/quick-start",
+    "/faq",
+    "/support",
+    "/system-health",
+    "/settings",
+    "/submission"
+  ]
+}

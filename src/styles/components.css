@@ -1909,7 +1909,11 @@
 .os-palette__kbd {
   font-family: var(--os-font-mono);
   font-size: var(--os-text-2xs);
-  color: var(--os-muted);
+  /* W9-C a11y: --os-muted on --os-highlight measured 4.67:1 — only just over the
+     4.5:1 AA floor, so axe flipped it to a serious color-contrast failure once the
+     palette's translucent backdrop composited during render. --os-text-2 measures
+     ~7:1 on the same surface, which keeps 11px text safely above AA. */
+  color: var(--os-text-2);
   background: var(--os-highlight);
   border: var(--os-border-thin);
   border-radius: var(--os-radius-xs);
