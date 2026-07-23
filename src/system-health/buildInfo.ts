@@ -7,16 +7,16 @@ import type { BuildInformation } from "@/domain/system-health";
 
 export const BUILD_VALUE_NOT_SUPPLIED_HE = "לא סופק בזמן build";
 
-function readDefine(name: string): string | null {
-  // vite/client types import.meta.env with an index signature; values only
-  // exist when a define/env var was supplied at build time.
-  const raw: unknown = (import.meta.env as Record<string, unknown>)[name];
+function clean(raw: unknown): string | null {
+  // STATIC member access below so Vite's `define` (vite.config.ts, W9-D REQ-1)
+  // replaces the exact expression at build time; a dynamic index access would
+  // miss the define and always fall back to the honest "not supplied" value.
   return typeof raw === "string" && raw.trim() !== "" ? raw.trim() : null;
 }
 
 export function collectBuildInformation(): BuildInformation {
-  const version = readDefine("VITE_APP_VERSION");
-  const commit = readDefine("VITE_BUILD_COMMIT");
+  const version = clean(import.meta.env.VITE_APP_VERSION);
+  const commit = clean(import.meta.env.VITE_BUILD_COMMIT);
   return {
     mode: import.meta.env.MODE,
     appVersion: version ?? BUILD_VALUE_NOT_SUPPLIED_HE,
