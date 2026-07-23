@@ -1,21 +1,101 @@
-# TERAGON AI BUSINESS OS — Netlify configuration
+# TERAGON AI BUSINESS OS — Netlify configuration (Phase 10.0 + 10.1, W9-D)
+# =============================================================================
+# Local demo classification: browser-local IndexedDB, synthetic seed data,
+# Mode A (AI_REMOTE_ENABLED=false ⇒ no remote provider is contacted).
+# Deploy itself is OPERATOR-GATED — see docs/DEPLOYMENT.md. This file is the
+# declarative config the operator's `netlify deploy` consumes; it authenticates
+# to nothing on its own.
+
 [build]
   command = "npm run build"
   publish = "dist"
 
+[build.environment]
+  # Pinned to a Netlify-supported LTS for a reproducible build image.
+  # Local baseline (docs/FINAL_BASELINE.md) was verified on Node v25.8.1 (odd,
+  # non-LTS). The build uses no Node-25-specific APIs (tsc -b + vite build only),
+  # so 22 LTS is the safe, supported production pin. Operator may raise this to
+  # "25" to mirror local exactly if any build discrepancy appears.
+  NODE_VERSION = "22"
+  # Deterministic install; matches the committed package-lock.json.
+  NPM_FLAGS = "--no-audit --no-fund"
+
 [functions]
   directory = "netlify/functions"
+  # Server env (AI_*) is set in the Netlify UI at scope Functions — NEVER here,
+  # NEVER VITE_-prefixed. See .env.example + docs/AI_PROVIDER_SETUP.md.
 
-# SPA fallback — client-side router owns all routes
+# --- SPA fallback ------------------------------------------------------------
+# The client-side router (react-router) owns every route; a direct hit on any
+# of the deep links (e.g. /governance) must serve index.html with 200 so the
+# router can resolve it. Netlify serves real files/functions before this rule,
+# so /assets/* and /.netlify/functions/* are unaffected.
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
+# --- Security headers (Phase 10.1) — applied to every response ---------------
 [[headers]]
   for = "/*"
   [headers.values]
+    # Clickjacking: deny framing entirely (legacy header + CSP frame-ancestors).
     X-Frame-Options = "DENY"
+    # MIME-sniffing protection.
     X-Content-Type-Options = "nosniff"
+    # Leak only the origin cross-site.
     Referrer-Policy = "strict-origin-when-cross-origin"
+    # No powerful features are used by the app — deny camera/mic/geolocation.
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    # Content Security Policy — restrictive, audited against the actual build:
+    #   default-src 'self'          — everything falls back to same-origin.
+    #   script-src 'self'           — NO 'unsafe-inline'/'unsafe-eval'. Verified:
+    #                                 the built dist/index.html contains only a
+    #                                 <script type="module" src="/assets/…"> — no
+    #                                 inline script and no inline event handlers.
+    #   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com
+    #                                 — 'unsafe-inline' is REQUIRED (see below);
+    #                                 the Google Fonts stylesheet is loaded from
+    #                                 fonts.googleapis.com by index.html.
+    #   font-src  'self' https://fonts.gstatic.com  — Google Fonts webfonts.
+    #   img-src   'self' data:      — inline data: URIs (SVG icons, canvas/chart
+    #                                 exports) plus same-origin assets.
+    #   connect-src 'self'          — the app only calls same-origin
+    #                                 /.netlify/functions/* (ai-*). No 3rd-party.
+    #   object-src 'none'           — no plugins/embeds.
+    #   frame-ancestors 'none'      — cannot be framed (clickjacking).
+    #   base-uri 'self' / form-action 'self' — lock <base> and form targets.
+    #
+    # style-src 'unsafe-inline' justification + remediation path:
+    #   Scope: (1) 65 React components render dynamic runtime styles via the
+    #   style={{…}} prop (charts, ConfidenceBar/GlowOrb widths & colors, layout
+    #   positioning) which emit inline style="" attributes; (2) the print view
+    #   (src/modules/quotations/printView.ts) writes an inline <style> block into
+    #   the print document. Both are inline styles, which style-src 'unsafe-inline'
+    #   governs. It does NOT weaken script execution — scripts remain 'self' only,
+    #   so the XSS-critical vector is closed.
+    #   Remediation (future, not a release blocker): move dynamic styles to CSS
+    #   custom properties (style={{'--w': x}} + a static class) and adopt a
+    #   nonce/hash strategy for the print <style>, then drop 'unsafe-inline' from
+    #   style-src. Tracked in docs/integration-requests-w9d.md.
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+
+# --- Cache headers -----------------------------------------------------------
+# Hashed, content-addressed build assets are immutable — cache for a year.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# The HTML entry must never be cached, so a new deploy's asset hashes are picked
+# up immediately (avoids stale index.html pointing at deleted chunks).
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# The SVG favicon: short cache, revalidate.
+[[headers]]
+  for = "/favicon.svg"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
