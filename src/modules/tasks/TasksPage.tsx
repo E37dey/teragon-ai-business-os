@@ -33,20 +33,21 @@ import { useCollection, useInvalidateCollections } from "@/app/data/hooks";
 import {
   baseStatusFor,
   buildWorkItems,
+  cleanDescription,
   dueToday,
   groupByState,
   isOverdue,
+  isSharedTask,
   meetingsByDay,
   meetingsOn,
   overdueTasks,
-  parseMarkers,
   taskOwnership,
   taskWorkState,
-  withMarkers,
   WORK_STATES,
   type WorkItem,
   type WorkState,
 } from "./lib";
+import type { TaskX } from "@/integration/domainExtensions";
 
 const kpiRowStyle: CSSProperties = {
   display: "grid",
@@ -484,15 +485,19 @@ function HumanTaskCard({
   const overdue = isOverdue(task, today);
   const ownership = taskOwnership(task);
   const owner = users.find((u) => u.id === task.ownerId);
-  const { clean, shared } = parseMarkers(task.description);
+  const clean = cleanDescription(task);
+  const shared = isSharedTask(task);
 
   async function moveTo(next: WorkState): Promise<void> {
     setBusy(true);
     try {
-      const repo = getRepository<Task>("tasks");
+      // W6 m001: canonical fields — the description stays clean, no ⟦…⟧ markers
+      const repo = getRepository<TaskX>("tasks");
       await repo.update(task.id, {
         status: baseStatusFor(next),
-        description: withMarkers(clean, next, shared),
+        description: clean,
+        workState: next,
+        ownership: shared ? "משותפת" : "אנושית",
         updatedAt: new Date().toISOString(),
       });
       await logTaskActivity(`המשימה «${task.title}» עברה למצב «${next}»`, `task:${task.id}`);
@@ -626,13 +631,12 @@ function TaskModal({
 }): ReactElement {
   const { toast } = useToast();
   const invalidate = useInvalidateCollections();
-  const parsed = task ? parseMarkers(task.description) : null;
   const [title, setTitle] = useState(task?.title ?? "");
-  const [description, setDescription] = useState(parsed?.clean ?? "");
+  const [description, setDescription] = useState(task ? cleanDescription(task) : "");
   const [priority, setPriority] = useState<TicketPriority>(task?.priority ?? "בינונית");
   const [due, setDue] = useState(task?.due.slice(0, 10) ?? todayISO());
   const [ownerId, setOwnerId] = useState(task?.ownerId ?? CEO_USER_ID);
-  const [shared, setShared] = useState(parsed?.shared ?? false);
+  const [shared, setShared] = useState(task ? isSharedTask(task) : false);
   const [relatedRef, setRelatedRef] = useState(task?.relatedRef ?? "");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -647,13 +651,16 @@ function TaskModal({
       return;
     }
     setBusy(true);
-    const repo = getRepository<Task>("tasks");
-    const description2 = withMarkers(description, parsed?.state ?? null, shared);
+    // W6 m001: canonical fields — descriptions stay clean, no ⟦…⟧ markers
+    const repo = getRepository<TaskX>("tasks");
+    const ownership = shared ? ("משותפת" as const) : ("אנושית" as const);
     void (async () => {
       if (task) {
         await repo.update(task.id, {
           title: title.trim(),
-          description: description2,
+          description,
+          workState: taskWorkState(task),
+          ownership,
           priority,
           due,
           ownerId,
@@ -670,7 +677,9 @@ function TaskModal({
             all.map((t) => t.id),
           ),
           title: title.trim(),
-          description: description2,
+          description,
+          workState: "לביצוע",
+          ownership,
           status: "פתוחה",
           priority,
           due,

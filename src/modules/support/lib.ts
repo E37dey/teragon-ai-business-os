@@ -1,8 +1,11 @@
 // Support module — pure derivations: tier model (ref 19), SLA timers vs
 // per-tier targets, deterministic category classifier, recurring-issue
-// detection and marker-based tier/assignee/feedback persistence (the domain
-// SupportRequest lacks these fields — integration request filed). Unit-tested.
+// detection. Wave 6 (m002): tier/assigneeId/category/feedback live on the
+// record (extension typing in src/integration/domainExtensions.ts until the
+// lead folds them into domain/types.ts); reading FALLS BACK to the legacy
+// ⟦…⟧ description markers for un-migrated records. Unit-tested.
 import type { KnowledgeNote, SupportRequest } from "@/domain/types";
+import type { SupportRequestX } from "@/integration/domainExtensions";
 
 export const RULES_ENGINE_LABEL = "מנוע מקומי מבוסס כללים";
 
@@ -44,6 +47,30 @@ export function parseSupport(description: string): ParsedSupport {
   return { tier, assigneeId, feedback, clean };
 }
 
+/**
+ * Effective support fields: canonical record fields (m002) win; legacy ⟦…⟧
+ * markers in the description are the fallback for un-migrated records.
+ */
+export function effectiveSupport(sr: SupportRequest): ParsedSupport {
+  const ext = sr as SupportRequestX;
+  const parsed = parseSupport(sr.description);
+  return {
+    tier: ext.tier ?? parsed.tier,
+    assigneeId: ext.assigneeId !== undefined ? ext.assigneeId : parsed.assigneeId,
+    feedback: ext.feedback !== undefined ? ext.feedback : parsed.feedback,
+    clean: parsed.clean,
+  };
+}
+
+/** Effective category: persisted snapshot (m002) → deterministic classifier. */
+export function effectiveCategory(sr: SupportRequest): SupportCategory {
+  const ext = (sr as SupportRequestX).category;
+  if (ext && (SUPPORT_CATEGORIES as readonly string[]).includes(ext)) {
+    return ext as SupportCategory;
+  }
+  return categorize(sr.subject, effectiveSupport(sr).clean);
+}
+
 export function withSupportMarkers(
   clean: string,
   tier: Tier,
@@ -72,7 +99,7 @@ export function supportSla(sr: SupportRequest, nowMs: number): SupportSla {
   const end = closed ? new Date(sr.updatedAt).getTime() : nowMs;
   const start = new Date(sr.createdAt).getTime();
   const elapsedHours = Math.max(0, Math.round(((end - start) / 3_600_000) * 10) / 10);
-  const targetHours = TIER_SLA_HOURS[parseSupport(sr.description).tier];
+  const targetHours = TIER_SLA_HOURS[effectiveSupport(sr).tier];
   const ratio = Math.round((elapsedHours / targetHours) * 100) / 100;
   const level = ratio > 1 ? "חריגה" : ratio >= 0.75 ? "בסיכון" : "תקין";
   return { elapsedHours, targetHours, ratio, level, closed };
@@ -136,7 +163,7 @@ export function recurringIssues(
   const byCategory = new Map<SupportCategory, string[]>();
   for (const r of requests) {
     if (new Date(r.createdAt).getTime() < cutoff) continue;
-    const cat = categorize(r.subject, parseSupport(r.description).clean);
+    const cat = effectiveCategory(r);
     const list = byCategory.get(cat) ?? [];
     list.push(r.id);
     byCategory.set(cat, list);
@@ -152,7 +179,7 @@ export function championLoad(requests: readonly SupportRequest[]): Map<string, n
   const load = new Map<string, number>();
   for (const r of requests) {
     if (r.status === "נסגרה") continue;
-    const { assigneeId } = parseSupport(r.description);
+    const { assigneeId } = effectiveSupport(r);
     if (!assigneeId) continue;
     load.set(assigneeId, (load.get(assigneeId) ?? 0) + 1);
   }
