@@ -1,5 +1,7 @@
 // Router helper pages — separated from router.tsx so component files only export components.
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Suspense, lazy } from "react";
+import { Link, Outlet, useLocation, useParams } from "react-router-dom";
+import { ReturnToPresentation } from "@/modules/presentation";
 import PlaceholderPage from "./PlaceholderPage";
 
 /** wraps PlaceholderPage so the live path (incl. params) is shown */
@@ -22,5 +24,26 @@ export function NotFoundPage() {
         חזרה למרכז הפיקוד
       </Link>
     </div>
+  );
+}
+
+const LazyPresentationPage = lazy(() => import("@/modules/presentation/PresentationPage"));
+
+/** Top-level presentation route element — outside OsShell for true full-screen (W7-F). */
+export function TopLevelPresentation() {
+  return (
+    <Suspense fallback={<div className="os-route-loading" aria-busy="true" />}>
+      <LazyPresentationPage />
+    </Suspense>
+  );
+}
+
+/** Shared top layout: floating "חזרה למצגת" control renders app-wide (W7-F). */
+export function AppTopLayout() {
+  return (
+    <>
+      <Outlet />
+      <ReturnToPresentation />
+    </>
   );
 }

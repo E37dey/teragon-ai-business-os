@@ -26,10 +26,15 @@ describe("router smoke — all canonical paths render", () => {
   });
 
   for (const r of APP_ROUTES) {
-    it(`${r.navPath} renders "${r.title}"`, () => {
+    it(`${r.navPath} renders "${r.title}"`, async () => {
       mount(r.navPath);
-      // title appears in the page heading (and possibly the nav) — at least once
-      const matches = screen.getAllByText((text) => text.includes(r.title));
+      // title appears in the page heading (and possibly the nav) — at least once.
+      // /submission/presentation is a top-level lazy route outside OsShell (W7-F),
+      // so its content (which contains the title) must be awaited.
+      const matches =
+        r.path === "/submission/presentation"
+          ? await screen.findAllByText((text) => text.includes(r.title))
+          : screen.getAllByText((text) => text.includes(r.title));
       expect(matches.length).toBeGreaterThanOrEqual(1);
     });
   }

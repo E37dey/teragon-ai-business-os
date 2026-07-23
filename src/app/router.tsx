@@ -6,7 +6,7 @@ import { Suspense, lazy } from "react";
 import type { ComponentType, LazyExoticComponent } from "react";
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import OsShell from "./OsShell";
-import { NotFoundPage, RoutedPlaceholder } from "./routerPages";
+import { AppTopLayout, NotFoundPage, RoutedPlaceholder, TopLevelPresentation } from "./routerPages";
 import { APP_ROUTES } from "./routes";
 import DesignShowcase from "@/design-system/showcase/DesignShowcase";
 
@@ -51,18 +51,28 @@ function routeElement(path: string, title: string, wave: number) {
 
 export const appRouteObjects: RouteObject[] = [
   {
-    path: "/",
-    element: <OsShell />,
+    // shared top layout: floating "חזרה למצגת" control renders app-wide (W7-F request #2)
+    element: <AppTopLayout />,
     children: [
-      ...APP_ROUTES.map((r): RouteObject => {
-        const element = routeElement(r.path, r.title, r.wave);
-        return r.path === "/" ? { index: true, element } : { path: r.path.slice(1), element };
-      }),
-      { path: "*", element: <NotFoundPage /> },
+      // Presentation — TOP-LEVEL route outside OsShell for true full-screen (W7-F request #1)
+      { path: "/submission/presentation", element: <TopLevelPresentation /> },
+      {
+        path: "/",
+        element: <OsShell />,
+        children: [
+          ...APP_ROUTES.filter((r) => r.path !== "/submission/presentation").map(
+            (r): RouteObject => {
+              const element = routeElement(r.path, r.title, r.wave);
+              return r.path === "/" ? { index: true, element } : { path: r.path.slice(1), element };
+            },
+          ),
+          { path: "*", element: <NotFoundPage /> },
+        ],
+      },
+      // Design-system showcase — renders its own full AppShell, so it lives outside OsShell.
+      { path: "/design", element: <DesignShowcase /> },
     ],
   },
-  // Design-system showcase — renders its own full AppShell, so it lives outside OsShell.
-  { path: "/design", element: <DesignShowcase /> },
 ];
 
 export function createAppRouter() {
