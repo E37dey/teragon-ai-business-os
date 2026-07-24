@@ -1,7 +1,9 @@
 {
+  "//": "Solution-style root config. The compilerOptions.paths block below is NOT used by the app build (tsconfig.app.json owns that) — it exists so Netlify's esbuild function bundler can resolve the '@/*' alias that src/server/** uses transitively when bundling netlify/functions/*. Verified against a real deploy: without it every function fails at runtime with ERR_MODULE_NOT_FOUND '@/ai'.",
   "files": [],
-  "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
-  ]
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }]
 }
