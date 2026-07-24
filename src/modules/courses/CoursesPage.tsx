@@ -180,27 +180,32 @@ export default function CoursesPage(): ReactElement {
 
       <div style={kpiRowStyle}>
         <KpiCard title="קורסים פעילים" value={activeCourses} accent="cyan" icon="graduation" />
-        <KpiCard title="רישומי תלמידים" value={enrollments.length} accent="blue" icon="users" />
+        <KpiCard title="לומדים פעילים" value={enrollments.length} accent="blue" icon="users" />
         <KpiCard
-          title="ממתינים לאישור מדריך"
+          title="ממתינים לבדיקת מדריך"
           value={approvals.length}
           accent="violet"
           icon="check"
           glow={approvals.length > 0}
         />
-        <KpiCard title="תלמידים בסיכון" value={delayed.length} accent="danger" icon="alert" />
-        <KpiCard title="מפגשים קרובים" value={upcoming.length} accent="success" icon="clock" />
+        <KpiCard title="לומדים הדורשים מעקב" value={delayed.length} accent="danger" icon="alert" />
+        <KpiCard
+          title="מפגשים בשבעת הימים הקרובים"
+          value={upcoming.length}
+          accent="success"
+          icon="clock"
+        />
       </div>
 
       <Tabs
         ariaLabel="אזורי העבודה של מודול הקורסים"
         items={[
-          { id: "students", label: "תלמידים והתקדמות", badge: enrollments.length },
-          { id: "approvals", label: "מטלות ואישורים", badge: approvals.length },
-          { id: "catalog", label: "קטלוג קורסים", badge: courses.length },
-          { id: "paths", label: "מסלולי למידה", badge: paths.length },
-          { id: "sessions", label: "מפגשים ונוכחות", badge: sessions.length },
-          { id: "certs", label: "תעודות" },
+          { id: "students", label: "לומדים והתקדמות", badge: enrollments.length },
+          { id: "approvals", label: "מטלות והגשות", badge: approvals.length },
+          { id: "catalog", label: "קטלוג הקורסים", badge: courses.length },
+          { id: "paths", label: "מסלולים וקורסים", badge: paths.length },
+          { id: "sessions", label: "לוח מפגשים", badge: sessions.length },
+          { id: "certs", label: "תעודות והסמכות" },
         ]}
         activeId={tab}
         onChange={setTab}
@@ -257,20 +262,20 @@ function CoursesRail({
   return (
     <div style={{ display: "grid", gap: "var(--os-space-6)", fontSize: "var(--os-text-sm)" }}>
       <div>
-        <div style={railTitleStyle}>השלמת מסלולים</div>
+        <div style={railTitleStyle}>התקדמות במסלולים</div>
         {withStudents.length === 0 && <div style={railMutedStyle}>אין רישומים פעילים למדידה.</div>}
         {withStudents.map((s) => (
           <div key={s.courseId} style={{ marginBlockEnd: "var(--os-space-4)" }}>
             <ConfidenceBar
               value={s.avgProgress}
-              label={`${nameOf(s.courseId)} · ${s.students} תלמידים`}
+              label={`${nameOf(s.courseId)} · ${s.students} לומדים`}
             />
           </div>
         ))}
       </div>
       <div>
-        <div style={railTitleStyle}>תלמידים בסיכון ({delayed.length})</div>
-        {delayed.length === 0 && <div style={railMutedStyle}>אין תלמידים בסיכון כרגע.</div>}
+        <div style={railTitleStyle}>לומדים הדורשים מעקב ({delayed.length})</div>
+        {delayed.length === 0 && <div style={railMutedStyle}>אין כרגע לומדים הדורשים מעקב.</div>}
         {delayed.slice(0, 5).map((d, i) => (
           <div key={`${d.enrollment.id}-${d.stage.stageId}-${i}`} style={railRowStyle}>
             <span>{d.enrollment.studentName}</span>
@@ -279,7 +284,7 @@ function CoursesRail({
         ))}
       </div>
       <div>
-        <div style={railTitleStyle}>מפגשים קרובים</div>
+        <div style={railTitleStyle}>מפגשים בשבעת הימים הקרובים</div>
         {upcoming.length === 0 && <div style={railMutedStyle}>אין מפגשים מתוזמנים קדימה.</div>}
         {upcoming.map((s) => (
           <div key={s.id} style={{ marginBlockEnd: "var(--os-space-3)" }}>
@@ -436,6 +441,9 @@ function StudentDetail({
     enrollment.stages.find((s) => s.stageId === activeStageId) ?? cur ?? enrollment.stages[0];
   const stageMeta = path?.stages.find((s) => s.id === activeStage?.stageId);
   const rec = nextExercise(enrollment, path);
+  // copy helpers (display only): total stages + how many the learner has cleared
+  const totalStages = path?.stages.length ?? 0;
+  const completedStages = enrollment.stages.filter((s) => s.status === "אושר").length;
 
   const steps: StepperStep[] = (path?.stages ?? []).map((st) => {
     const sp = enrollment.stages.find((s) => s.stageId === st.id);
@@ -489,7 +497,7 @@ function StudentDetail({
       <Panel style={{ padding: "var(--os-space-5)" }}>
         <SectionTitle
           title={enrollment.studentName}
-          subtitle={`${course?.name ?? ""} · ${path.name}`}
+          subtitle={`מסלול: ${course?.name ?? path.name} · ${completedStages} מתוך ${totalStages} שלבים הושלמו`}
         />
         <div
           className="os-table-scroll"
@@ -509,12 +517,27 @@ function StudentDetail({
       >
         <Panel style={{ padding: "var(--os-space-5)", display: "grid", gap: "var(--os-space-4)" }}>
           <SectionTitle
-            title={stageMeta ? `שלב ${stageMeta.order}: ${stageMeta.name}` : activeStage.stageId}
+            title={
+              stageMeta
+                ? `שלב ${stageMeta.order} מתוך ${totalStages} · ${stageMeta.name}`
+                : activeStage.stageId
+            }
             action={statusToChip(activeStage.status)}
           />
           {stageMeta && (
-            <div style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-sm)" }}>
-              {stageMeta.description}
+            <div style={{ display: "grid", gap: 4 }}>
+              <div
+                style={{
+                  color: "var(--os-muted)",
+                  fontSize: "var(--os-text-xs)",
+                  fontWeight: 600,
+                }}
+              >
+                מטלת השלב
+              </div>
+              <div style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-sm)" }}>
+                {stageMeta.description}
+              </div>
             </div>
           )}
           <div style={{ fontSize: "var(--os-text-sm)" }}>
@@ -528,7 +551,9 @@ function StudentDetail({
               variant="raised"
               style={{ padding: "var(--os-space-4)", fontSize: "var(--os-text-sm)" }}
             >
-              <div style={{ color: "var(--os-muted)", marginBlockEnd: 4 }}>הגשת התלמיד/ה</div>
+              <div
+                style={{ color: "var(--os-muted)", marginBlockEnd: 4 }}
+              >{`ההגשה של ${enrollment.studentName}`}</div>
               {activeStage.text}
             </Panel>
           )}
@@ -546,7 +571,7 @@ function StudentDetail({
             <div style={{ fontSize: "var(--os-text-sm)", display: "grid", gap: 4 }}>
               {activeStage.files.map((f) => (
                 <div key={f.name} style={{ color: "var(--os-text-2)" }}>
-                  📎 {f.name} <span className="os-num">({f.size})</span>
+                  📎 צפייה בצילום המסך שצורף — {f.name} <span className="os-num">({f.size})</span>
                 </div>
               ))}
               {activeStage.links.map((l) => (
@@ -558,7 +583,7 @@ function StudentDetail({
           )}
           {stageMeta && stageMeta.checklist.length > 0 && (
             <div style={{ fontSize: "var(--os-text-sm)", display: "grid", gap: 4 }}>
-              <div style={{ color: "var(--os-muted)" }}>צ'קליסט השלב</div>
+              <div style={{ color: "var(--os-muted)" }}>רשימת בדיקה לשלב</div>
               {stageMeta.checklist.map((item) => {
                 const done = activeStage.checklistDone.includes(item);
                 return (
@@ -575,7 +600,7 @@ function StudentDetail({
           {activeStage.notes.length > 0 && (
             <div style={{ display: "grid", gap: 6 }}>
               <div style={{ color: "var(--os-muted)", fontSize: "var(--os-text-sm)" }}>
-                הערות ולמידה ({activeStage.notes.length})
+                סיכומי מדריך קודמים ({activeStage.notes.length})
               </div>
               {activeStage.notes.map((n, i) => (
                 <Panel
@@ -610,29 +635,29 @@ function StudentDetail({
                     ).then(() => toast("השלב אושר ונרשם ביומן הפעילות", "success"));
                   }}
                 >
-                  אישור השלב
+                  אישור השלמת השלב
                 </OsButton>
               ) : (
                 <OsButton
                   variant="approve"
                   icon="check"
                   disabled
-                  disabledReason="אישור אפשרי רק כשהשלב הוגש לבדיקת המדריך"
+                  disabledReason="אישור אפשרי רק לאחר שהשלב הוגש לבדיקת המדריך"
                 >
-                  אישור השלב
+                  אישור השלמת השלב
                 </OsButton>
               )}
             </div>
             <div style={{ display: "grid", gap: 6 }}>
               <label className="os-qc-label" htmlFor="return-note">
-                החזרה לתיקון — הערה חובה
+                {`משוב המדריך — כתבו משוב קצר וברור שיעזור ל${enrollment.studentName} להתקדם לשלב הבא`}
               </label>
               <textarea
                 id="return-note"
                 className="os-qc-input os-qc-input--area"
                 value={returnNote}
                 onChange={(e) => setReturnNote(e.target.value)}
-                placeholder="מה נדרש לתקן? ההערה תוצג לתלמיד/ה."
+                placeholder={`מה נדרש לתקן? המשוב יוצג ל${enrollment.studentName}.`}
                 rows={2}
               />
               <div>
@@ -665,7 +690,7 @@ function StudentDetail({
                     disabled
                     disabledReason={
                       awaiting
-                        ? "החזרה לתיקון מחייבת הערה כתובה לתלמיד/ה"
+                        ? "החזרה לתיקון מחייבת משוב כתוב ללומד"
                         : "החזרה אפשרית רק כשהשלב ממתין לבדיקת המדריך"
                     }
                   >
@@ -676,7 +701,7 @@ function StudentDetail({
             </div>
             <div style={{ display: "grid", gap: 6 }}>
               <label className="os-qc-label" htmlFor="memory-note">
-                הערת למידה (זיכרון תלמיד)
+                סיכום לתיק הלומד — נקודות חשובות להמשך הליווי
               </label>
               <div style={{ display: "flex", gap: "var(--os-space-3)" }}>
                 <input
@@ -684,7 +709,7 @@ function StudentDetail({
                   className="os-qc-input"
                   value={memoryNote}
                   onChange={(e) => setMemoryNote(e.target.value)}
-                  placeholder="תובנה על התלמיד/ה שתישמר על השלב"
+                  placeholder={`תובנה על ${enrollment.studentName} שתישמר בתיק הלמידה`}
                 />
                 {memoryNote.trim().length > 0 ? (
                   <OsButton
@@ -706,16 +731,16 @@ function StudentDetail({
                       });
                     }}
                   >
-                    שמירה
+                    שמירת הסיכום
                   </OsButton>
                 ) : (
                   <OsButton
                     variant="ghost"
                     icon="memory"
                     disabled
-                    disabledReason="כתבו הערה לפני השמירה"
+                    disabledReason="כתבו סיכום לפני השמירה"
                   >
-                    שמירה
+                    שמירת הסיכום
                   </OsButton>
                 )}
               </div>
@@ -729,7 +754,7 @@ function StudentDetail({
           accent="cyan"
           style={{ padding: "var(--os-space-5)", display: "grid", gap: "var(--os-space-3)" }}
         >
-          <SectionTitle icon="sparkle" title="התרגיל הבא" subtitle={RULES_ENGINE_LABEL} />
+          <SectionTitle icon="sparkle" title="השלב הבא" subtitle={RULES_ENGINE_LABEL} />
           {rec ? (
             <>
               <div style={{ fontWeight: 600 }}>
@@ -744,7 +769,7 @@ function StudentDetail({
               </div>
             </>
           ) : (
-            <div style={{ color: "var(--os-success)" }}>המסלול הושלם — אין תרגיל הבא. 🎓</div>
+            <div style={{ color: "var(--os-success)" }}>המסלול הושלם — אין שלב הבא. 🎓</div>
           )}
         </Panel>
       </div>
@@ -765,7 +790,7 @@ function ApprovalsQueue({
   onOpenStudent: (enrollmentId: string) => void;
 }): ReactElement {
   const columns: DataTableColumn<(typeof approvals)[number]>[] = [
-    { key: "student", header: "תלמיד/ה", render: (r) => r.enrollment.studentName },
+    { key: "student", header: "לומד", render: (r) => r.enrollment.studentName },
     {
       key: "course",
       header: "קורס",
@@ -804,7 +829,7 @@ function ApprovalsQueue({
       rows={approvals}
       rowKey={(r) => `${r.enrollment.id}-${r.stage.stageId}`}
       emptyText="אין מטלות שממתינות לאישור"
-      emptyReason="כשתלמיד/ה יגישו שלב לבדיקה הוא יופיע כאן."
+      emptyReason="כאשר לומד יגיש שלב לבדיקה הוא יופיע כאן."
     />
   );
 }
@@ -1134,7 +1159,7 @@ function CertificatesView({
 }): ReactElement {
   const rows = enrollments.map((e) => ({ enr: e, eligible: certificateEligible(e) }));
   const columns: DataTableColumn<(typeof rows)[number]>[] = [
-    { key: "student", header: "תלמיד/ה", render: (r) => r.enr.studentName },
+    { key: "student", header: "לומד", render: (r) => r.enr.studentName },
     {
       key: "course",
       header: "קורס",
