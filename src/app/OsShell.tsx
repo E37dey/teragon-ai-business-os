@@ -30,7 +30,7 @@ import {
   type QuickCreateState,
 } from "./quick-create/QuickCreateHost";
 import { RailProvider } from "./rail";
-import { useRailContent } from "./railContext";
+import { useRailContent, useRailHidden } from "./railContext";
 import CopilotWorkspace from "@/modules/ai-copilot/CopilotWorkspace";
 import { CopilotProvider } from "@/modules/ai-copilot/copilotContext";
 import { useCopilot } from "@/modules/ai-copilot/copilotApi";
@@ -169,6 +169,8 @@ function OsShellInner(): ReactElement {
   const [quickCreate, setQuickCreate] = useState<QuickCreateState | null>(null);
   const [navDrawerOpen, setNavDrawerOpen] = useState(false);
   const { unreadCount } = useNotifications();
+  // A dense page may opt out of the shell rail (HideShellRail) for a full-width canvas.
+  const railHidden = useRailHidden();
 
   // Ctrl+K / ⌘K — open (or close) the command palette
   useEffect(() => {
@@ -252,14 +254,16 @@ function OsShellInner(): ReactElement {
         }}
         copilotSlot={<NavCopilotCard />}
         railContent={
-          <LeftIntelligenceRail
-            title="לוח הקשר"
-            collapsible
-            collapsed={shellState.railCollapsed}
-            onToggleCollapsed={toggleRail}
-          >
-            <RailSlot />
-          </LeftIntelligenceRail>
+          railHidden ? undefined : (
+            <LeftIntelligenceRail
+              title="לוח הקשר"
+              collapsible
+              collapsed={shellState.railCollapsed}
+              onToggleCollapsed={toggleRail}
+            >
+              <RailSlot />
+            </LeftIntelligenceRail>
+          )
         }
       >
         <Outlet />

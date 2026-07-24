@@ -7,7 +7,12 @@ import { RailContext, useRailApi } from "./railContext";
 
 export function RailProvider({ children }: { children: ReactNode }): ReactElement {
   const [content, setContent] = useState<ReactNode | null>(null);
-  return <RailContext.Provider value={{ content, setContent }}>{children}</RailContext.Provider>;
+  const [hidden, setHidden] = useState(false);
+  return (
+    <RailContext.Provider value={{ content, setContent, hidden, setHidden }}>
+      {children}
+    </RailContext.Provider>
+  );
 }
 
 /**
@@ -24,5 +29,23 @@ export function PageRail({ children }: { children: ReactNode }): null {
     setContent(children);
     return () => setContent(null);
   }, [children, setContent]);
+  return null;
+}
+
+/**
+ * Mount inside a page to hide the shell intelligence rail so the workspace
+ * canvas spans full width. For dense pages that own their own contextual
+ * layout. Restores the rail automatically on unmount.
+ */
+export function HideShellRail(): null {
+  const ctx = useRailApi();
+  if (!ctx) {
+    throw new Error("HideShellRail חייב לרוץ בתוך RailProvider (OsShell).");
+  }
+  const { setHidden } = ctx;
+  useEffect(() => {
+    setHidden(true);
+    return () => setHidden(false);
+  }, [setHidden]);
   return null;
 }
