@@ -71,3 +71,15 @@
 | W8-E | Cross-Module | main | ✅ | 22 tests, 10 flows + wiring |
 | W8-F | QA/Security/Visual | main | ✅ | 22 security tests + 102 e2e + 68 screenshots + axe clean |
 | Lead | Integration | main | ✅ | P-1/P-2 fixed, collections v6, 5 routes, D8F-3 fix, GATE-RED guard |
+
+## Wave 9/10 — Final Release Gate (24.07.2026)
+
+| # | Agent | Role | State | Result |
+|---|-------|------|-------|--------|
+| W9-A | Interaction Audit | worktree 7231ca3 → merge | ✅ | static auditor (self-testing 14/14) + 1833 controls, 0 dead |
+| W9-B | RBAC + Security | worktree → merge | ✅ | 9×24 matrix, 4 layers, 51 tests, CSV-injection FINDING (fixed by Lead) |
+| W9-C | Regression/a11y/Visual | worktree 5635a2a → merge | ✅ | 196 e2e, axe 0 serious/critical ×31, 106 screenshots |
+| W9-D | Netlify/Release Eng | worktree bbf55cd → merge | ✅ | netlify.toml + CSP + runbooks + preview smoke |
+| W9-E | Final Docs | worktree ca0e697 → merge | ✅ | feature matrix (31), release notes, guides, approval runbook |
+| Lead | Integration | main | ✅ | redact split, vite defines, 6 defect fixes, full regression, release tag |
+| W9-F | Live Verification | — | ⏸ PENDING | requires operator Netlify deploy |

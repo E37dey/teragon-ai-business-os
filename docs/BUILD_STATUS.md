@@ -50,3 +50,6 @@
 
 ## Wave 8 — DONE (24.07.2026)
 5 ראוטים אחרונים הופעלו: /analytics /governance /administration /system-health /settings. **כל 31 הראוטים מבצעיים — אפס placeholders.** שערים: 1639/1639 unit · 329/329 e2e · axe 0 serious · scanner CLEAN. 12 deliverables נשארים "ממתין לאישור אנושי בשם".
+
+## Wave 9/10 — RELEASE GATE (24.07.2026)
+כל 31 הראוטים מבצעיים · 1694/1694 unit · 558/558 e2e · axe 0 serious/critical · scanner CLEAN · interaction audit 0 dead controls · preview smoke 32/32. תג: teragon-os-demo-v1.0.0. פריסה = פעולת מפעיל (OPERATOR_ACTION_REQUIRED).
