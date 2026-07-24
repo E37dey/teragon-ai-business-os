@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-07-23T21:47:02.202Z",
+  "generatedAt": "2026-07-23T23:34:26.203Z",
   "totals": {
-    "total": 1833,
-    "buttons": 779,
+    "total": 1847,
+    "buttons": 793,
     "links": 892,
     "inputs": 112,
     "tabs": 50,
@@ -91,8 +91,8 @@
     {
       "path": "/courses",
       "title": "קורסים ולמידה",
-      "total": 62,
-      "buttons": 24,
+      "total": 76,
+      "buttons": 38,
       "links": 28,
       "inputs": 4,
       "tabs": 6,

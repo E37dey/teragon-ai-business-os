@@ -57,7 +57,9 @@ test.describe("service — ticket lifecycle", () => {
     await page.getByRole("button", { name: "קריאה חדשה" }).click();
 
     await page.locator("#nt-customer").selectOption({ label: "סטודיו דגש" });
-    await page.locator("#nt-printer").selectOption({ index: 1 });
+    // W9-A defect #2 fix split the printer control into two distinct ids
+    // (select when the customer has a fleet, free-text input otherwise).
+    await page.locator("#nt-printer-select").selectOption({ index: 1 });
     await page.locator("#nt-issue").fill("רעש חריג בציר X");
     await page.locator("#nt-desc").fill("רעש בזמן הדפסה מהירה בלבד");
     await page.getByRole("button", { name: "פתיחת קריאה" }).click();

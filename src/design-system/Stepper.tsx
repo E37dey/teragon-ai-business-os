@@ -1,4 +1,4 @@
-import type { ReactElement, KeyboardEvent } from "react";
+import type { ReactElement } from "react";
 import { OsIcon, type IconName } from "./icons";
 import "../styles/components.css";
 
@@ -48,29 +48,14 @@ export function Stepper({
               : i === activeIndex
                 ? "active"
                 : "pending");
-        // W9-A defect #1: a clickable step must be keyboard-operable. Handlers
-        // are hoisted (not inline arrows) so the JSX stays simple and readable.
+        // W9-A defect #1: a clickable step must be keyboard-operable — but the
+        // container is role="list", so the step itself MUST stay a listitem
+        // (aria-required-children). The activation affordance is therefore a
+        // real <button> nested inside, which is keyboard-operable for free.
         const clickable = typeof onStepClick === "function";
         const activate = clickable ? () => onStepClick(step) : undefined;
-        const onKey = clickable
-          ? (e: KeyboardEvent<HTMLDivElement>) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onStepClick(step);
-              }
-            }
-          : undefined;
-        return (
-          <div
-            key={step.id}
-            role={clickable ? "button" : "listitem"}
-            className={`os-stepper__step os-stepper__step--${status}`}
-            onClick={activate}
-            tabIndex={clickable ? 0 : undefined}
-            onKeyDown={onKey}
-            style={clickable ? { cursor: "pointer" } : undefined}
-            aria-current={status === "active" ? "step" : undefined}
-          >
+        const body = (
+          <>
             <span className="os-stepper__circle" aria-hidden="true">
               {step.icon ? (
                 <OsIcon name={step.icon} size={16} />
@@ -81,6 +66,22 @@ export function Stepper({
             <span className="os-stepper__label">{step.label}</span>
             {typeof step.count === "number" && (
               <span className="os-stepper__count os-num">{step.count}</span>
+            )}
+          </>
+        );
+        return (
+          <div
+            key={step.id}
+            role="listitem"
+            className={`os-stepper__step os-stepper__step--${status}`}
+            aria-current={status === "active" ? "step" : undefined}
+          >
+            {clickable ? (
+              <button type="button" className="os-stepper__activate" onClick={activate}>
+                {body}
+              </button>
+            ) : (
+              body
             )}
           </div>
         );

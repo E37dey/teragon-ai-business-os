@@ -2365,3 +2365,20 @@
     display: none;
   }
 }
+
+/* Stepper: clickable steps nest a real <button> (keyboard-operable) inside the
+   listitem so role="list" keeps valid children. The button is visually a
+   pass-through of the step layout. */
+.os-stepper__activate {
+  all: unset;
+  display: inherit;
+  align-items: inherit;
+  gap: inherit;
+  cursor: pointer;
+  inline-size: 100%;
+}
+.os-stepper__activate:focus-visible {
+  outline: 2px solid var(--os-cyan);
+  outline-offset: 2px;
+  border-radius: var(--os-radius-sm, 6px);
+}
