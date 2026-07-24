@@ -1,42 +1,29 @@
-// /courses — קורסים והכשרות (Wave 4). Instructor workbench: catalogue,
+// /courses — קורסים והכשרות (Layout v3). Instructor workbench: catalogue,
 // learning paths, student progress + approval flow, sessions & attendance,
-// certificates, delayed queue. Data only through repositories (TanStack Query);
-// every derived number comes from src/modules/courses/lib.ts.
+// certificates. The page owns the full-width canvas (HideShellRail removes the
+// shell rail) and drives ALL responsive decisions through a single named
+// container (`courses`) via @container queries — never viewport media queries.
+// Data only through repositories (TanStack Query); every derived number comes
+// from src/modules/courses/lib.ts.
 import { useMemo, useState } from "react";
-import type { CSSProperties, ReactElement } from "react";
-import { PageRail } from "@/app/rail";
+import type { ReactElement } from "react";
+import { HideShellRail } from "@/app/rail";
 import {
-  ConfidenceBar,
   DataTable,
   Drawer,
   EmptyState,
-  KpiCard,
   Modal,
   OsButton,
   Panel,
   SectionTitle,
   StatusChip,
-  Tabs,
   useToast,
   type DataTableColumn,
-  type StepperStep,
 } from "@/design-system";
-import { StageGroups } from "./StageGroups";
-import { LearnerList } from "./LearnerList";
-import { useDrawer, useIsWide } from "./useCoursesLayout";
 import "../../styles/courses.css";
-import type {
-  Activity,
-  Course,
-  CourseSession,
-  Enrollment,
-  LearningPath,
-  StageProgress,
-  StageProgressStatus,
-  User,
-} from "@/domain/types";
+import type { Course, CourseSession, Enrollment, LearningPath, User } from "@/domain/types";
 import { getRepository, nextId } from "@/repositories";
-import { CEO_USER_ID, DEMO_DATA_LABEL } from "@/repositories/seed";
+import { DEMO_DATA_LABEL } from "@/repositories/seed";
 import { useCollection, useInvalidateCollections } from "@/app/data/hooks";
 import {
   approvalQueue,
@@ -47,57 +34,21 @@ import {
   formatDateHe,
   nextExercise,
   progressPercent,
-  RULES_ENGINE_LABEL,
   studentCount,
   todayISO,
   upcomingSessions,
 } from "./lib";
-
-// ── shared layout bits ──────────────────────────────────────────────────────
-function statusToChip(status: StageProgressStatus): ReactElement {
-  switch (status) {
-    case "אושר":
-      return <StatusChip status="הושלם" label="אושר" />;
-    case "הוגש לבדיקה":
-    case "ממתין לאישור מדריך":
-      return <StatusChip status="דורש אישור" label={status} />;
-    case "בעבודה":
-      return <StatusChip status="פעיל" label="בעבודה" />;
-    case "נדרש תיקון":
-    case "באיחור":
-      return <StatusChip status="אזהרה" label={status} />;
-    case "חסום / צריך עזרה":
-      return <StatusChip status="חסום" label="חסום / צריך עזרה" />;
-    default:
-      return <StatusChip status="ממתין" label={status} />;
-  }
-}
-
-/** Disabled-with-reason props while an async action runs (OsButton honesty contract). */
-function busyDisabled(
-  busy: boolean,
-): { disabled: true; disabledReason: string } | { disabled?: false } {
-  return busy ? { disabled: true, disabledReason: "פעולה קודמת עדיין רצה" } : {};
-}
-
-async function logCourseActivity(text: string, entityRef: string | null): Promise<void> {
-  const repo = getRepository<Activity>("activities");
-  const all = await repo.list();
-  const now = new Date().toISOString();
-  await repo.create({
-    id: nextId(
-      "act",
-      all.map((a) => a.id),
-    ),
-    kind: "קורס",
-    text,
-    actorId: CEO_USER_ID,
-    entityRef,
-    at: now,
-    createdAt: now,
-    updatedAt: now,
-  });
-}
+import { logCourseActivity } from "./activity";
+import { busyDisabled } from "./controls";
+import { statusToChip } from "./statusChip";
+import { useOpenDrawer } from "./useCoursesLayout";
+import { CoursesHeader } from "./CoursesHeader";
+import { CoursesKpiStrip } from "./CoursesKpiStrip";
+import { CoursesSubnav } from "./CoursesSubnav";
+import { MainWorkflow } from "./MainWorkflow";
+import { CoursesInsights } from "./InsightsDrawer";
+import { LearnerListPanel } from "./LearnerListDrawer";
+import { NextStageDrawerBody } from "./NextStageMiniCard";
 
 // ── page ────────────────────────────────────────────────────────────────────
 export default function CoursesPage(): ReactElement {
@@ -110,6 +61,9 @@ export default function CoursesPage(): ReactElement {
   const [tab, setTab] = useState("students");
   const [selectedEnrollmentId, setSelectedEnrollmentId] = useState<string | null>(null);
   const [newCourseOpen, setNewCourseOpen] = useState(false);
+  const [courseFilter, setCourseFilter] = useState("all");
+  const [learnerSearch, setLearnerSearch] = useState("");
+  const drawer = useOpenDrawer();
 
   const loading =
     coursesQ.isLoading || pathsQ.isLoading || enrollmentsQ.isLoading || sessionsQ.isLoading;
@@ -130,6 +84,35 @@ export default function CoursesPage(): ReactElement {
   const stats = useMemo(() => completionStats(courses, enrollments), [courses, enrollments]);
 
   const activeCourses = courses.filter((c) => c.status === "פעיל" || c.status === "מלא").length;
+  const overallProgress = useMemo(() => {
+    const measured = stats.map((s) => s.avgProgress).filter((p): p is number => p !== null);
+    return measured.length === 0
+      ? null
+      : Math.round(measured.reduce((a, b) => a + b, 0) / measured.length);
+  }, [stats]);
+
+  // learner roster filtered by course + free-text search on the learner name
+  const search = learnerSearch.trim();
+  const filtered = useMemo(
+    () =>
+      enrollments
+        .filter((e) => courseFilter === "all" || e.courseId === courseFilter)
+        .filter((e) => search === "" || e.studentName.includes(search)),
+    [enrollments, courseFilter, search],
+  );
+  const selected = enrollments.find((e) => e.id === selectedEnrollmentId) ?? filtered[0] ?? null;
+  const courseOf = (id: string): Course | undefined => courses.find((c) => c.id === id);
+  const selectedCourse = selected ? courseOf(selected.courseId) : undefined;
+  const selectedPath = selected ? paths.find((p) => p.courseId === selected.courseId) : undefined;
+  const instructorName = selectedCourse
+    ? (users.find((u) => u.id === selectedCourse.instructorId)?.name ?? null)
+    : null;
+  const rec = selected ? nextExercise(selected, selectedPath) : null;
+  const courseUpcoming = selected ? upcoming.filter((s) => s.courseId === selected.courseId) : [];
+  const statusOf = (enr: Enrollment): ReactElement | null => {
+    const cur = currentStage(enr);
+    return cur ? statusToChip(cur.status) : null;
+  };
 
   if (error) {
     return (
@@ -149,69 +132,84 @@ export default function CoursesPage(): ReactElement {
   }
 
   return (
-    <div className="courses-page" style={{ display: "grid", gap: "var(--os-space-6)" }}>
-      <PageRail>
-        <CoursesRail
-          courses={courses}
-          stats={stats}
-          delayed={delayed}
-          upcoming={upcoming.slice(0, 3)}
-        />
-      </PageRail>
+    <div className="courses-page">
+      <HideShellRail />
 
-      <SectionTitle
-        icon="graduation"
-        title="קורסים והכשרות"
+      <CoursesHeader
         subtitle={DEMO_DATA_LABEL}
-        action={
-          <OsButton icon="plus" onClick={() => setNewCourseOpen(true)}>
-            קורס חדש
-          </OsButton>
-        }
+        onNewCourse={() => setNewCourseOpen(true)}
+        onOpenLearner={() => drawer.open("learner")}
+        onOpenInsights={() => drawer.open("insights")}
       />
 
-      <div className="courses-kpi-grid">
-        <KpiCard title="קורסים פעילים" value={activeCourses} accent="cyan" icon="graduation" />
-        <KpiCard title="לומדים פעילים" value={enrollments.length} accent="blue" icon="users" />
-        <KpiCard
-          title="ממתינים לבדיקת מדריך"
-          value={approvals.length}
-          accent="violet"
-          icon="check"
-          glow={approvals.length > 0}
-        />
-        <KpiCard title="לומדים הדורשים מעקב" value={delayed.length} accent="danger" icon="alert" />
-        <KpiCard
-          title="מפגשים בשבעת הימים הקרובים"
-          value={upcoming.length}
-          accent="success"
-          icon="clock"
-        />
-      </div>
+      <CoursesKpiStrip
+        activeCourses={activeCourses}
+        learners={enrollments.length}
+        approvals={approvals.length}
+        delayed={delayed.length}
+        upcoming={upcoming.length}
+        overallProgress={overallProgress}
+      />
 
-      <Tabs
-        ariaLabel="אזורי העבודה של מודול הקורסים"
-        items={[
-          { id: "students", label: "לומדים והתקדמות", badge: enrollments.length },
-          { id: "approvals", label: "מטלות והגשות", badge: approvals.length },
-          { id: "catalog", label: "קטלוג הקורסים", badge: courses.length },
-          { id: "paths", label: "מסלולים וקורסים", badge: paths.length },
-          { id: "sessions", label: "לוח מפגשים", badge: sessions.length },
-          { id: "certs", label: "תעודות והסמכות" },
-        ]}
+      <CoursesSubnav
         activeId={tab}
         onChange={setTab}
+        counts={{
+          students: enrollments.length,
+          paths: paths.length,
+          approvals: approvals.length,
+          sessions: sessions.length,
+          catalog: courses.length,
+        }}
       />
 
       {tab === "students" && (
-        <StudentsWorkbench
-          enrollments={enrollments}
-          courses={courses}
-          paths={paths}
-          upcoming={upcoming}
-          selectedId={selectedEnrollmentId}
-          onSelect={setSelectedEnrollmentId}
-        />
+        <div className="courses-workspace">
+          <div className="courses-insights-col">
+            <Panel className="courses-side-panel">
+              <CoursesInsights
+                courses={courses}
+                stats={stats}
+                delayed={delayed}
+                upcoming={upcoming.slice(0, 3)}
+              />
+            </Panel>
+          </div>
+
+          <div className="courses-center-col">
+            {selected ? (
+              <MainWorkflow
+                key={selected.id}
+                enrollment={selected}
+                course={selectedCourse}
+                path={selectedPath}
+                upcoming={upcoming}
+                instructorName={instructorName}
+                drawer={drawer}
+              />
+            ) : (
+              <EmptyState title="בחרו תלמיד" reason="בחרו רישום מהרשימה כדי לצפות בהתקדמות." />
+            )}
+          </div>
+
+          <div className="courses-learner-col">
+            <Panel className="courses-side-panel">
+              <LearnerListPanel
+                idPrefix="col"
+                courses={courses}
+                enrollments={filtered}
+                courseFilter={courseFilter}
+                onCourseFilter={setCourseFilter}
+                search={learnerSearch}
+                onSearch={setLearnerSearch}
+                selectedId={selected?.id ?? null}
+                onSelect={setSelectedEnrollmentId}
+                courseOf={courseOf}
+                statusOf={statusOf}
+              />
+            </Panel>
+          </div>
+        </div>
       )}
       {tab === "approvals" && (
         <ApprovalsQueue
@@ -233,634 +231,41 @@ export default function CoursesPage(): ReactElement {
       )}
       {tab === "certs" && <CertificatesView enrollments={enrollments} courses={courses} />}
 
-      <NewCourseModal open={newCourseOpen} onClose={() => setNewCourseOpen(false)} users={users} />
-    </div>
-  );
-}
-
-// ── rail ────────────────────────────────────────────────────────────────────
-function CoursesRail({
-  courses,
-  stats,
-  delayed,
-  upcoming,
-}: {
-  courses: readonly Course[];
-  stats: ReturnType<typeof completionStats>;
-  delayed: ReturnType<typeof delayedQueue>;
-  upcoming: readonly CourseSession[];
-}): ReactElement {
-  const nameOf = (id: string): string => courses.find((c) => c.id === id)?.name ?? id;
-  const withStudents = stats.filter((s) => s.students > 0);
-  return (
-    <div style={{ display: "grid", gap: "var(--os-space-6)", fontSize: "var(--os-text-sm)" }}>
-      <div>
-        <div style={railTitleStyle}>התקדמות במסלולים</div>
-        {withStudents.length === 0 && <div style={railMutedStyle}>אין רישומים פעילים למדידה.</div>}
-        {withStudents.map((s) => (
-          <div key={s.courseId} style={{ marginBlockEnd: "var(--os-space-4)" }}>
-            <ConfidenceBar
-              value={s.avgProgress}
-              label={`${nameOf(s.courseId)} · ${s.students} לומדים`}
-            />
-          </div>
-        ))}
-      </div>
-      <div>
-        <div style={railTitleStyle}>לומדים הדורשים מעקב ({delayed.length})</div>
-        {delayed.length === 0 && <div style={railMutedStyle}>אין כרגע לומדים הדורשים מעקב.</div>}
-        {delayed.slice(0, 5).map((d, i) => (
-          <div key={`${d.enrollment.id}-${d.stage.stageId}-${i}`} style={railRowStyle}>
-            <span>{d.enrollment.studentName}</span>
-            <StatusChip status={d.kind === "חסום / צריך עזרה" ? "חסום" : "אזהרה"} label={d.kind} />
-          </div>
-        ))}
-      </div>
-      <div>
-        <div style={railTitleStyle}>מפגשים בשבעת הימים הקרובים</div>
-        {upcoming.length === 0 && <div style={railMutedStyle}>אין מפגשים מתוזמנים קדימה.</div>}
-        {upcoming.map((s) => (
-          <div key={s.id} style={{ marginBlockEnd: "var(--os-space-3)" }}>
-            <div>{s.title}</div>
-            <div style={railMutedStyle}>
-              <span className="os-num" dir="ltr">
-                {new Date(s.scheduledAt).toLocaleString("he-IL", {
-                  day: "2-digit",
-                  month: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
-              {" · "}
-              {nameOf(s.courseId)}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-const railTitleStyle: CSSProperties = {
-  color: "var(--os-text)",
-  fontWeight: "var(--os-weight-semibold)" as CSSProperties["fontWeight"],
-  marginBlockEnd: "var(--os-space-3)",
-};
-const railMutedStyle: CSSProperties = { color: "var(--os-muted)", fontSize: "var(--os-text-xs)" };
-const railRowStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: "var(--os-space-3)",
-  marginBlockEnd: "var(--os-space-3)",
-};
-
-// ── students workbench ─────────────────────────────────────────────────────
-function StudentsWorkbench({
-  enrollments,
-  courses,
-  paths,
-  upcoming,
-  selectedId,
-  onSelect,
-}: {
-  enrollments: readonly Enrollment[];
-  courses: readonly Course[];
-  paths: readonly LearningPath[];
-  upcoming: readonly CourseSession[];
-  selectedId: string | null;
-  onSelect: (id: string | null) => void;
-}): ReactElement {
-  const [courseFilter, setCourseFilter] = useState("all");
-  const isWide = useIsWide();
-  const learnerDrawer = useDrawer();
-  const filtered = enrollments.filter((e) => courseFilter === "all" || e.courseId === courseFilter);
-  const selected = enrollments.find((e) => e.id === selectedId) ?? filtered[0] ?? null;
-  const courseOf = (id: string): Course | undefined => courses.find((c) => c.id === id);
-
-  // One course-filter control; rendered in the wide column OR the compact bar,
-  // never both at once, so the "course-filter" id stays unique.
-  const courseFilterControl = (
-    <div className="courses-learner-bar__field">
-      <label className="os-qc-label" htmlFor="course-filter">
-        סינון לפי קורס
-      </label>
-      <select
-        id="course-filter"
-        className="os-qc-input"
-        value={courseFilter}
-        onChange={(e) => setCourseFilter(e.target.value)}
-      >
-        <option value="all">כל הקורסים</option>
-        {courses.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-
-  const detail = selected ? (
-    <StudentDetail
-      key={selected.id}
-      enrollment={selected}
-      course={courseOf(selected.courseId)}
-      path={paths.find((p) => p.courseId === selected.courseId)}
-      upcoming={upcoming}
-    />
-  ) : (
-    <EmptyState title="בחרו תלמיד" reason="בחרו רישום מהרשימה כדי לצפות בהתקדמות." />
-  );
-
-  // ≥1800px: learner list is a permanent column beside the workflow.
-  if (isWide) {
-    return (
-      <div className="courses-workbench courses-workbench--wide">
-        <Panel style={{ padding: "var(--os-space-5)", display: "grid", gap: "var(--os-space-4)" }}>
-          {courseFilterControl}
-          <LearnerList
-            enrollments={filtered}
-            selectedId={selected?.id ?? null}
-            onSelect={onSelect}
-            courseOf={courseOf}
-          />
-        </Panel>
-        {detail}
-      </div>
-    );
-  }
-
-  // 1440–1799px & tablet: learner list becomes a top selector + a drawer, so the
-  // central workflow gets the full usable width (never a permanent 4th column).
-  return (
-    <div className="courses-workbench">
-      <Panel style={{ padding: "var(--os-space-5)" }}>
-        <div className="courses-learner-bar">
-          {courseFilterControl}
-          <div className="courses-learner-bar__field">
-            <label className="os-qc-label" htmlFor="learner-select">
-              לומד
-            </label>
-            <select
-              id="learner-select"
-              className="os-qc-input"
-              value={selected?.id ?? ""}
-              onChange={(e) => e.target.value && onSelect(e.target.value)}
-              disabled={filtered.length === 0}
-            >
-              {filtered.length === 0 && <option value="">אין רישומים</option>}
-              {filtered.map((enr) => (
-                <option key={enr.id} value={enr.id}>
-                  {enr.studentName}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="courses-learner-bar__actions">
-            <OsButton variant="ghost" icon="users" onClick={learnerDrawer.openDrawer}>
-              רשימת הלומדים
-            </OsButton>
-          </div>
-        </div>
-      </Panel>
-
-      {detail}
-
-      <Drawer open={learnerDrawer.open} onClose={learnerDrawer.closeDrawer} title="רשימת הלומדים">
-        <LearnerList
+      {/* page-level drawers — exactly one open at a time (single controller) */}
+      <Drawer open={drawer.isOpen("learner")} onClose={drawer.close} title="רשימת הלומדים">
+        <LearnerListPanel
+          idPrefix="drawer"
+          showSearch
+          courses={courses}
           enrollments={filtered}
+          courseFilter={courseFilter}
+          onCourseFilter={setCourseFilter}
+          search={learnerSearch}
+          onSearch={setLearnerSearch}
           selectedId={selected?.id ?? null}
           onSelect={(id) => {
-            onSelect(id);
-            learnerDrawer.closeDrawer();
+            setSelectedEnrollmentId(id);
+            drawer.close();
           }}
           courseOf={courseOf}
+          statusOf={statusOf}
         />
       </Drawer>
-    </div>
-  );
-}
 
-function StudentDetail({
-  enrollment,
-  course,
-  path,
-  upcoming,
-}: {
-  enrollment: Enrollment;
-  course: Course | undefined;
-  path: LearningPath | undefined;
-  upcoming: readonly CourseSession[];
-}): ReactElement {
-  const { toast } = useToast();
-  const invalidate = useInvalidateCollections();
-  const nextStageDrawer = useDrawer();
-  const [activeStageId, setActiveStageId] = useState<string | null>(null);
-  const [returnNote, setReturnNote] = useState("");
-  const [memoryNote, setMemoryNote] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const cur = currentStage(enrollment);
-  const activeStage =
-    enrollment.stages.find((s) => s.stageId === activeStageId) ?? cur ?? enrollment.stages[0];
-  const stageMeta = path?.stages.find((s) => s.id === activeStage?.stageId);
-  const rec = nextExercise(enrollment, path);
-  // copy helpers (display only): total stages + how many the learner has cleared
-  const totalStages = path?.stages.length ?? 0;
-  const completedStages = enrollment.stages.filter((s) => s.status === "אושר").length;
-  // upcoming sessions for THIS course — derived from props already on the page
-  // (no repository access); feeds the compact next-stage card + detail drawer.
-  const courseUpcoming = upcoming.filter((s) => s.courseId === enrollment.courseId);
-
-  const steps: StepperStep[] = (path?.stages ?? []).map((st) => {
-    const sp = enrollment.stages.find((s) => s.stageId === st.id);
-    const status: StepperStep["status"] =
-      sp && sp.status === "אושר"
-        ? "done"
-        : sp && sp.stageId === activeStage?.stageId
-          ? "active"
-          : "pending";
-    return { id: st.id, label: `${st.order}. ${st.name}`, status };
-  });
-
-  async function patchStage(
-    stageId: string,
-    patch: Partial<StageProgress>,
-    activityText: string,
-  ): Promise<void> {
-    setBusy(true);
-    try {
-      const repo = getRepository<Enrollment>("enrollments");
-      const fresh = await repo.get(enrollment.id);
-      if (!fresh) throw new Error("הרישום לא נמצא");
-      const stages = fresh.stages.map((s) =>
-        s.stageId === stageId ? { ...s, ...patch, updated: todayISO() } : s,
-      );
-      await repo.update(enrollment.id, { stages, updatedAt: new Date().toISOString() });
-      await logCourseActivity(activityText, `enrollment:${enrollment.id}`);
-      await invalidate(["enrollments", "activities"]);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  if (!path || enrollment.stages.length === 0) {
-    return (
-      <EmptyState
-        title="אין מסלול למידה מובנה לקורס זה"
-        reason="לקורס זה אין LearningPath מוגדר — ההתקדמות מנוהלת ידנית מול המדריך."
-      />
-    );
-  }
-  if (!activeStage) {
-    return <EmptyState title="אין שלבים" reason="לרישום זה אין שלבי התקדמות." />;
-  }
-
-  const awaiting =
-    activeStage.status === "הוגש לבדיקה" || activeStage.status === "ממתין לאישור מדריך";
-
-  return (
-    <div className="courses-detail">
-      <Panel style={{ padding: "var(--os-space-5)", display: "grid", gap: "var(--os-space-4)" }}>
-        <SectionTitle
-          title={enrollment.studentName}
-          subtitle={`מסלול: ${course?.name ?? path.name} · ${completedStages} מתוך ${totalStages} שלבים הושלמו`}
+      <Drawer open={drawer.isOpen("insights")} onClose={drawer.close} title="תובנות והמשך">
+        <CoursesInsights
+          courses={courses}
+          stats={stats}
+          delayed={delayed}
+          upcoming={upcoming.slice(0, 3)}
         />
-        <StageGroups
-          pathStages={path.stages}
-          steps={steps}
-          activeStepId={activeStage.stageId}
-          onStepClick={(s) => setActiveStageId(s.id)}
-        />
-      </Panel>
-
-      <div className="courses-detail-grid">
-        <Panel style={{ padding: "var(--os-space-5)", display: "grid", gap: "var(--os-space-4)" }}>
-          <SectionTitle
-            title={
-              stageMeta
-                ? `שלב ${stageMeta.order} מתוך ${totalStages} · ${stageMeta.name}`
-                : activeStage.stageId
-            }
-            action={statusToChip(activeStage.status)}
-          />
-          {stageMeta && (
-            <div style={{ display: "grid", gap: 4 }}>
-              <div
-                style={{
-                  color: "var(--os-muted)",
-                  fontSize: "var(--os-text-xs)",
-                  fontWeight: 600,
-                }}
-              >
-                מטלת השלב
-              </div>
-              <div style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-sm)" }}>
-                {stageMeta.description}
-              </div>
-            </div>
-          )}
-          <div style={{ fontSize: "var(--os-text-sm)" }}>
-            <span style={{ color: "var(--os-muted)" }}>יעד: </span>
-            <span className="os-num">{formatDateHe(activeStage.due)}</span>
-            <span style={{ color: "var(--os-muted)" }}> · עודכן: </span>
-            <span className="os-num">{formatDateHe(activeStage.updated)}</span>
-          </div>
-          {activeStage.text && (
-            <Panel
-              variant="raised"
-              style={{ padding: "var(--os-space-4)", fontSize: "var(--os-text-sm)" }}
-            >
-              <div
-                style={{ color: "var(--os-muted)", marginBlockEnd: 4 }}
-              >{`ההגשה של ${enrollment.studentName}`}</div>
-              {activeStage.text}
-            </Panel>
-          )}
-          {activeStage.help && (
-            <Panel
-              variant="raised"
-              accent="danger"
-              style={{ padding: "var(--os-space-4)", fontSize: "var(--os-text-sm)" }}
-            >
-              <div style={{ color: "var(--os-danger)", marginBlockEnd: 4 }}>בקשת עזרה</div>
-              {activeStage.help}
-            </Panel>
-          )}
-          {(activeStage.files.length > 0 || activeStage.links.length > 0) && (
-            <div style={{ fontSize: "var(--os-text-sm)", display: "grid", gap: 4 }}>
-              {activeStage.files.map((f) => (
-                <div key={f.name} style={{ color: "var(--os-text-2)" }}>
-                  📎 צפייה בצילום המסך שצורף — {f.name} <span className="os-num">({f.size})</span>
-                </div>
-              ))}
-              {activeStage.links.map((l) => (
-                <div key={l.url} style={{ color: "var(--os-cyan)" }}>
-                  🔗 {l.label}
-                </div>
-              ))}
-            </div>
-          )}
-          {stageMeta && stageMeta.checklist.length > 0 && (
-            <div style={{ fontSize: "var(--os-text-sm)", display: "grid", gap: 4 }}>
-              <div style={{ color: "var(--os-muted)" }}>רשימת בדיקה לשלב</div>
-              {stageMeta.checklist.map((item) => {
-                const done = activeStage.checklistDone.includes(item);
-                return (
-                  <div
-                    key={item}
-                    style={{ color: done ? "var(--os-success)" : "var(--os-text-2)" }}
-                  >
-                    {done ? "✓" : "○"} {item}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          {activeStage.notes.length > 0 && (
-            <div style={{ display: "grid", gap: 6 }}>
-              <div style={{ color: "var(--os-muted)", fontSize: "var(--os-text-sm)" }}>
-                סיכומי מדריך קודמים ({activeStage.notes.length})
-              </div>
-              {activeStage.notes.map((n, i) => (
-                <Panel
-                  key={i}
-                  variant="raised"
-                  style={{ padding: "var(--os-space-3)", fontSize: "var(--os-text-xs)" }}
-                >
-                  <span style={{ color: "var(--os-cyan)" }}>{n.author}</span>
-                  <span style={{ color: "var(--os-muted)" }}>
-                    {" · "}
-                    <span className="os-num">{formatDateHe(n.date)}</span>
-                  </span>
-                  <div>{n.text}</div>
-                </Panel>
-              ))}
-            </div>
-          )}
-
-          {/* instructor actions */}
-          <div style={{ display: "grid", gap: "var(--os-space-3)" }}>
-            <div style={{ display: "flex", gap: "var(--os-space-3)", flexWrap: "wrap" }}>
-              {awaiting ? (
-                <OsButton
-                  variant="approve"
-                  icon="check"
-                  {...busyDisabled(busy)}
-                  onClick={() => {
-                    void patchStage(
-                      activeStage.stageId,
-                      { status: "אושר" },
-                      `המדריך אישר את שלב «${stageMeta?.name ?? activeStage.stageId}» של ${enrollment.studentName}`,
-                    ).then(() => toast("השלב אושר ונרשם ביומן הפעילות", "success"));
-                  }}
-                >
-                  אישור השלמת השלב
-                </OsButton>
-              ) : (
-                <OsButton
-                  variant="approve"
-                  icon="check"
-                  disabled
-                  disabledReason="אישור אפשרי רק לאחר שהשלב הוגש לבדיקת המדריך"
-                >
-                  אישור השלמת השלב
-                </OsButton>
-              )}
-            </div>
-            <div style={{ display: "grid", gap: 6 }}>
-              <label className="os-qc-label" htmlFor="return-note">
-                {`משוב המדריך — כתבו משוב קצר וברור שיעזור ל${enrollment.studentName} להתקדם לשלב הבא`}
-              </label>
-              <textarea
-                id="return-note"
-                className="os-qc-input os-qc-input--area"
-                value={returnNote}
-                onChange={(e) => setReturnNote(e.target.value)}
-                placeholder={`מה נדרש לתקן? המשוב יוצג ל${enrollment.studentName}.`}
-                rows={2}
-              />
-              <div>
-                {awaiting && returnNote.trim().length > 0 ? (
-                  <OsButton
-                    variant="reject"
-                    icon="x"
-                    onClick={() => {
-                      const note = {
-                        author: "צחי זוסטייהם",
-                        text: returnNote.trim(),
-                        date: todayISO(),
-                      };
-                      void patchStage(
-                        activeStage.stageId,
-                        { status: "נדרש תיקון", notes: [...activeStage.notes, note] },
-                        `המדריך החזיר לתיקון את שלב «${stageMeta?.name ?? activeStage.stageId}» של ${enrollment.studentName}`,
-                      ).then(() => {
-                        setReturnNote("");
-                        toast("השלב הוחזר לתיקון עם הערה", "warning");
-                      });
-                    }}
-                  >
-                    החזרה לתיקון
-                  </OsButton>
-                ) : (
-                  <OsButton
-                    variant="reject"
-                    icon="x"
-                    disabled
-                    disabledReason={
-                      awaiting
-                        ? "החזרה לתיקון מחייבת משוב כתוב ללומד"
-                        : "החזרה אפשרית רק כשהשלב ממתין לבדיקת המדריך"
-                    }
-                  >
-                    החזרה לתיקון
-                  </OsButton>
-                )}
-              </div>
-            </div>
-            <div style={{ display: "grid", gap: 6 }}>
-              <label className="os-qc-label" htmlFor="memory-note">
-                סיכום לתיק הלומד — נקודות חשובות להמשך הליווי
-              </label>
-              <div style={{ display: "flex", gap: "var(--os-space-3)" }}>
-                <input
-                  id="memory-note"
-                  className="os-qc-input"
-                  value={memoryNote}
-                  onChange={(e) => setMemoryNote(e.target.value)}
-                  placeholder={`תובנה על ${enrollment.studentName} שתישמר בתיק הלמידה`}
-                />
-                {memoryNote.trim().length > 0 ? (
-                  <OsButton
-                    variant="ghost"
-                    icon="memory"
-                    onClick={() => {
-                      const note = {
-                        author: "צחי זוסטייהם",
-                        text: memoryNote.trim(),
-                        date: todayISO(),
-                      };
-                      void patchStage(
-                        activeStage.stageId,
-                        { notes: [...activeStage.notes, note] },
-                        `נוספה הערת למידה עבור ${enrollment.studentName}`,
-                      ).then(() => {
-                        setMemoryNote("");
-                        toast("הערת הלמידה נשמרה", "success");
-                      });
-                    }}
-                  >
-                    שמירת הסיכום
-                  </OsButton>
-                ) : (
-                  <OsButton
-                    variant="ghost"
-                    icon="memory"
-                    disabled
-                    disabledReason="כתבו סיכום לפני השמירה"
-                  >
-                    שמירת הסיכום
-                  </OsButton>
-                )}
-              </div>
-            </div>
-          </div>
-        </Panel>
-
-        {/* deterministic recommendation — compact card (three lines by default);
-            the full recommendation + meeting details live in a detail drawer. */}
-        <Panel
-          variant="raised"
-          accent="cyan"
-          style={{ padding: "var(--os-space-5)", display: "grid", gap: "var(--os-space-3)" }}
-        >
-          <SectionTitle icon="sparkle" title="השלב הבא" />
-          {rec ? (
-            <div className="courses-next">
-              <div className="courses-next__stage">
-                שלב {rec.stage.order}: {rec.stage.name}
-              </div>
-              <div className="courses-next__count">
-                <span className="os-num">{courseUpcoming.length}</span> מפגשים קרובים
-              </div>
-              <div>
-                <OsButton variant="ghost" icon="doc" onClick={nextStageDrawer.openDrawer}>
-                  פרטים נוספים
-                </OsButton>
-              </div>
-            </div>
-          ) : (
-            <div className="courses-next">
-              <div className="courses-next__done">המסלול הושלם — אין שלב הבא. 🎓</div>
-              <div className="courses-next__count">
-                <span className="os-num">{courseUpcoming.length}</span> מפגשים קרובים
-              </div>
-              {courseUpcoming.length > 0 && (
-                <div>
-                  <OsButton variant="ghost" icon="doc" onClick={nextStageDrawer.openDrawer}>
-                    פרטים נוספים
-                  </OsButton>
-                </div>
-              )}
-            </div>
-          )}
-        </Panel>
-      </div>
-
-      <Drawer
-        open={nextStageDrawer.open}
-        onClose={nextStageDrawer.closeDrawer}
-        title="השלב הבא"
-        className="courses-drawer--secondary"
-      >
-        <div className="courses-drawer-section">
-          <SectionTitle icon="sparkle" title="השלב הבא" subtitle={RULES_ENGINE_LABEL} />
-          {rec ? (
-            <>
-              <div style={{ fontWeight: 600 }}>
-                שלב {rec.stage.order}: {rec.stage.name}
-              </div>
-              <div style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-sm)" }}>
-                {rec.reason}
-              </div>
-              <ConfidenceBar value={null} label="רמת ביטחון" />
-              <div style={{ color: "var(--os-muted)", fontSize: "var(--os-text-2xs)" }}>
-                המלצה דטרמיניסטית מסדר המסלול — ללא מודל AI וללא מדדים מומצאים.
-              </div>
-            </>
-          ) : (
-            <div style={{ color: "var(--os-success)" }}>המסלול הושלם — אין שלב הבא. 🎓</div>
-          )}
-          <div className="courses-next__count">
-            <span className="os-num">{courseUpcoming.length}</span> מפגשים קרובים
-          </div>
-          {courseUpcoming.length > 0 && (
-            <div className="courses-drawer-list">
-              {courseUpcoming.map((s) => (
-                <Panel
-                  key={s.id}
-                  variant="raised"
-                  style={{ padding: "var(--os-space-3)", fontSize: "var(--os-text-sm)" }}
-                >
-                  <div>{s.title}</div>
-                  <div style={{ color: "var(--os-muted)", fontSize: "var(--os-text-xs)" }}>
-                    <span className="os-num" dir="ltr">
-                      {new Date(s.scheduledAt).toLocaleString("he-IL", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  </div>
-                </Panel>
-              ))}
-            </div>
-          )}
-        </div>
       </Drawer>
+
+      <Drawer open={drawer.isOpen("nextStage")} onClose={drawer.close} title="השלב הבא">
+        <NextStageDrawerBody rec={rec} courseUpcoming={courseUpcoming} />
+      </Drawer>
+
+      <NewCourseModal open={newCourseOpen} onClose={() => setNewCourseOpen(false)} users={users} />
     </div>
   );
 }
@@ -1157,7 +562,6 @@ function AttendanceModal({
   const { toast } = useToast();
   const invalidate = useInvalidateCollections();
   const [checked, setChecked] = useState<ReadonlySet<string>>(() => {
-    // parse a previous "נוכחות (k/n): a, b" note back into names
     const m = /^נוכחות \(\d+\/\d+\): (.+)$/.exec(session.notes);
     return new Set(m?.[1] ? m[1].split(", ") : []);
   });

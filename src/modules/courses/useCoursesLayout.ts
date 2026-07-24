@@ -1,65 +1,49 @@
-// Courses module — layout-only hooks (no domain logic).
-// A matchMedia hook drives the viewport breakpoint that decides whether the
-// learner list is a permanent column or a drawer, and a small drawer hook that
-// restores focus to the opener on close (the Drawer primitive focuses its own
-// panel on open but does not restore focus, so we do it here for a11y).
+// Courses module — layout-only hook (no domain logic).
+// A single mutually-exclusive drawer controller: only one of the page drawers
+// (learner list / insights / next-stage) is open at a time, and focus returns
+// to the element that opened it once it closes. The Drawer primitive focuses its
+// own panel on open and closes on ESC/overlay, but does not restore focus — so
+// we manage focus restoration here for accessibility.
 import { useCallback, useEffect, useRef, useState } from "react";
 
-/** Reactive matchMedia — SSR-safe, updates on viewport change. */
-export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState<boolean>(() =>
-    typeof window !== "undefined" && typeof window.matchMedia === "function"
-      ? window.matchMedia(query).matches
-      : false,
-  );
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
-    const mql = window.matchMedia(query);
-    const onChange = (): void => setMatches(mql.matches);
-    onChange();
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
-  }, [query]);
-  return matches;
+export type DrawerKind = "learner" | "insights" | "nextStage";
+
+export interface OpenDrawerController {
+  /** Which drawer is open, or null when all are closed. */
+  openKind: DrawerKind | null;
+  isOpen: (kind: DrawerKind) => boolean;
+  /** Open a drawer; opening one closes any other (single-state mutual exclusion). */
+  open: (kind: DrawerKind) => void;
+  close: () => void;
 }
 
-/** True at ≥1800px — the only mode that shows the learner list as a permanent column. */
-export function useIsWide(): boolean {
-  return useMediaQuery("(min-width: 1800px)");
-}
-
-export interface DrawerController {
-  open: boolean;
-  openDrawer: () => void;
-  closeDrawer: () => void;
-}
-
-/**
- * Drawer open/close state with focus restoration: remembers the element that
- * opened the drawer and returns focus to it once the drawer closes.
- */
-export function useDrawer(): DrawerController {
-  const [open, setOpen] = useState(false);
+export function useOpenDrawer(): OpenDrawerController {
+  const [openKind, setOpenKind] = useState<DrawerKind | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
 
-  const openDrawer = useCallback((): void => {
-    openerRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    setOpen(true);
+  const open = useCallback((kind: DrawerKind): void => {
+    // Remember the trigger so focus can return to it on close. When switching
+    // from one drawer to another the new trigger becomes the restore target.
+    if (document.activeElement instanceof HTMLElement) {
+      openerRef.current = document.activeElement;
+    }
+    setOpenKind(kind);
   }, []);
 
-  const closeDrawer = useCallback((): void => {
-    setOpen(false);
+  const close = useCallback((): void => {
+    setOpenKind(null);
   }, []);
 
   useEffect(() => {
-    if (open || !openerRef.current) return;
+    if (openKind !== null || !openerRef.current) return;
     const opener = openerRef.current;
     openerRef.current = null;
     // restore focus after the drawer has unmounted
     const raf = requestAnimationFrame(() => opener.focus());
     return () => cancelAnimationFrame(raf);
-  }, [open]);
+  }, [openKind]);
 
-  return { open, openDrawer, closeDrawer };
+  const isOpen = useCallback((kind: DrawerKind): boolean => openKind === kind, [openKind]);
+
+  return { openKind, isOpen, open, close };
 }
