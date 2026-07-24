@@ -1,0 +1,244 @@
+/* Courses module — responsive information-density redesign (LAYOUT/CSS only).
+   Scoped to .courses-page classes; no edits to design-system primitives.
+   Rules: CSS Grid + logical properties, min-inline-size:0 on every grid child,
+   minmax(0,1fr) for flexible tracks, max-inline-size:100% — never any structural
+   absolute positioning, never overflow:hidden on a structural container. */
+
+.courses-page {
+  container-type: inline-size;
+  container-name: coursespage;
+  min-inline-size: 0;
+}
+
+/* ── KPI grid: viewport-keyed columns (2 → 3 → 5), each cell min-inline-size:0 so
+   a card is never clipped and never forces horizontal page overflow. ── */
+.courses-kpi-grid {
+  display: grid;
+  gap: var(--os-space-5);
+  min-inline-size: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.courses-kpi-grid > * {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+@media (min-width: 1400px) {
+  .courses-kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1800px) {
+  .courses-kpi-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+/* ── Students workbench: learner list is a permanent column ONLY when wide
+   (≥1800px viewport). Otherwise it collapses to a top selector + drawer. ── */
+.courses-workbench {
+  display: grid;
+  gap: var(--os-space-6);
+  align-items: start;
+  min-inline-size: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+.courses-workbench--wide {
+  grid-template-columns: minmax(250px, 280px) minmax(0, 1fr);
+}
+.courses-workbench > * {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+/* learner selector bar (non-wide modes) */
+.courses-learner-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--os-space-4);
+  align-items: flex-end;
+  min-inline-size: 0;
+}
+.courses-learner-bar__field {
+  display: grid;
+  gap: 6px;
+  flex: 1 1 240px;
+  min-inline-size: 0;
+}
+.courses-learner-bar__actions {
+  display: flex;
+  align-items: flex-end;
+}
+
+/* learner list (cards) — shared between the wide column and the drawer */
+.courses-learner-list {
+  display: grid;
+  gap: var(--os-space-3);
+  min-inline-size: 0;
+}
+.courses-learner-card {
+  text-align: start;
+  background: var(--os-raised);
+  border: 1px solid var(--os-border);
+  border-radius: var(--os-radius-md);
+  padding: var(--os-space-4);
+  color: var(--os-text);
+  cursor: pointer;
+  font: inherit;
+  min-inline-size: 0;
+}
+.courses-learner-card--active {
+  background: var(--os-highlight);
+  border-color: var(--os-cyan-border);
+}
+.courses-learner-card:focus-visible {
+  outline: 2px solid var(--os-cyan);
+  outline-offset: 2px;
+}
+.courses-learner-card__head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--os-space-3);
+  min-inline-size: 0;
+}
+.courses-learner-card__name {
+  font-weight: var(--os-weight-semibold);
+  min-inline-size: 0;
+}
+.courses-learner-card__sub {
+  color: var(--os-text-2);
+  font-size: var(--os-text-xs);
+  min-inline-size: 0;
+}
+
+/* ── Student detail ── */
+.courses-detail {
+  display: grid;
+  gap: var(--os-space-5);
+  min-inline-size: 0;
+  container-type: inline-size;
+  container-name: coursesdetail;
+}
+
+/* assignment card (fluid) + compact next-stage card (bounded, never wider than
+   its track). Stacks under a narrow detail width. */
+.courses-detail-grid {
+  display: grid;
+  gap: var(--os-space-5);
+  align-items: start;
+  min-inline-size: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+.courses-detail-grid > * {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+@container coursesdetail (min-inline-size: 720px) {
+  .courses-detail-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+  }
+}
+
+/* ── Grouped stepper: a compact 3-group header + detailed steps for the active
+   group only. Replaces the single 14-step horizontal bar that overflowed. ── */
+.courses-stages {
+  display: grid;
+  gap: var(--os-space-4);
+  min-inline-size: 0;
+}
+.courses-stage-groups {
+  display: grid;
+  gap: var(--os-space-3);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-inline-size: 0;
+}
+@container coursesdetail (max-inline-size: 560px) {
+  .courses-stage-groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.courses-stage-group {
+  all: unset;
+  cursor: pointer;
+  display: grid;
+  gap: 8px;
+  padding: var(--os-space-4);
+  border-radius: var(--os-radius-md);
+  border: 1px solid var(--os-border);
+  background: var(--os-raised);
+  min-inline-size: 0;
+  box-sizing: border-box;
+}
+.courses-stage-group:focus-visible {
+  outline: 2px solid var(--os-cyan);
+  outline-offset: 2px;
+}
+.courses-stage-group--selected {
+  border-color: var(--os-cyan-border);
+  background: var(--os-highlight);
+}
+.courses-stage-group__title {
+  font-weight: var(--os-weight-semibold);
+  color: var(--os-text);
+  font-size: var(--os-text-sm);
+  min-inline-size: 0;
+}
+.courses-stage-group--selected .courses-stage-group__title {
+  color: var(--os-cyan);
+}
+.courses-stage-group__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--os-space-3);
+  min-inline-size: 0;
+}
+.courses-stage-group__count {
+  color: var(--os-muted);
+  font-size: var(--os-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+/* the active group's detailed steps — internal scroll only, never page overflow */
+.courses-stage-steps {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow-x: auto;
+}
+
+/* ── Compact next-stage card: three lines by default, full detail in a drawer ── */
+.courses-next {
+  display: grid;
+  gap: var(--os-space-3);
+  min-inline-size: 0;
+}
+.courses-next__stage {
+  font-weight: var(--os-weight-semibold);
+  color: var(--os-text);
+  min-inline-size: 0;
+}
+.courses-next__count {
+  color: var(--os-text-2);
+  font-size: var(--os-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.courses-next__done {
+  color: var(--os-success);
+  min-inline-size: 0;
+}
+
+/* detail-drawer body blocks */
+.courses-drawer-section {
+  display: grid;
+  gap: var(--os-space-3);
+  min-inline-size: 0;
+}
+.courses-drawer-list {
+  display: grid;
+  gap: var(--os-space-3);
+  min-inline-size: 0;
+}
+
+/* When the learner-list drawer and the next-stage detail drawer are open at the
+   same time, offset the secondary panel so both are visible side-by-side. */
+.courses-drawer--secondary {
+  inset-inline-start: min(380px, 92vw);
+}

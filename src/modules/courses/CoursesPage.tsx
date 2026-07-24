@@ -8,6 +8,7 @@ import { PageRail } from "@/app/rail";
 import {
   ConfidenceBar,
   DataTable,
+  Drawer,
   EmptyState,
   KpiCard,
   Modal,
@@ -15,12 +16,15 @@ import {
   Panel,
   SectionTitle,
   StatusChip,
-  Stepper,
   Tabs,
   useToast,
   type DataTableColumn,
   type StepperStep,
 } from "@/design-system";
+import { StageGroups } from "./StageGroups";
+import { LearnerList } from "./LearnerList";
+import { useDrawer, useIsWide } from "./useCoursesLayout";
+import "../../styles/courses.css";
 import type {
   Activity,
   Course,
@@ -50,18 +54,6 @@ import {
 } from "./lib";
 
 // ── shared layout bits ──────────────────────────────────────────────────────
-const kpiRowStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-  gap: "var(--os-space-5)",
-};
-const twoPaneStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "minmax(260px, 340px) 1fr",
-  gap: "var(--os-space-6)",
-  alignItems: "start",
-};
-
 function statusToChip(status: StageProgressStatus): ReactElement {
   switch (status) {
     case "אושר":
@@ -157,7 +149,7 @@ export default function CoursesPage(): ReactElement {
   }
 
   return (
-    <div style={{ display: "grid", gap: "var(--os-space-6)" }}>
+    <div className="courses-page" style={{ display: "grid", gap: "var(--os-space-6)" }}>
       <PageRail>
         <CoursesRail
           courses={courses}
@@ -178,7 +170,7 @@ export default function CoursesPage(): ReactElement {
         }
       />
 
-      <div style={kpiRowStyle}>
+      <div className="courses-kpi-grid">
         <KpiCard title="קורסים פעילים" value={activeCourses} accent="cyan" icon="graduation" />
         <KpiCard title="לומדים פעילים" value={enrollments.length} accent="blue" icon="users" />
         <KpiCard
@@ -216,6 +208,7 @@ export default function CoursesPage(): ReactElement {
           enrollments={enrollments}
           courses={courses}
           paths={paths}
+          upcoming={upcoming}
           selectedId={selectedEnrollmentId}
           onSelect={setSelectedEnrollmentId}
         />
@@ -327,95 +320,124 @@ function StudentsWorkbench({
   enrollments,
   courses,
   paths,
+  upcoming,
   selectedId,
   onSelect,
 }: {
   enrollments: readonly Enrollment[];
   courses: readonly Course[];
   paths: readonly LearningPath[];
+  upcoming: readonly CourseSession[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
 }): ReactElement {
   const [courseFilter, setCourseFilter] = useState("all");
+  const isWide = useIsWide();
+  const learnerDrawer = useDrawer();
   const filtered = enrollments.filter((e) => courseFilter === "all" || e.courseId === courseFilter);
   const selected = enrollments.find((e) => e.id === selectedId) ?? filtered[0] ?? null;
   const courseOf = (id: string): Course | undefined => courses.find((c) => c.id === id);
 
+  // One course-filter control; rendered in the wide column OR the compact bar,
+  // never both at once, so the "course-filter" id stays unique.
+  const courseFilterControl = (
+    <div className="courses-learner-bar__field">
+      <label className="os-qc-label" htmlFor="course-filter">
+        סינון לפי קורס
+      </label>
+      <select
+        id="course-filter"
+        className="os-qc-input"
+        value={courseFilter}
+        onChange={(e) => setCourseFilter(e.target.value)}
+      >
+        <option value="all">כל הקורסים</option>
+        {courses.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+
+  const detail = selected ? (
+    <StudentDetail
+      key={selected.id}
+      enrollment={selected}
+      course={courseOf(selected.courseId)}
+      path={paths.find((p) => p.courseId === selected.courseId)}
+      upcoming={upcoming}
+    />
+  ) : (
+    <EmptyState title="בחרו תלמיד" reason="בחרו רישום מהרשימה כדי לצפות בהתקדמות." />
+  );
+
+  // ≥1800px: learner list is a permanent column beside the workflow.
+  if (isWide) {
+    return (
+      <div className="courses-workbench courses-workbench--wide">
+        <Panel style={{ padding: "var(--os-space-5)", display: "grid", gap: "var(--os-space-4)" }}>
+          {courseFilterControl}
+          <LearnerList
+            enrollments={filtered}
+            selectedId={selected?.id ?? null}
+            onSelect={onSelect}
+            courseOf={courseOf}
+          />
+        </Panel>
+        {detail}
+      </div>
+    );
+  }
+
+  // 1440–1799px & tablet: learner list becomes a top selector + a drawer, so the
+  // central workflow gets the full usable width (never a permanent 4th column).
   return (
-    <div style={twoPaneStyle}>
+    <div className="courses-workbench">
       <Panel style={{ padding: "var(--os-space-5)" }}>
-        <div style={{ marginBlockEnd: "var(--os-space-4)" }}>
-          <label className="os-qc-label" htmlFor="course-filter">
-            סינון לפי קורס
-          </label>
-          <select
-            id="course-filter"
-            className="os-qc-input"
-            value={courseFilter}
-            onChange={(e) => setCourseFilter(e.target.value)}
-          >
-            <option value="all">כל הקורסים</option>
-            {courses.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        {filtered.length === 0 && (
-          <EmptyState title="אין רישומים" reason="לא נמצאו רישומי תלמידים לקורס שנבחר." />
-        )}
-        <div style={{ display: "grid", gap: "var(--os-space-3)" }}>
-          {filtered.map((enr) => {
-            const pct = progressPercent(enr);
-            const active = selected?.id === enr.id;
-            return (
-              <button
-                key={enr.id}
-                type="button"
-                onClick={() => onSelect(enr.id)}
-                style={{
-                  textAlign: "start",
-                  background: active ? "var(--os-highlight)" : "var(--os-raised)",
-                  border: active ? "1px solid var(--os-cyan-border)" : "1px solid var(--os-border)",
-                  borderRadius: "var(--os-radius-md)",
-                  padding: "var(--os-space-4)",
-                  color: "var(--os-text)",
-                  cursor: "pointer",
-                  font: "inherit",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                  <span style={{ fontWeight: 600 }}>{enr.studentName}</span>
-                  {pct !== null ? (
-                    <span className="os-num" style={{ color: "var(--os-cyan)" }}>
-                      {pct}%
-                    </span>
-                  ) : (
-                    <span style={{ color: "var(--os-muted)", fontSize: "var(--os-text-2xs)" }}>
-                      ללא מסלול
-                    </span>
-                  )}
-                </div>
-                <div style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-xs)" }}>
-                  {courseOf(enr.courseId)?.name ?? enr.courseId} · תשלום: {enr.payment}
-                </div>
-              </button>
-            );
-          })}
+        <div className="courses-learner-bar">
+          {courseFilterControl}
+          <div className="courses-learner-bar__field">
+            <label className="os-qc-label" htmlFor="learner-select">
+              לומד
+            </label>
+            <select
+              id="learner-select"
+              className="os-qc-input"
+              value={selected?.id ?? ""}
+              onChange={(e) => e.target.value && onSelect(e.target.value)}
+              disabled={filtered.length === 0}
+            >
+              {filtered.length === 0 && <option value="">אין רישומים</option>}
+              {filtered.map((enr) => (
+                <option key={enr.id} value={enr.id}>
+                  {enr.studentName}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="courses-learner-bar__actions">
+            <OsButton variant="ghost" icon="users" onClick={learnerDrawer.openDrawer}>
+              רשימת הלומדים
+            </OsButton>
+          </div>
         </div>
       </Panel>
 
-      {selected ? (
-        <StudentDetail
-          key={selected.id}
-          enrollment={selected}
-          course={courseOf(selected.courseId)}
-          path={paths.find((p) => p.courseId === selected.courseId)}
+      {detail}
+
+      <Drawer open={learnerDrawer.open} onClose={learnerDrawer.closeDrawer} title="רשימת הלומדים">
+        <LearnerList
+          enrollments={filtered}
+          selectedId={selected?.id ?? null}
+          onSelect={(id) => {
+            onSelect(id);
+            learnerDrawer.closeDrawer();
+          }}
+          courseOf={courseOf}
         />
-      ) : (
-        <EmptyState title="בחרו תלמיד" reason="בחרו רישום מהרשימה כדי לצפות בהתקדמות." />
-      )}
+      </Drawer>
     </div>
   );
 }
@@ -424,13 +446,16 @@ function StudentDetail({
   enrollment,
   course,
   path,
+  upcoming,
 }: {
   enrollment: Enrollment;
   course: Course | undefined;
   path: LearningPath | undefined;
+  upcoming: readonly CourseSession[];
 }): ReactElement {
   const { toast } = useToast();
   const invalidate = useInvalidateCollections();
+  const nextStageDrawer = useDrawer();
   const [activeStageId, setActiveStageId] = useState<string | null>(null);
   const [returnNote, setReturnNote] = useState("");
   const [memoryNote, setMemoryNote] = useState("");
@@ -444,6 +469,9 @@ function StudentDetail({
   // copy helpers (display only): total stages + how many the learner has cleared
   const totalStages = path?.stages.length ?? 0;
   const completedStages = enrollment.stages.filter((s) => s.status === "אושר").length;
+  // upcoming sessions for THIS course — derived from props already on the page
+  // (no repository access); feeds the compact next-stage card + detail drawer.
+  const courseUpcoming = upcoming.filter((s) => s.courseId === enrollment.courseId);
 
   const steps: StepperStep[] = (path?.stages ?? []).map((st) => {
     const sp = enrollment.stages.find((s) => s.stageId === st.id);
@@ -493,28 +521,21 @@ function StudentDetail({
     activeStage.status === "הוגש לבדיקה" || activeStage.status === "ממתין לאישור מדריך";
 
   return (
-    <div style={{ display: "grid", gap: "var(--os-space-5)" }}>
-      <Panel style={{ padding: "var(--os-space-5)" }}>
+    <div className="courses-detail">
+      <Panel style={{ padding: "var(--os-space-5)", display: "grid", gap: "var(--os-space-4)" }}>
         <SectionTitle
           title={enrollment.studentName}
           subtitle={`מסלול: ${course?.name ?? path.name} · ${completedStages} מתוך ${totalStages} שלבים הושלמו`}
         />
-        <div
-          className="os-table-scroll"
-          style={{ overflowX: "auto", paddingBlock: "var(--os-space-3)" }}
-        >
-          <Stepper steps={steps} onStepClick={(s) => setActiveStageId(s.id)} />
-        </div>
+        <StageGroups
+          pathStages={path.stages}
+          steps={steps}
+          activeStepId={activeStage.stageId}
+          onStepClick={(s) => setActiveStageId(s.id)}
+        />
       </Panel>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr minmax(220px, 280px)",
-          gap: "var(--os-space-5)",
-          alignItems: "start",
-        }}
-      >
+      <div className="courses-detail-grid">
         <Panel style={{ padding: "var(--os-space-5)", display: "grid", gap: "var(--os-space-4)" }}>
           <SectionTitle
             title={
@@ -748,12 +769,53 @@ function StudentDetail({
           </div>
         </Panel>
 
-        {/* deterministic recommendation */}
+        {/* deterministic recommendation — compact card (three lines by default);
+            the full recommendation + meeting details live in a detail drawer. */}
         <Panel
           variant="raised"
           accent="cyan"
           style={{ padding: "var(--os-space-5)", display: "grid", gap: "var(--os-space-3)" }}
         >
+          <SectionTitle icon="sparkle" title="השלב הבא" />
+          {rec ? (
+            <div className="courses-next">
+              <div className="courses-next__stage">
+                שלב {rec.stage.order}: {rec.stage.name}
+              </div>
+              <div className="courses-next__count">
+                <span className="os-num">{courseUpcoming.length}</span> מפגשים קרובים
+              </div>
+              <div>
+                <OsButton variant="ghost" icon="doc" onClick={nextStageDrawer.openDrawer}>
+                  פרטים נוספים
+                </OsButton>
+              </div>
+            </div>
+          ) : (
+            <div className="courses-next">
+              <div className="courses-next__done">המסלול הושלם — אין שלב הבא. 🎓</div>
+              <div className="courses-next__count">
+                <span className="os-num">{courseUpcoming.length}</span> מפגשים קרובים
+              </div>
+              {courseUpcoming.length > 0 && (
+                <div>
+                  <OsButton variant="ghost" icon="doc" onClick={nextStageDrawer.openDrawer}>
+                    פרטים נוספים
+                  </OsButton>
+                </div>
+              )}
+            </div>
+          )}
+        </Panel>
+      </div>
+
+      <Drawer
+        open={nextStageDrawer.open}
+        onClose={nextStageDrawer.closeDrawer}
+        title="השלב הבא"
+        className="courses-drawer--secondary"
+      >
+        <div className="courses-drawer-section">
           <SectionTitle icon="sparkle" title="השלב הבא" subtitle={RULES_ENGINE_LABEL} />
           {rec ? (
             <>
@@ -771,8 +833,34 @@ function StudentDetail({
           ) : (
             <div style={{ color: "var(--os-success)" }}>המסלול הושלם — אין שלב הבא. 🎓</div>
           )}
-        </Panel>
-      </div>
+          <div className="courses-next__count">
+            <span className="os-num">{courseUpcoming.length}</span> מפגשים קרובים
+          </div>
+          {courseUpcoming.length > 0 && (
+            <div className="courses-drawer-list">
+              {courseUpcoming.map((s) => (
+                <Panel
+                  key={s.id}
+                  variant="raised"
+                  style={{ padding: "var(--os-space-3)", fontSize: "var(--os-text-sm)" }}
+                >
+                  <div>{s.title}</div>
+                  <div style={{ color: "var(--os-muted)", fontSize: "var(--os-text-xs)" }}>
+                    <span className="os-num" dir="ltr">
+                      {new Date(s.scheduledAt).toLocaleString("he-IL", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                </Panel>
+              ))}
+            </div>
+          )}
+        </div>
+      </Drawer>
     </div>
   );
 }
