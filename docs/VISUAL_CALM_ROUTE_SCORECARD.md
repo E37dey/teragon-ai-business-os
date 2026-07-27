@@ -27,13 +27,13 @@ Palette + shell calm inherited globally (color/glow/border/type). **Density pass
 | /documents | VC-C | pending | — | list+selected; preview on demand |
 | /tasks | VC-C | ✅ done | 5/5/5 | decorative KPI strip removed; board is hero; detail→drawer; 0 axe |
 | /printers | VC-D | ✅ done | 5/5/5 | 5→3 KPIs; fleet table (3 concerns as columns); per-row buttons→drawer; 0 axe |
-| /organizations | VC-D | pending | — | identity+contacts+agreements; history in tabs |
+| /organizations | VC-D | ✅ done | 5/5/5 | 5→4 KPIs zero-neutral; revenue→disclosure; green-misuse fixed; history in tabs · 0 axe |
 | /support | VC-D | pending | — | — |
-| /agents/collaboration | VC-E | pending | — | — |
-| /automations | VC-E | pending | — | state + pending approvals; run log on demand |
-| /memory | VC-E | pending | — | record nav; graph only when useful |
-| /knowledge | VC-E | pending | — | as memory |
-| /learning | VC-E | pending | — | as memory |
+| /agents/collaboration | VC-E | ✅ done | 5/5/5 | 4 KPIs; graph subdued (neutral nodes, accent only on action); evidence→drawer · 0 axe |
+| /automations | VC-E | ✅ done | 5/5/5 | KPIs→state+pending zero-neutral; run history→drawer; approvals promoted · 0 axe |
+| /memory | VC-E | ✅ done | 5/5/5 | 8→4 KPIs; link graph→tab (not always-on); passive→disclosure · 0 axe |
+| /knowledge | VC-E | ✅ done | 5/5/5 | 5→4 KPIs no glow; queues→tabs; totals→disclosure · 0 axe |
+| /learning | VC-E | ✅ done | 5/5/5 | 8→4 KPIs zero-neutral; tallies→disclosure; honest loop stepper kept · 0 axe |
 | /implementation | VC-F | pending | — | — |
 | /personas | VC-F | pending | — | — |
 | /stage-gates | VC-F | pending | — | — |
