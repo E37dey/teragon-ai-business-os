@@ -1,0 +1,15 @@
+/* VC-D density — /service module-scoped calm rules.
+   Shared table/token CSS is untouched; these rules only add the single
+   steel selected-row accent the shared DataTable does not provide. */
+
+/* One selected-ticket accent: quiet steel tint + a 3px steel bar on the
+   logical start edge (physical right in RTL). No glow, no per-cell borders. */
+.os-table tbody tr.os-service-row--selected td {
+  background: var(--os-highlight);
+}
+.os-table tbody tr.os-service-row--selected:hover td {
+  background: var(--os-highlight);
+}
+.os-table tbody tr.os-service-row--selected td:first-child {
+  border-inline-start: 3px solid var(--accent-primary);
+}

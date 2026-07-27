@@ -8,6 +8,7 @@ import type { CSSProperties, ReactElement } from "react";
 import { PageRail } from "@/app/rail";
 import {
   DataTable,
+  Drawer,
   EmptyState,
   KpiCard,
   Modal,
@@ -20,6 +21,7 @@ import {
   type DataTableColumn,
   type OsStatus,
 } from "@/design-system";
+import "./service.css";
 import type {
   Activity,
   Customer,
@@ -144,6 +146,8 @@ export default function ServicePage(): ReactElement {
   const closedThisWeek = tickets.filter(
     (t) => isClosedStatus(t.status) && daysAgo(t.updatedAt) <= 7,
   ).length;
+  const slaBreaches = risk.filter((r) => r.sla.level === "חריגה").length;
+  const slaAtRisk = risk.filter((r) => r.sla.level === "בסיכון").length;
 
   const filtered = tickets
     .filter((t) =>
@@ -192,29 +196,58 @@ export default function ServicePage(): ReactElement {
         }
       />
 
+      {/* VC-D: four quiet, action-driving KPIs only — the operator's live queue
+          state. Zero is neutral (muted), never success; amber/red appear only
+          when action is genuinely required; no glow. Passive totals move to
+          "מדדים נוספים". */}
       <div style={kpiRowStyle}>
-        <KpiCard title="קריאות פתוחות" value={open.length} accent="cyan" icon="wrench" />
+        <KpiCard
+          title="קריאות פתוחות"
+          value={open.length}
+          accent="cyan"
+          icon="wrench"
+          muted={open.length === 0}
+        />
         <KpiCard
           title="עדיפות גבוהה"
           value={byPriority["גבוהה"]}
-          accent="danger"
+          accent="warning"
           icon="alert"
-          glow={byPriority["גבוהה"] > 0}
+          muted={byPriority["גבוהה"] === 0}
         />
         <KpiCard
           title="חריגות SLA"
-          value={risk.filter((r) => r.sla.level === "חריגה").length}
+          value={slaBreaches}
           accent="danger"
           icon="clock"
+          muted={slaBreaches === 0}
         />
         <KpiCard
           title="בסיכון SLA"
-          value={risk.filter((r) => r.sla.level === "בסיכון").length}
+          value={slaAtRisk}
           accent="warning"
           icon="clock"
+          muted={slaAtRisk === 0}
         />
-        <KpiCard title="נסגרו השבוע" value={closedThisWeek} accent="success" icon="check" />
       </div>
+
+      <details className="os-more-metrics">
+        <summary>מדדים נוספים</summary>
+        <div className="os-more-metrics__grid">
+          <div className="os-more-metrics__item">
+            <span>נסגרו השבוע</span>
+            <span className="os-num">{closedThisWeek}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>סך הקריאות במערכת</span>
+            <span className="os-num">{tickets.length}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>קריאות סגורות</span>
+            <span className="os-num">{tickets.length - open.length}</span>
+          </div>
+        </div>
+      </details>
 
       <div style={{ display: "flex", gap: "var(--os-space-4)", flexWrap: "wrap" }}>
         <select
@@ -409,9 +442,9 @@ function TicketQueue({
             style={{
               color:
                 s.level === "חריגה"
-                  ? "var(--os-danger)"
+                  ? "var(--danger-text)"
                   : s.level === "בסיכון"
-                    ? "var(--os-warning)"
+                    ? "var(--warning-text)"
                     : "var(--os-text-2)",
             }}
           >
@@ -427,7 +460,7 @@ function TicketQueue({
       rows={tickets}
       rowKey="id"
       onRowClick={(t) => onSelect(t.id)}
-      rowClassName={(t) => (t.id === selectedId ? "os-table__row--clickable" : "")}
+      rowClassName={(t) => (t.id === selectedId ? "os-service-row--selected" : "")}
       emptyText="אין קריאות שירות"
       emptyReason="לא נמצאו קריאות בסינון הנוכחי — פתחו קריאה חדשה או שנו סינון."
       maxHeight={520}
@@ -452,6 +485,7 @@ function TicketWorkbench({
   const { toast } = useToast();
   const invalidate = useInvalidateCollections();
   const [busy, setBusy] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [actionKind, setActionKind] = useState<ActionKind>("אבחון");
   const [actionText, setActionText] = useState("");
   const [actionCost, setActionCost] = useState("");
@@ -524,9 +558,19 @@ function TicketWorkbench({
           title={`קריאה ${ticket.id} — ${ticket.customerName}`}
           subtitle={`${ticket.printer} · נפתחה ${fmtDate(ticket.openedAt)}`}
           action={
-            <OsButton size="sm" variant="ghost" icon="x" onClick={onClose}>
-              סגירת חלונית
-            </OsButton>
+            <div style={{ display: "flex", gap: "var(--os-space-3)", flexWrap: "wrap" }}>
+              <OsButton
+                size="sm"
+                variant="ghost"
+                icon="clock"
+                onClick={() => setHistoryOpen(true)}
+              >
+                ציר זמן והיסטוריה ({ticketActions.length + ticketActivities.length})
+              </OsButton>
+              <OsButton size="sm" variant="ghost" icon="x" onClick={onClose}>
+                סגירת חלונית
+              </OsButton>
+            </div>
           }
         />
         <div className="os-table-scroll" style={{ overflowX: "auto" }}>
@@ -618,12 +662,11 @@ function TicketWorkbench({
         {/* deterministic diagnosis + tests checklist */}
         <Panel
           variant="raised"
-          accent="cyan"
           style={{ padding: "var(--os-space-5)", display: "grid", gap: "var(--os-space-3)" }}
         >
           <SectionTitle icon="sparkle" title="אבחון ראשוני" subtitle={RULES_ENGINE_LABEL} />
           <div style={{ fontWeight: 600 }}>{diag.cause}</div>
-          <div style={{ color: "var(--os-warning)", fontSize: "var(--os-text-xs)" }}>
+          <div style={{ color: "var(--warning-text)", fontSize: "var(--os-text-sm)" }}>
             {DIAGNOSIS_DISCLAIMER} · חוק שהופעל: {diag.rule}
           </div>
           <div style={{ display: "grid", gap: 6 }}>
@@ -792,52 +835,58 @@ function TicketWorkbench({
         </Panel>
       </div>
 
-      {/* timeline */}
-      <Panel style={{ padding: "var(--os-space-5)" }}>
-        <SectionTitle
-          icon="clock"
-          title="ציר זמן מלא"
-          subtitle={`${ticketActions.length} פעולות · ${ticketActivities.length} אירועים`}
-        />
-        <div style={{ display: "grid", gap: "var(--os-space-3)" }}>
+      {/* VC-D: full history/evidence/part-records are SECONDARY — kept off the
+          primary workflow and opened on demand in a drawer. */}
+      <Drawer
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        title={`ציר זמן והיסטוריה — קריאה ${ticket.id}`}
+      >
+        <div style={{ display: "grid", gap: "var(--os-space-4)" }}>
+          <div style={{ fontSize: "var(--os-text-sm)", color: "var(--os-muted)" }}>
+            {ticketActions.length} פעולות תיקון · {ticketActivities.length} אירועים ·
+            עלות חלקים מצטברת ₪{parts.toLocaleString("he-IL")}
+          </div>
           {ticketActions.length === 0 && ticketActivities.length === 0 && (
             <EmptyState
               title="אין אירועים עדיין"
               reason="פעולות תיקון ושינויי סטטוס יופיעו כאן ברגע שיתועדו."
             />
           )}
-          {ticketActivities.map((a) => (
-            <div key={a.id} style={timelineRow}>
-              <span className="os-num" style={timelineWhen} dir="ltr">
-                {new Date(a.at).toLocaleString("he-IL", {
-                  day: "2-digit",
-                  month: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
-              <span style={{ color: "var(--os-cyan)" }}>אירוע</span>
-              <span>{a.text}</span>
-            </div>
-          ))}
-          {ticketActions.map((a) => (
-            <div key={a.id} style={timelineRow}>
-              <span className="os-num" style={timelineWhen}>
-                {fmtDate(a.performedAt)}
-              </span>
-              <span style={{ color: "var(--os-violet-text)" }}>
-                {actionKindOf(a.description) ?? "פעולה"}
-              </span>
-              <span>{a.description.replace(/^[^:]+: /, "")}</span>
-              {a.partsCost > 0 && (
-                <span className="os-num" style={{ color: "var(--os-warning)" }}>
-                  ₪{a.partsCost.toLocaleString("he-IL")}
+          <div style={{ display: "grid", gap: "var(--os-space-3)" }}>
+            {ticketActivities.map((a) => (
+              <div key={a.id} style={timelineRow}>
+                <span className="os-num" style={timelineWhen} dir="ltr">
+                  {new Date(a.at).toLocaleString("he-IL", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </span>
-              )}
-            </div>
-          ))}
+                <span style={{ color: "var(--accent-primary-text)" }}>אירוע</span>
+                <span>{a.text}</span>
+              </div>
+            ))}
+            {ticketActions.map((a) => (
+              <div key={a.id} style={timelineRow}>
+                <span className="os-num" style={timelineWhen}>
+                  {fmtDate(a.performedAt)}
+                </span>
+                <span style={{ color: "var(--os-violet-text)" }}>
+                  {actionKindOf(a.description) ?? "פעולה"}
+                </span>
+                <span>{a.description.replace(/^[^:]+: /, "")}</span>
+                {a.partsCost > 0 && (
+                  <span className="os-num" style={{ color: "var(--warning-text)" }}>
+                    ₪{a.partsCost.toLocaleString("he-IL")}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
-      </Panel>
+      </Drawer>
     </div>
   );
 }
