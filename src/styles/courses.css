@@ -48,8 +48,9 @@
   min-inline-size: 0;
 }
 
-/* ── KPI strip: content-keyed columns 2 → 3 → 5. Each card min-inline-size 190px
-   so a card is never clipped and never forces horizontal page overflow. ── */
+/* ── KPI strip: VC-D density — three action-driving cards, content-keyed
+   columns 2 → 3. Each card min-inline-size 190px so a card is never clipped and
+   never forces horizontal page overflow. ── */
 .courses-kpi {
   display: grid;
   gap: var(--os-space-5);
@@ -63,11 +64,6 @@
 @container courses (min-width: 950px) {
   .courses-kpi {
     grid-template-columns: repeat(3, minmax(190px, 1fr));
-  }
-}
-@container courses (min-width: 1350px) {
-  .courses-kpi {
-    grid-template-columns: repeat(5, minmax(190px, 1fr));
   }
 }
 
