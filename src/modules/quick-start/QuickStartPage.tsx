@@ -176,8 +176,8 @@ function ActionCard({ action, compact }: { action: QuickStartAction; compact: bo
           <div
             style={{
               padding: "6px var(--os-space-4)",
-              background: "rgba(32,196,232,0.08)",
-              color: "var(--os-cyan)",
+              background: "var(--accent-primary-soft)",
+              color: "var(--accent-primary-text)",
               fontSize: "var(--os-text-xs)",
               fontWeight: 600,
             }}
@@ -204,10 +204,10 @@ function ActionCard({ action, compact }: { action: QuickStartAction; compact: bo
         <span>
           <b style={{ color: "var(--os-text)" }}>זמן משוער:</b> {action.estimatedTime}
         </span>
-        <span style={{ color: "var(--os-warning)" }}>
+        <span style={{ color: "var(--warning-text)" }}>
           <b>טעות נפוצה:</b> {action.commonMistake}
         </span>
-        <span style={{ color: "var(--os-success)" }}>
+        <span style={{ color: "var(--success-text)" }}>
           <b>הערת בטיחות:</b> {action.safetyNote}
         </span>
       </div>
