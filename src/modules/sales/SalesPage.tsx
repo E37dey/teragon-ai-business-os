@@ -4,9 +4,9 @@
 import { useMemo, useState } from "react";
 import type { CSSProperties, ReactElement } from "react";
 import {
+  Drawer,
   EmptyState,
   KpiCard,
-  Modal,
   OsButton,
   Panel,
   SectionTitle,
@@ -286,29 +286,59 @@ export default function SalesPage(): ReactElement {
         </span>
       </div>
 
+      {/* VC-C: primary KPIs only drive the current workflow — the open pipeline,
+          its value (financial → neutral until it needs action), and deals that
+          need attention. Zero stays neutral; amber shows only when >0. No glow.
+          Passive win/loss measurements move to "מדדים נוספים". */}
       <div
+        data-testid="sales-metrics"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-          gap: "var(--os-space-3)",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: "var(--os-space-4)",
         }}
       >
-        <KpiCard title="הזדמנויות פתוחות" value={conversion.open} accent="blue" icon="briefcase" />
+        <KpiCard
+          title="הזדמנויות פתוחות"
+          value={conversion.open}
+          accent="blue"
+          icon="briefcase"
+          muted={conversion.open === 0}
+        />
         <KpiCard
           title="שווי צנרת פתוחה"
           value={ils(conversion.openValue)}
-          accent="cyan"
-          glow
           icon="target"
+          muted
         />
         <KpiCard
-          title="אחוז זכייה"
-          value={conversion.winRate === null ? "טרם נמדד" : `${conversion.winRate}%`}
-          accent="success"
-          icon="check"
+          title="עסקאות תקועות"
+          value={stuck.length}
+          accent="warning"
+          icon="alert"
+          muted={stuck.length === 0}
         />
-        <KpiCard title="עסקאות תקועות" value={stuck.length} accent="warning" icon="alert" />
       </div>
+
+      <details data-testid="sales-more-metrics" className="os-more-metrics">
+        <summary>מדדים נוספים</summary>
+        <div className="os-more-metrics__grid">
+          <div className="os-more-metrics__item">
+            <span>אחוז זכייה (הוכרעו)</span>
+            <span className="os-num">
+              {conversion.winRate === null ? "טרם נמדד" : `${conversion.winRate}%`}
+            </span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>זכיות</span>
+            <span className="os-num">{conversion.won}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>הפסדים</span>
+            <span className="os-num">{conversion.lost}</span>
+          </div>
+        </div>
+      </details>
 
       {/* the journey stepper */}
       <Panel variant="panel" style={{ padding: "var(--os-space-5)", overflowX: "auto" }}>
@@ -362,10 +392,7 @@ export default function SalesPage(): ReactElement {
                     return (
                       <tr key={o.id}>
                         <td>{o.name}</td>
-                        <td
-                          data-testid={`journey-step-${o.id}`}
-                          style={{ color: "var(--os-cyan)" }}
-                        >
+                        <td data-testid={`journey-step-${o.id}`}>
                           {stepDef?.label ?? step}
                         </td>
                         <td>
@@ -534,17 +561,31 @@ export default function SalesPage(): ReactElement {
             ) : (
               matchState.results.map((r, i) => {
                 const estimate = solutionEstimate(r, products, matchState.need);
+                const topMatch = i === 0;
                 return (
                   <Panel
                     key={r.model.id}
                     variant="raised"
-                    accent={i === 0 ? "cyan" : undefined}
-                    style={{ padding: "var(--os-space-4)", display: "grid", gap: 8 }}
+                    accent={topMatch ? "blue" : undefined}
+                    style={{ padding: "var(--os-space-4)", display: "grid", gap: 10 }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "baseline",
+                        gap: 8,
+                      }}
+                    >
                       <strong>{r.model.name}</strong>
-                      {i === 0 && (
-                        <span style={{ color: "var(--os-cyan)", fontSize: "var(--os-text-2xs)" }}>
+                      {topMatch && (
+                        <span
+                          style={{
+                            color: "var(--accent-primary-text)",
+                            fontSize: "var(--os-text-2xs)",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
                           ההתאמה המובילה
                         </span>
                       )}
@@ -555,43 +596,40 @@ export default function SalesPage(): ReactElement {
                       {r.model.manufacturer} · {r.model.technology} ·{" "}
                       <span className="os-num">{ils(r.model.price)}</span>
                     </div>
-                    <div style={{ fontSize: "var(--os-text-2xs, 11px)" }}>
-                      <strong style={{ color: "var(--os-success)" }}>התאמה:</strong>
-                      <ul style={{ margin: "2px 0", paddingInlineStart: "1.1em" }}>
-                        {r.suitability.map((s, j) => (
-                          <li key={j}>{s}</li>
-                        ))}
-                        {r.suitability.length === 0 && <li>לא נמצאו כללי התאמה חיוביים</li>}
-                      </ul>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "var(--os-space-4)",
+                        flexWrap: "wrap",
+                        fontSize: "var(--os-text-2xs, 11px)",
+                        color: "var(--os-text-2)",
+                      }}
+                    >
+                      <span>
+                        התאמות <span className="os-num">{r.suitability.length}</span>
+                      </span>
                       {r.limitations.length > 0 && (
-                        <>
-                          <strong style={{ color: "var(--os-warning)" }}>מגבלות:</strong>
-                          <ul style={{ margin: "2px 0", paddingInlineStart: "1.1em" }}>
-                            {r.limitations.map((s, j) => (
-                              <li key={j}>{s}</li>
-                            ))}
-                          </ul>
-                        </>
+                        <span>
+                          מגבלות <span className="os-num">{r.limitations.length}</span>
+                        </span>
                       )}
                     </div>
-                    <div
-                      style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-text-2)" }}
-                    >
-                      אביזרים: {estimate.accessories.map((a) => a.product.name).join(", ") || "—"}
-                      <br />
-                      קורס מומלץ: {estimate.recommendedCourse?.name ?? "—"}
-                      <br />
-                      <strong style={{ color: "var(--os-text)" }}>
-                        אומדן פתרון מלא: <span className="os-num">{ils(estimate.total)}</span> (לפני
-                        מע"מ)
-                      </strong>
+                    <div style={{ fontSize: "var(--os-text-sm, 13px)" }}>
+                      אומדן פתרון מלא:{" "}
+                      <strong className="os-num">{ils(estimate.total)}</strong>{" "}
+                      <span
+                        style={{ color: "var(--os-muted)", fontSize: "var(--os-text-2xs, 11px)" }}
+                      >
+                        (לפני מע"מ)
+                      </span>
                     </div>
                     <OsButton
                       size="sm"
-                      variant={i === 0 ? "cyan" : "ghost"}
+                      variant={topMatch ? "cyan" : "ghost"}
                       onClick={() => setPreviewMatch(r)}
+                      data-testid={`match-details-${r.model.id}`}
                     >
-                      תצוגה מקדימה ואישור
+                      פירוט התאמה ואישור
                     </OsButton>
                   </Panel>
                 );
@@ -601,73 +639,123 @@ export default function SalesPage(): ReactElement {
         )}
       </Panel>
 
-      {/* preview → approval → draft quotation */}
-      {previewMatch && matchState && (
-        <Modal
-          open
-          onClose={() => setPreviewMatch(null)}
-          title={`תצוגה מקדימה — ${previewMatch.model.name}`}
-          footer={
-            <div style={{ display: "flex", gap: "var(--os-space-2)" }}>
-              {creatingQuote ? (
-                <OsButton variant="approve" disabled disabledReason="הטיוטה נוצרת…">
-                  אישור ויצירת טיוטת הצעה
-                </OsButton>
-              ) : (
-                <OsButton
-                  variant="approve"
-                  icon="check"
-                  data-testid="approve-quote"
-                  onClick={() => void createDraftQuote(previewMatch)}
-                >
-                  אישור ויצירת טיוטת הצעה
-                </OsButton>
-              )}
-              <OsButton variant="ghost" onClick={() => setPreviewMatch(null)}>
-                ביטול
-              </OsButton>
-            </div>
-          }
-        >
-          {(() => {
-            const estimate = solutionEstimate(previewMatch, products, matchState.need);
-            return (
-              <div style={{ display: "grid", gap: 8, fontSize: "var(--os-text-sm, 13px)" }}>
-                <div>
-                  <strong>מדפסת: </strong>
-                  {previewMatch.model.name} —{" "}
+      {/* VC-C: the recommendation's evidence (matching rules, limitations) and
+          the full solution breakdown are shown here, on demand — not on every
+          result card at once. Approval lives with the evidence it acts on. */}
+      {previewMatch &&
+        matchState &&
+        (() => {
+          const estimate = solutionEstimate(previewMatch, products, matchState.need);
+          return (
+            <Drawer
+              open
+              onClose={() => setPreviewMatch(null)}
+              title={`פירוט התאמה — ${previewMatch.model.name}`}
+            >
+              <div
+                style={{
+                  display: "grid",
+                  gap: "var(--os-space-4)",
+                  fontSize: "var(--os-text-sm, 13px)",
+                }}
+                data-testid="match-detail"
+              >
+                <div style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-text-2)" }}>
+                  {previewMatch.model.manufacturer} · {previewMatch.model.technology} ·{" "}
                   <span className="os-num">{ils(previewMatch.model.price)}</span>
                 </div>
-                {estimate.accessories.map((a) => (
-                  <div key={a.product.id}>
-                    <strong>אביזר: </strong>
-                    {a.product.name} ({a.reason}) —{" "}
-                    <span className="os-num">{ils(a.product.price)}</span>
-                  </div>
-                ))}
-                {estimate.recommendedCourse && (
+
+                <div>
+                  <strong style={{ color: "var(--success-text)" }}>התאמה</strong>
+                  <ul style={{ margin: "4px 0 0", paddingInlineStart: "1.1em" }}>
+                    {previewMatch.suitability.map((s, j) => (
+                      <li key={j}>{s}</li>
+                    ))}
+                    {previewMatch.suitability.length === 0 && (
+                      <li>לא נמצאו כללי התאמה חיוביים</li>
+                    )}
+                  </ul>
+                </div>
+
+                {previewMatch.limitations.length > 0 && (
                   <div>
-                    <strong>קורס מומלץ: </strong>
-                    {estimate.recommendedCourse.name} —{" "}
-                    <span className="os-num">{ils(estimate.recommendedCourse.price)}</span>
+                    <strong style={{ color: "var(--warning-text)" }}>מגבלות</strong>
+                    <ul style={{ margin: "4px 0 0", paddingInlineStart: "1.1em" }}>
+                      {previewMatch.limitations.map((s, j) => (
+                        <li key={j}>{s}</li>
+                      ))}
+                    </ul>
                   </div>
                 )}
+
                 <div
-                  style={{ borderBlockStart: "1px solid var(--os-border)", paddingBlockStart: 8 }}
+                  style={{
+                    display: "grid",
+                    gap: 6,
+                    borderBlockStart: "1px solid var(--os-border)",
+                    paddingBlockStart: "var(--os-space-3)",
+                  }}
+                >
+                  <div>
+                    <strong>מדפסת: </strong>
+                    {previewMatch.model.name} —{" "}
+                    <span className="os-num">{ils(previewMatch.model.price)}</span>
+                  </div>
+                  {estimate.accessories.map((a) => (
+                    <div key={a.product.id}>
+                      <strong>אביזר: </strong>
+                      {a.product.name} ({a.reason}) —{" "}
+                      <span className="os-num">{ils(a.product.price)}</span>
+                    </div>
+                  ))}
+                  {estimate.recommendedCourse && (
+                    <div>
+                      <strong>קורס מומלץ: </strong>
+                      {estimate.recommendedCourse.name} —{" "}
+                      <span className="os-num">{ils(estimate.recommendedCourse.price)}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  style={{
+                    borderBlockStart: "1px solid var(--os-border)",
+                    paddingBlockStart: "var(--os-space-3)",
+                  }}
                 >
                   <strong>
                     אומדן כולל: <span className="os-num">{ils(estimate.total)}</span> (לפני מע"מ)
                   </strong>
                 </div>
+
                 <div style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-muted)" }}>
                   אישור ייצור טיוטת הצעת מחיר במסך המסמכים. ההמלצה הופקה על ידי מנוע מקומי מבוסס
                   כללים מתוך קטלוג טרגון בלבד.
                 </div>
+
+                <div style={{ display: "flex", gap: "var(--os-space-2)", flexWrap: "wrap" }}>
+                  {creatingQuote ? (
+                    <OsButton variant="approve" disabled disabledReason="הטיוטה נוצרת…">
+                      אישור ויצירת טיוטת הצעה
+                    </OsButton>
+                  ) : (
+                    <OsButton
+                      variant="approve"
+                      icon="check"
+                      data-testid="approve-quote"
+                      onClick={() => void createDraftQuote(previewMatch)}
+                    >
+                      אישור ויצירת טיוטת הצעה
+                    </OsButton>
+                  )}
+                  <OsButton variant="ghost" onClick={() => setPreviewMatch(null)}>
+                    ביטול
+                  </OsButton>
+                </div>
               </div>
-            );
-          })()}
-        </Modal>
-      )}
+            </Drawer>
+          );
+        })()}
     </div>
   );
 }
