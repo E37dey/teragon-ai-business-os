@@ -1,0 +1,9 @@
+/* /printers — module-scoped calm density.
+   One selected-row steel accent (VC-D tables rule): a subtle surface change plus
+   a single inline-start accent bar — no glow, no colorful row background. */
+.printers-row--selected > td {
+  background: var(--accent-primary-soft);
+}
+.printers-row--selected > td:first-child {
+  border-inline-start: 2px solid var(--accent-primary);
+}

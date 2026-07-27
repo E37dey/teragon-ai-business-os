@@ -42,6 +42,24 @@ import {
   warrantyUntil,
   type WarrantyState,
 } from "./lib";
+import "./printers.css";
+
+/** Open service-ticket statuses (presentation-only mirror of the fleet-health rule). */
+const OPEN_TICKET_STATUSES: ReadonlySet<string> = new Set([
+  "חדש",
+  "בבדיקה",
+  "ממתין ללקוח",
+  "ממתין לחלק",
+]);
+function openTicketsFor(
+  printer: CustomerPrinter,
+  model: PrinterModel | undefined,
+  tickets: readonly ServiceTicket[],
+): ServiceTicket[] {
+  return ticketsForPrinter(printer, model, tickets).filter((t) =>
+    OPEN_TICKET_STATUSES.has(t.status),
+  );
+}
 
 const kpiRowStyle: CSSProperties = {
   display: "grid",
@@ -68,6 +86,30 @@ function warrantyChip(state: WarrantyState): ReactElement {
     <StatusChip status="אזהרה" label="אחריות פגה בקרוב" />
   ) : (
     <StatusChip status="מושבת" label="ללא אחריות" />
+  );
+}
+
+/** Fleet "current condition" cell — chip only when it needs a scan (amber when
+ *  nearing/needing attention); the healthy state is calm plain text, not a chip. */
+function conditionCell(state: WarrantyState): ReactElement {
+  return state === "פג בקרוב" ? (
+    <StatusChip status="אזהרה" label="אחריות פגה בקרוב" />
+  ) : state === "פגה" ? (
+    <StatusChip status="מושבת" label="ללא אחריות" />
+  ) : (
+    <span style={{ color: "var(--os-text-2)" }}>תקין · אחריות בתוקף</span>
+  );
+}
+
+/** Fleet "service" cell — chip only when an open call exists (amber), else calm text. */
+function serviceCell(openCount: number): ReactElement {
+  return openCount > 0 ? (
+    <StatusChip
+      status="אזהרה"
+      label={openCount > 1 ? `${openCount} קריאות פתוחות` : "קריאה פתוחה"}
+    />
+  ) : (
+    <span style={{ color: "var(--os-muted)" }}>אין קריאה פתוחה</span>
   );
 }
 
@@ -138,6 +180,9 @@ export default function PrintersPage(): ReactElement {
     );
   }
 
+  // VC-D operator table: model + customer + serial identify the unit; then the
+  // three things an operator acts on — current condition, service status and the
+  // maintenance timeline. Purchase/warranty dates live in the detail drawer.
   const fleetColumns: DataTableColumn<CustomerPrinter>[] = [
     {
       key: "model",
@@ -155,23 +200,18 @@ export default function PrintersPage(): ReactElement {
       render: (p) => <span className="os-table__num">{p.serialNumber}</span>,
     },
     {
-      key: "purchased",
-      header: "נרכשה",
-      render: (p) => <span className="os-table__num">{fmtDate(p.purchasedAt)}</span>,
+      key: "condition",
+      header: "מצב נוכחי",
+      render: (p) => conditionCell(warrantyState(p, today)),
     },
     {
-      key: "warranty",
-      header: "אחריות עד",
-      render: (p) => (
-        <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-          <span className="os-table__num">{fmtDate(warrantyUntil(p))}</span>
-          {warrantyChip(warrantyState(p, today))}
-        </span>
-      ),
+      key: "service",
+      header: "סטטוס שירות",
+      render: (p) => serviceCell(openTicketsFor(p, modelOf(p.printerModelId), tickets).length),
     },
     {
       key: "maintenance",
-      header: "תחזוקה",
+      header: "תחזוקה הבאה",
       render: (p) => {
         const m = maintenanceInfo(p, modelOf(p.printerModelId), tickets, actions, today);
         return m.due ? (
@@ -202,34 +242,50 @@ export default function PrintersPage(): ReactElement {
         }
       />
 
+      {/* VC-D: ≤4 primary KPIs, each action-driving. Zero is neutral (not success,
+          not attention) so it stays muted-grey. No glow. Passive fleet totals move
+          to "מדדים נוספים" below. */}
       <div style={kpiRowStyle}>
-        <KpiCard title="מדפסות בצי" value={health.total} accent="cyan" icon="printer" />
         <KpiCard
-          title="באחריות בתוקף"
-          value={health.underWarranty}
-          accent="success"
-          icon="shield"
+          title="תחזוקה נדרשת"
+          value={health.maintenanceDue}
+          accent="warning"
+          icon="wrench"
+          muted={health.maintenanceDue === 0}
         />
         <KpiCard
           title="אחריות פגה בקרוב"
           value={health.warrantyExpiringSoon}
           accent="warning"
           icon="clock"
-        />
-        <KpiCard
-          title="תחזוקה נדרשת"
-          value={health.maintenanceDue}
-          accent="danger"
-          icon="wrench"
-          glow={health.maintenanceDue > 0}
+          muted={health.warrantyExpiringSoon === 0}
         />
         <KpiCard
           title="עם קריאה פתוחה"
           value={health.withOpenTicket}
-          accent="violet"
+          accent="warning"
           icon="alert"
+          muted={health.withOpenTicket === 0}
         />
       </div>
+
+      <details className="os-more-metrics">
+        <summary>מדדים נוספים</summary>
+        <div className="os-more-metrics__grid">
+          <div className="os-more-metrics__item">
+            <span>מדפסות בצי</span>
+            <span className="os-num">{health.total}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>באחריות בתוקף</span>
+            <span className="os-num">{health.underWarranty}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>דגמים בקטלוג</span>
+            <span className="os-num">{models.length}</span>
+          </div>
+        </div>
+      </details>
 
       <Tabs
         ariaLabel="אזורי מודול המדפסות"
@@ -248,6 +304,7 @@ export default function PrintersPage(): ReactElement {
           rows={printers}
           rowKey="id"
           onRowClick={(p) => setSelectedId(p.id)}
+          rowClassName={(p) => (p.id === selectedId ? "printers-row--selected" : "")}
           emptyText="אין מדפסות רשומות"
           emptyReason="רשמו מדפסת ראשונה ללקוח כדי להתחיל לנהל את הצי."
         />
@@ -321,6 +378,7 @@ export default function PrintersPage(): ReactElement {
         <RemindersQueue
           reminders={reminders}
           customers={customers}
+          selectedId={selectedId}
           onOpen={(id) => setSelectedId(id)}
         />
       )}
@@ -435,9 +493,12 @@ const railRow: CSSProperties = {
 };
 
 // ── reminders queue ─────────────────────────────────────────────────────────
+// VC-D: a calm table — row click opens the printer card (drawer) where the
+// "צור משימת תחזוקה" action lives. No permanent per-row buttons, one selected accent.
 function RemindersQueue({
   reminders,
   customers,
+  selectedId,
   onOpen,
 }: {
   reminders: readonly {
@@ -447,61 +508,9 @@ function RemindersQueue({
     warranty: WarrantyState;
   }[];
   customers: readonly Customer[];
+  selectedId: string | null;
   onOpen: (printerId: string) => void;
 }): ReactElement {
-  const { toast } = useToast();
-  const invalidate = useInvalidateCollections();
-  const [busyId, setBusyId] = useState<string | null>(null);
-
-  async function createMaintenanceTask(r: (typeof reminders)[number]): Promise<void> {
-    setBusyId(r.printer.id);
-    try {
-      const repo = getRepository<Task>("tasks");
-      const all = await repo.list();
-      const customer = customers.find((c) => c.id === r.printer.customerId);
-      const now = new Date().toISOString();
-      const title = `תחזוקה תקופתית — ${r.model?.name ?? r.printer.printerModelId} (${customer?.name ?? ""})`;
-      if (all.some((t) => t.title === title && t.status !== "הושלמה" && t.status !== "בוטלה")) {
-        toast("כבר קיימת משימת תחזוקה פתוחה למדפסת זו", "warning");
-        return;
-      }
-      await repo.create({
-        id: nextId(
-          "task",
-          all.map((t) => t.id),
-        ),
-        title,
-        description: `S/N ${r.printer.serialNumber} · תחזוקה אחרונה: ${fmtDate(r.maint.lastTouch)} · באיחור ${Math.max(0, r.maint.overdueDays)} ימים`,
-        status: "פתוחה",
-        priority: r.maint.overdueDays > 30 ? "גבוהה" : "בינונית",
-        due: todayISO(),
-        ownerId: "u-ran",
-        relatedRef: `customerPrinter:${r.printer.id}`,
-        createdAt: now,
-        updatedAt: now,
-      });
-      const actRepo = getRepository<Activity>("activities");
-      const acts = await actRepo.list();
-      await actRepo.create({
-        id: nextId(
-          "act",
-          acts.map((a) => a.id),
-        ),
-        kind: "מערכת",
-        text: `נוצרה משימת תחזוקה למדפסת ${r.model?.name ?? ""} של ${customer?.name ?? ""}`,
-        actorId: CEO_USER_ID,
-        entityRef: `customerPrinter:${r.printer.id}`,
-        at: now,
-        createdAt: now,
-        updatedAt: now,
-      });
-      await invalidate(["tasks", "activities"]);
-      toast("משימת תחזוקה נוצרה בתור המשימות", "success");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
   const columns: DataTableColumn<(typeof reminders)[number]>[] = [
     { key: "model", header: "דגם", render: (r) => r.model?.name ?? r.printer.printerModelId },
     {
@@ -530,32 +539,14 @@ function RemindersQueue({
       header: "תחזוקה הבאה",
       render: (r) => <span className="os-table__num">{fmtDate(r.maint.nextDue)}</span>,
     },
-    {
-      key: "act",
-      header: "",
-      render: (r) => (
-        <span style={{ display: "inline-flex", gap: 6 }}>
-          <OsButton size="sm" variant="ghost" onClick={() => onOpen(r.printer.id)}>
-            פתיחת כרטיס
-          </OsButton>
-          {busyId === r.printer.id ? (
-            <OsButton size="sm" variant="cyan" disabled disabledReason="יצירת משימה רצה">
-              משימת תחזוקה
-            </OsButton>
-          ) : (
-            <OsButton size="sm" variant="cyan" onClick={() => void createMaintenanceTask(r)}>
-              משימת תחזוקה
-            </OsButton>
-          )}
-        </span>
-      ),
-    },
   ];
   return (
     <DataTable
       columns={columns}
       rows={reminders}
       rowKey={(r) => r.printer.id}
+      onRowClick={(r) => onOpen(r.printer.id)}
+      rowClassName={(r) => (r.printer.id === selectedId ? "printers-row--selected" : "")}
       emptyText="אין תזכורות תחזוקה"
       emptyReason="כל המדפסות בטווח התחזוקה והאחריות — התור ריק."
     />
@@ -586,10 +577,61 @@ function PrinterDrawer({
   const invalidate = useInvalidateCollections();
   const [notes, setNotes] = useState(printer.notes);
   const [busy, setBusy] = useState(false);
+  const [taskBusy, setTaskBusy] = useState(false);
 
   const linked = ticketsForPrinter(printer, model, tickets);
   const maint = maintenanceInfo(printer, model, tickets, actions, today);
   const related = relatedCourses(model, courses);
+
+  // Maintenance-task creation lives here (progressive disclosure): the fleet /
+  // reminders tables stay button-free; the action surfaces only when due.
+  async function createMaintenanceTask(): Promise<void> {
+    setTaskBusy(true);
+    try {
+      const repo = getRepository<Task>("tasks");
+      const all = await repo.list();
+      const now = new Date().toISOString();
+      const title = `תחזוקה תקופתית — ${model?.name ?? printer.printerModelId} (${customer?.name ?? ""})`;
+      if (all.some((t) => t.title === title && t.status !== "הושלמה" && t.status !== "בוטלה")) {
+        toast("כבר קיימת משימת תחזוקה פתוחה למדפסת זו", "warning");
+        return;
+      }
+      await repo.create({
+        id: nextId(
+          "task",
+          all.map((t) => t.id),
+        ),
+        title,
+        description: `S/N ${printer.serialNumber} · תחזוקה אחרונה: ${fmtDate(maint.lastTouch)} · באיחור ${Math.max(0, maint.overdueDays)} ימים`,
+        status: "פתוחה",
+        priority: maint.overdueDays > 30 ? "גבוהה" : "בינונית",
+        due: todayISO(),
+        ownerId: "u-ran",
+        relatedRef: `customerPrinter:${printer.id}`,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const actRepo = getRepository<Activity>("activities");
+      const acts = await actRepo.list();
+      await actRepo.create({
+        id: nextId(
+          "act",
+          acts.map((a) => a.id),
+        ),
+        kind: "מערכת",
+        text: `נוצרה משימת תחזוקה למדפסת ${model?.name ?? ""} של ${customer?.name ?? ""}`,
+        actorId: CEO_USER_ID,
+        entityRef: `customerPrinter:${printer.id}`,
+        at: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+      await invalidate(["tasks", "activities"]);
+      toast("משימת תחזוקה נוצרה בתור המשימות", "success");
+    } finally {
+      setTaskBusy(false);
+    }
+  }
 
   interface TimelineEvent {
     at: string;
@@ -642,6 +684,16 @@ function PrinterDrawer({
               {maint.due ? ` (באיחור ${maint.overdueDays} ימים)` : ""}
             </span>
           </div>
+          {maint.due &&
+            (taskBusy ? (
+              <OsButton size="sm" variant="cyan" disabled disabledReason="יצירת משימה רצה">
+                צור משימת תחזוקה
+              </OsButton>
+            ) : (
+              <OsButton size="sm" variant="cyan" icon="wrench" onClick={() => void createMaintenanceTask()}>
+                צור משימת תחזוקה
+              </OsButton>
+            ))}
         </Panel>
 
         <div>
