@@ -7,7 +7,9 @@
 import { useState } from "react";
 import type { CSSProperties, ReactElement } from "react";
 import {
+  Drawer,
   EmptyState,
+  KpiCard,
   OsButton,
   OsIcon,
   Panel,
@@ -94,6 +96,7 @@ export default function AgentCollaborationPage(): ReactElement {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("הכל");
   const [providerFilter, setProviderFilter] = useState<ProviderFilter>("הכל");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
   const [demoBusy, setDemoBusy] = useState(false);
   const [conflictBusy, setConflictBusy] = useState(false);
   const [conflictNote, setConflictNote] = useState("");
@@ -166,6 +169,28 @@ export default function AgentCollaborationPage(): ReactElement {
   const runEvidence = activeRun
     ? evidence.filter((ev) => ev.subjectRef.startsWith(`agent-task:${activeRun.id}-`))
     : [];
+
+  // VC-E: current collaboration state — action-driving figures across all runs.
+  // Zero stays neutral (0 is not success and not attention). Passive totals
+  // move to "מדדים נוספים".
+  const activeRunsCount = runs.filter(
+    (r) => r.status === "רץ" || r.status === "ממתין לאישור",
+  ).length;
+  const openConflictsCount = conflicts.filter((c) => c.resolution === null).length;
+  const pendingApprovalsCount = approvals.filter((a) => a.status === "ממתין").length;
+  const runningTasksCount = tasks.filter((t) => t.status === "רץ").length;
+
+  // VC-E graph subduing: neutral borders/edges by default — semantic accent
+  // ONLY where action is required (open conflict = amber, pending approval =
+  // violet) or the node is the current selection (steel). No default glow.
+  const hasOpenConflict = (records?.conflicts ?? []).some((c) => c.resolution === null);
+  const hasPendingApproval = (records?.approvals ?? []).some((a) => a.status === "ממתין");
+  const nodeBorderColor = (node: { id: string; kind: RunGraphNode["kind"] }): string => {
+    if (node.id === selectedNodeId) return "var(--accent-primary, var(--os-blue))";
+    if (node.kind === "conflict" && hasOpenConflict) return "var(--os-warning)";
+    if (node.kind === "approval" && hasPendingApproval) return "var(--os-violet)";
+    return "var(--os-border)";
+  };
 
   const conflictDetail = (conflictId: string): ConflictDetail | null => {
     for (const rec of records?.events ?? []) {
@@ -299,61 +324,6 @@ export default function AgentCollaborationPage(): ReactElement {
               </div>
             </div>
           )}
-
-          <div style={stack("var(--os-space-2)")}>
-            <div
-              style={{
-                fontSize: "var(--os-text-2xs, 11px)",
-                fontWeight: 600,
-                color: "var(--os-text-2)",
-              }}
-            >
-              ראיות הריצה ({runEvidence.length})
-            </div>
-            {runEvidence.length === 0 ? (
-              <div style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-muted)" }}>
-                אין רשומות ראיה לריצה שנבחרה
-              </div>
-            ) : (
-              <div
-                style={{
-                  display: "grid",
-                  gap: 4,
-                  fontSize: "var(--os-text-2xs, 11px)",
-                  color: "var(--os-text-2)",
-                }}
-              >
-                {runEvidence.slice(0, 8).map((ev) => (
-                  <div
-                    key={ev.id}
-                    style={{ borderBlockEnd: "1px solid var(--os-border)", paddingBlockEnd: 3 }}
-                  >
-                    {ev.claim}{" "}
-                    <span className="os-ltr" style={{ color: "var(--os-muted)" }}>
-                      ({ev.sourceRef})
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div style={stack("var(--os-space-2)")}>
-            <div
-              style={{
-                fontSize: "var(--os-text-2xs, 11px)",
-                fontWeight: 600,
-                color: "var(--os-text-2)",
-              }}
-            >
-              רשומות מושפעות
-            </div>
-            <div style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-text-2)" }}>
-              {runEvidence.length === 0
-                ? "—"
-                : [...new Set(runEvidence.map((ev) => ev.sourceRef))].join(" · ")}
-            </div>
-          </div>
 
           {records && records.conflicts.length > 0 && (
             <div style={stack("var(--os-space-2)")} data-testid="conflict-rail">
@@ -491,6 +461,65 @@ export default function AgentCollaborationPage(): ReactElement {
         )}
       </div>
 
+      {/* VC-E: ≤4 quiet KPIs = current collaboration state + pending items;
+          each stays neutral at zero (0 is not success and not attention).
+          Passive totals move to "מדדים נוספים". */}
+      <div
+        data-testid="collaboration-metrics"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+          gap: "var(--os-space-3)",
+        }}
+      >
+        <KpiCard
+          title="ריצות פעילות"
+          value={activeRunsCount}
+          accent="blue"
+          icon="network"
+          muted={activeRunsCount === 0}
+        />
+        <KpiCard
+          title="קונפליקטים פתוחים"
+          value={openConflictsCount}
+          accent="warning"
+          icon="alert"
+          muted={openConflictsCount === 0}
+        />
+        <KpiCard
+          title="אישורים ממתינים"
+          value={pendingApprovalsCount}
+          accent="warning"
+          icon="shield"
+          muted={pendingApprovalsCount === 0}
+        />
+        <KpiCard
+          title="משימות בעבודה"
+          value={runningTasksCount}
+          accent="blue"
+          icon="inbox"
+          muted={runningTasksCount === 0}
+        />
+      </div>
+
+      <details data-testid="collaboration-more-metrics" className="os-more-metrics">
+        <summary>מדדים נוספים</summary>
+        <div className="os-more-metrics__grid">
+          <div className="os-more-metrics__item">
+            <span>סה״כ ריצות</span>
+            <span className="os-num">{runs.length}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>סה״כ אירועים</span>
+            <span className="os-num">{events.length}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>סה״כ הודעות סוכנים</span>
+            <span className="os-num">{messages.length}</span>
+          </div>
+        </div>
+      </details>
+
       <div
         style={{
           display: "flex",
@@ -621,8 +650,12 @@ export default function AgentCollaborationPage(): ReactElement {
                           y1={e.y1}
                           x2={e.x2}
                           y2={e.y2}
-                          stroke={highlighted ? "#20C4E8" : "rgba(112,158,220,.35)"}
-                          strokeWidth={highlighted ? 2 : 1}
+                          stroke={
+                            highlighted
+                              ? "var(--accent-primary, #4A73B8)"
+                              : "rgba(112,158,220,.20)"
+                          }
+                          strokeWidth={highlighted ? 1.5 : 1}
                           strokeDasharray={e.kind === "message" ? "4 4" : undefined}
                         />
                       );
@@ -649,9 +682,10 @@ export default function AgentCollaborationPage(): ReactElement {
                         textAlign: "start",
                         background:
                           n.id === selectedNodeId ? "var(--os-highlight)" : "var(--os-raised)",
-                        border: `1px solid ${NODE_COLOR[n.kind]}`,
-                        boxShadow:
-                          n.id === selectedNodeId ? `0 0 8px ${"rgba(32,196,232,.35)"}` : "none",
+                        border: `1px solid ${nodeBorderColor(n)}`,
+                        // VC-E: no default glow; selection reads through the
+                        // steel border + raised-highlight surface, not a halo.
+                        boxShadow: "none",
                         borderRadius: "var(--os-radius-sm, 6px)",
                         color: "var(--os-text)",
                         cursor: "pointer",
@@ -696,18 +730,31 @@ export default function AgentCollaborationPage(): ReactElement {
                 color: "var(--os-text-2)",
               }}
             >
-              {(Object.keys(KIND_LABEL_HE) as RunGraphNode["kind"][]).map((kind) => (
-                <span key={kind} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              {/* VC-E: semantic legend — the graph stays neutral; color marks
+                  only what needs action (open conflict, pending approval) or the
+                  current selection. */}
+              {(
+                [
+                  { label: "ריצה · סוכן · משימה", color: "var(--os-border)" },
+                  { label: "קונפליקט פתוח", color: "var(--os-warning)" },
+                  { label: "אישור ממתין", color: "var(--os-violet)" },
+                  { label: "נבחר", color: "var(--accent-primary, var(--os-blue))" },
+                ] as const
+              ).map((item) => (
+                <span
+                  key={item.label}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+                >
                   <span
                     style={{
                       inlineSize: 10,
                       blockSize: 10,
                       borderRadius: 2,
-                      border: `1px solid ${NODE_COLOR[kind]}`,
+                      border: `1px solid ${item.color}`,
                       display: "inline-block",
                     }}
                   />
-                  {KIND_LABEL_HE[kind]}
+                  {item.label}
                 </span>
               ))}
             </div>
@@ -719,6 +766,17 @@ export default function AgentCollaborationPage(): ReactElement {
               title="שיחות והעברות"
               subtitle="הודעות סוכנים, העברות ואירועי ראיות — מרשומות בלבד"
               icon="inbox"
+              action={
+                <OsButton
+                  variant="ghost"
+                  size="sm"
+                  icon="search"
+                  onClick={() => setShowHistory(true)}
+                  data-testid="open-history"
+                >
+                  ראיות ורשומות ({runEvidence.length})
+                </OsButton>
+              }
             />
             <div
               style={{
@@ -829,6 +887,52 @@ export default function AgentCollaborationPage(): ReactElement {
             </div>
           </Panel>
         </div>
+      )}
+
+      {showHistory && (
+        <Drawer open onClose={() => setShowHistory(false)} title="ראיות ורשומות מושפעות">
+          <div style={stack("var(--os-space-4)")} data-testid="collaboration-history-drawer">
+            <div style={stack("var(--os-space-2)")}>
+              <div style={{ fontWeight: 600, fontSize: "var(--os-text-sm, 13px)" }}>
+                ראיות הריצה ({runEvidence.length})
+              </div>
+              {runEvidence.length === 0 ? (
+                <div style={{ fontSize: "var(--os-text-sm, 13px)", color: "var(--os-muted)" }}>
+                  אין רשומות ראיה לריצה שנבחרה
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: 6, fontSize: "var(--os-text-sm, 13px)" }}>
+                  {runEvidence.map((ev) => (
+                    <div
+                      key={ev.id}
+                      style={{
+                        borderBlockEnd: "1px solid var(--os-border)",
+                        paddingBlockEnd: 4,
+                        color: "var(--os-text-2)",
+                      }}
+                    >
+                      {ev.claim}{" "}
+                      <span className="os-ltr" style={{ color: "var(--os-muted)" }}>
+                        ({ev.sourceRef})
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={stack("var(--os-space-2)")}>
+              <div style={{ fontWeight: 600, fontSize: "var(--os-text-sm, 13px)" }}>
+                רשומות מושפעות
+              </div>
+              <div style={{ fontSize: "var(--os-text-sm, 13px)", color: "var(--os-text-2)" }}>
+                {runEvidence.length === 0
+                  ? "—"
+                  : [...new Set(runEvidence.map((ev) => ev.sourceRef))].join(" · ")}
+              </div>
+            </div>
+          </div>
+        </Drawer>
       )}
     </div>
   );
