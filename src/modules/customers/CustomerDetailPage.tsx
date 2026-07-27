@@ -6,6 +6,7 @@ import { Link, useParams } from "react-router-dom";
 import { z } from "zod";
 import {
   DataTable,
+  Drawer,
   EmptyState,
   KpiCard,
   OsButton,
@@ -93,6 +94,7 @@ export default function CustomerDetailPage(): ReactElement {
   const { toast } = useToast();
   const invalidate = useInvalidateCollections();
   const [tab, setTab] = useState<TabId>("timeline");
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
@@ -186,6 +188,7 @@ export default function CustomerDetailPage(): ReactElement {
   const openQuote = quotations
     .filter((q) => q.status === "טיוטה" || q.status === "נשלחה")
     .sort((a, b) => (a.validUntil < b.validUntil ? -1 : 1))[0];
+  const actionRequired = Boolean(openTask || openQuote);
   const nextAction = openTask
     ? `${openTask.title} · עד ${dateHe(openTask.due)}`
     : openQuote
@@ -260,34 +263,10 @@ export default function CustomerDetailPage(): ReactElement {
             </div>
           </div>
           <div>
-            <div style={railTitle}>פריטים פתוחים</div>
-            <div style={{ display: "grid", gap: 6, fontSize: "var(--os-text-sm, 12px)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>קריאות שירות</span>
-                <span className="os-num">{openItems.openTickets}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>הצעות מחיר</span>
-                <span className="os-num">{openItems.openQuotes}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>משימות</span>
-                <span className="os-num">{openItems.openTasks}</span>
-              </div>
-            </div>
-          </div>
-          <div>
-            <div style={railTitle}>ראיות אחרונות</div>
-            <div style={{ display: "grid", gap: 6, fontSize: "var(--os-text-2xs, 11px)" }}>
-              {timeline.slice(0, 5).map((e) => (
-                <div key={e.id} style={{ color: "var(--os-text-2)" }}>
-                  <span className="os-num">{dateHe(e.at)}</span> · {e.text}
-                </div>
-              ))}
-              {timeline.length === 0 && (
-                <span style={{ color: "var(--os-muted)" }}>אין אירועים מתועדים ללקוח זה</span>
-              )}
-            </div>
+            <div style={railTitle}>ראיות והיסטוריה</div>
+            <OsButton size="sm" variant="ghost" onClick={() => setHistoryOpen(true)}>
+              פתחו ציר ראיות ({timeline.length})
+            </OsButton>
           </div>
         </div>
       </PageRail>
@@ -314,62 +293,104 @@ export default function CustomerDetailPage(): ReactElement {
                 {customer.id}
               </span>
             </div>
-            <div style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-sm, 13px)" }}>
+            <div style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-md, 14px)" }}>
               {customer.type}
               {org ? ` · ${org.name}` : ""} · {customer.city}
             </div>
           </div>
-          <div
+          <div style={{ fontSize: "var(--os-text-md, 14px)", textAlign: "start" }}>
+            <span style={{ color: "var(--os-muted)" }}>בעלים: </span>
+            {ownerName}
+          </div>
+        </div>
+
+        {/* NEXT ACTION — the operator's primary cue. Amber only when an action is
+            actually required; calm neutral surface otherwise (no default glow). */}
+        <div
+          style={{
+            display: "flex",
+            gap: "var(--os-space-3)",
+            alignItems: "center",
+            flexWrap: "wrap",
+            marginBlockStart: "var(--os-space-4)",
+            padding: "var(--os-space-3) var(--os-space-4)",
+            borderRadius: "var(--os-radius-md)",
+            border: `1px solid ${actionRequired ? "var(--os-warning-border)" : "var(--os-border)"}`,
+            background: actionRequired ? "var(--os-warning-soft)" : "transparent",
+            fontSize: "var(--os-text-md, 14px)",
+          }}
+        >
+          <span
             style={{
-              display: "grid",
-              gap: 4,
-              fontSize: "var(--os-text-sm, 13px)",
-              textAlign: "start",
+              color: actionRequired ? "var(--os-warning)" : "var(--os-muted)",
+              fontWeight: 600,
+              whiteSpace: "nowrap",
             }}
           >
-            <div>
-              <span style={{ color: "var(--os-muted)" }}>בעלים: </span>
-              {ownerName}
-            </div>
-            <div>
-              <span style={{ color: "var(--os-muted)" }}>הפעולה הבאה: </span>
-              {nextAction}
-            </div>
-          </div>
+            הפעולה הבאה
+          </span>
+          <span>{nextAction}</span>
         </div>
       </Panel>
 
-      {/* page-specific derived metrics */}
+      {/* VC-C: ≤4 primary KPIs — only the action-driving open-work counts. Each
+          stays amber only while it needs attention; a zero is neutral (muted),
+          not success and not attention. No default glow. Passive totals
+          (revenue, printers, satisfaction) move to "מדדים נוספים" below. */}
       <div
+        data-testid="customer-metrics"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
           gap: "var(--os-space-3)",
         }}
       >
         <KpiCard
-          title="הכנסות מצטברות"
-          value={ils(customer.revenue)}
-          accent="success"
-          icon="briefcase"
-          glow
+          title="הצעות מחיר פתוחות"
+          value={openItems.openQuotes}
+          accent="warning"
+          icon="doc"
+          muted={openItems.openQuotes === 0}
         />
-        <KpiCard title="הצעות מחיר פתוחות" value={openItems.openQuotes} accent="cyan" icon="doc" />
         <KpiCard
           title="קריאות שירות פתוחות"
           value={openItems.openTickets}
           accent="warning"
           icon="wrench"
+          muted={openItems.openTickets === 0}
         />
-        <KpiCard title="משימות פתוחות" value={openItems.openTasks} accent="blue" icon="clock" />
-        <KpiCard title="מדפסות רשומות" value={printers.length} accent="violet" icon="printer" />
         <KpiCard
-          title="שביעות רצון"
-          value={customer.review ? `${customer.review.rating}/5` : "טרם נמדד"}
-          accent="cyan"
-          icon="sparkle"
+          title="משימות פתוחות"
+          value={openItems.openTasks}
+          accent="warning"
+          icon="clock"
+          muted={openItems.openTasks === 0}
         />
       </div>
+
+      <details data-testid="customer-more-metrics" className="os-more-metrics">
+        <summary>מדדים נוספים</summary>
+        <div className="os-more-metrics__grid">
+          <div className="os-more-metrics__item">
+            <span>הכנסות מצטברות</span>
+            <span className="os-num">{ils(customer.revenue)}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>מדפסות רשומות</span>
+            <span className="os-num">{printers.length}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>שביעות רצון</span>
+            <span className="os-num">
+              {customer.review ? `${customer.review.rating}/5` : "טרם נמדד"}
+            </span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>מצב קשר</span>
+            <span>{customer.contactState}</span>
+          </div>
+        </div>
+      </details>
 
       <Tabs
         ariaLabel="כרטיס לקוח"
@@ -762,6 +783,50 @@ export default function CustomerDetailPage(): ReactElement {
       )}
 
       {tab === "memory" && <Customer360MemoryTab customer={customer} />}
+
+      {/* Secondary history/evidence on demand — kept out of the always-on view
+          so the identity + next action + open work stay the focus. */}
+      <Drawer
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        title="ציר ראיות והיסטוריה"
+      >
+        {timeline.length === 0 ? (
+          <EmptyState
+            icon="clock"
+            title="אין אירועים מתועדים"
+            reason="ללקוח זה אין עדיין פעילויות, קריאות או הצעות מתועדות."
+          />
+        ) : (
+          <div style={{ display: "grid", gap: "var(--os-space-3)" }}>
+            {timeline.map((e) => (
+              <div
+                key={e.id}
+                style={{
+                  display: "grid",
+                  gap: 2,
+                  fontSize: "var(--os-text-md, 14px)",
+                  borderBlockEnd: "1px solid var(--os-border)",
+                  paddingBlockEnd: "var(--os-space-2)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "var(--os-space-3)",
+                    color: "var(--os-muted)",
+                    fontSize: "var(--os-text-sm, 13px)",
+                  }}
+                >
+                  <span className="os-num">{dateTimeHe(e.at)}</span>
+                  <span>{e.kind}</span>
+                </div>
+                <span>{e.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Drawer>
     </div>
   );
 }
