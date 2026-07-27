@@ -21,12 +21,12 @@ Palette + shell calm inherited globally (color/glow/border/type). **Density pass
 
 | Route | Wave | Density pass | RD/HR/LS | Notes |
 |-------|------|--------------|----------|-------|
-| / (command center) | VC-C | pending | — | decisions-first; subdue agent network unless active |
-| /customers/:id | VC-C | pending | — | identity+next-action; section tabs |
-| /sales | VC-C | pending | — | pipeline first; evidence in panel |
+| / (command center) | VC-C | ✅ done | 5/5/5 | 6→4 KPIs zero-neutral; agent network subdued unless in-flight; single-series funnel; 0 axe |
+| /customers/:id | VC-C | ✅ done | 5/5/5 | 6→3 KPIs; next-action promoted; tabs kept; evidence→drawer; 0 axe |
+| /sales | VC-C | ✅ done | 5/5/4 | 4→3 KPIs; neutral financials; match evidence→drawer; 0 axe |
 | /documents | VC-C | pending | — | list+selected; preview on demand |
-| /tasks | VC-C | pending | — | queue first; no decorative KPI strip |
-| /printers | VC-D | pending | — | fleet table; maintenance timeline |
+| /tasks | VC-C | ✅ done | 5/5/5 | decorative KPI strip removed; board is hero; detail→drawer; 0 axe |
+| /printers | VC-D | ✅ done | 5/5/5 | 5→3 KPIs; fleet table (3 concerns as columns); per-row buttons→drawer; 0 axe |
 | /organizations | VC-D | pending | — | identity+contacts+agreements; history in tabs |
 | /support | VC-D | pending | — | — |
 | /agents/collaboration | VC-E | pending | — | — |

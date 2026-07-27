@@ -28,7 +28,7 @@ export function ProviderStateBadge({
     alignItems: "center",
     gap: 6,
     fontSize: size === "sm" ? "var(--os-text-2xs, 11px)" : "var(--os-text-sm, 13px)",
-    color: isLocal ? "var(--os-cyan)" : "var(--os-success)",
+    color: isLocal ? "var(--accent-primary-text)" : "var(--success-text)",
     border: `1px solid ${isLocal ? "var(--os-cyan-border, var(--os-border))" : "var(--os-success-border, var(--os-border))"}`,
     background: isLocal
       ? "var(--os-cyan-soft, transparent)"

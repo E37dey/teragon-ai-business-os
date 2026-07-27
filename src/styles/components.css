@@ -393,12 +393,12 @@
 
 .os-btn--cyan {
   background: var(--os-cyan-soft);
-  color: var(--os-cyan);
+  color: var(--accent-primary-text);
   border-color: var(--os-cyan-border);
 }
 .os-btn--cyan:hover:not(:disabled) {
-  background: rgba(32, 196, 232, 0.2);
-  box-shadow: var(--os-glow-cyan);
+  background: var(--accent-primary-soft);
+  border-color: var(--accent-primary);
 }
 
 .os-btn--violet {
@@ -407,18 +407,18 @@
   border-color: var(--os-violet-border);
 }
 .os-btn--violet:hover:not(:disabled) {
-  background: rgba(118, 85, 255, 0.2);
-  box-shadow: var(--os-glow-violet);
+  background: var(--accent-ai-soft);
+  border-color: var(--accent-ai);
 }
 
 .os-btn--success {
   background: var(--os-success-soft);
-  color: var(--os-success);
+  color: var(--success-text);
   border-color: var(--os-success-border);
 }
 .os-btn--success:hover:not(:disabled) {
-  background: rgba(33, 201, 129, 0.2);
-  box-shadow: var(--os-glow-success);
+  background: var(--success-soft);
+  border-color: var(--success);
 }
 
 .os-btn--danger {
