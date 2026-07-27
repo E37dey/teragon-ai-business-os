@@ -534,33 +534,69 @@ export default function LearningPage(): ReactElement {
         </span>
       </div>
 
+      {/* VC-E: four primary KPIs only — the governance state of the loop
+          (what needs a manager, what is monitored, what is live, what was
+          reverted). Zero stays neutral (0 is not attention). Passive history
+          tallies move to "מדדים נוספים". */}
       <div
         data-testid="learning-metrics"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-          gap: "var(--os-space-3)",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: "var(--os-space-4)",
         }}
       >
-        <KpiCard title="המלצות שאושרו" value={metrics.approvedCount} accent="success" icon="check" />
-        <KpiCard title="המלצות שנערכו" value={metrics.editedCount} accent="blue" icon="doc" />
-        <KpiCard title="המלצות שנדחו" value={metrics.rejectedCount} accent="danger" icon="x" />
-        <KpiCard
-          title="תוצאות שנמדדו"
-          value={metrics.measuredOutcomeDisplay}
-          accent="cyan"
-          icon="gauge"
-        />
         <KpiCard
           title="תובנות ממתינות לבדיקה"
           value={metrics.proposalsPending}
-          accent="violet"
+          accent="warning"
           icon="shield"
+          muted={metrics.proposalsPending === 0}
         />
-        <KpiCard title="כללים פעילים" value={metrics.activeRules} accent="blue" icon="book" />
-        <KpiCard title="במעקב (טרם נמדדו)" value={metrics.underReview} accent="warning" icon="clock" />
-        <KpiCard title="ביטולים (rollback)" value={metrics.rollbackCount} accent="danger" icon="alert" />
+        <KpiCard
+          title="במעקב (טרם נמדדו)"
+          value={metrics.underReview}
+          accent="warning"
+          icon="clock"
+          muted={metrics.underReview === 0}
+        />
+        <KpiCard
+          title="כללים פעילים"
+          value={metrics.activeRules}
+          accent="blue"
+          icon="book"
+          muted={metrics.activeRules === 0}
+        />
+        <KpiCard
+          title="ביטולים (rollback)"
+          value={metrics.rollbackCount}
+          accent="danger"
+          icon="alert"
+          muted={metrics.rollbackCount === 0}
+        />
       </div>
+
+      <details data-testid="learning-more-metrics" className="os-more-metrics">
+        <summary>מדדים נוספים</summary>
+        <div className="os-more-metrics__grid">
+          <div className="os-more-metrics__item">
+            <span>המלצות שאושרו</span>
+            <span className="os-num">{metrics.approvedCount}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>המלצות שנערכו</span>
+            <span className="os-num">{metrics.editedCount}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>המלצות שנדחו</span>
+            <span className="os-num">{metrics.rejectedCount}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>תוצאות שנמדדו</span>
+            <span className="os-num">{metrics.measuredOutcomeDisplay}</span>
+          </div>
+        </div>
+      </details>
 
       <Panel variant="panel" style={{ padding: "var(--os-space-5)" }}>
         <SectionTitle
