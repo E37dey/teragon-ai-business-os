@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { Link } from "react-router-dom";
+import "./agents.css";
 import {
   DataTable,
   Drawer,
@@ -347,6 +348,13 @@ export default function AgentsPage(): ReactElement {
   const rows = fleetRows({ agents, tasks, runs, errors, events, approvals });
   const summary = fleetSummary(agents, approvals, runs);
 
+  // VC-E derived KPI figures
+  const fleetFailures = rows.reduce((s, r) => s + r.counts.failure, 0);
+  const fleetSuccesses = rows.reduce((s, r) => s + r.counts.success, 0);
+  const measuredCostLabel = rows.some((r) => r.measuredUsageILS !== null)
+    ? `${rows.reduce((s, r) => s + (r.measuredUsageILS ?? 0), 0)} ₪`
+    : "טרם נמדד";
+
   const toggleDisable = async (agent: Agent): Promise<void> => {
     setBusyAgent(agent.id);
     try {
@@ -364,6 +372,16 @@ export default function AgentsPage(): ReactElement {
       toast("שינוי מצב הסוכן נכשל — נסו שוב", "danger");
     } finally {
       setBusyAgent(null);
+    }
+  };
+
+  // VC-E: one system-level emergency control (replaces a red button on every row).
+  const [confirmStopAll, setConfirmStopAll] = useState(false);
+  const activeAgentCount = rows.filter((r) => r.agent.status !== AGENT_DISABLED_STATUS).length;
+  const emergencyStopAll = async (): Promise<void> => {
+    setConfirmStopAll(false);
+    for (const r of rows) {
+      if (r.agent.status !== AGENT_DISABLED_STATUS) await toggleDisable(r.agent);
     }
   };
 
@@ -472,31 +490,78 @@ export default function AgentsPage(): ReactElement {
           gap: "var(--os-space-3)",
         }}
       >
-        <KpiCard title="סוכנים בצי" value={summary.total} accent="blue" icon="bot" />
-        <KpiCard title="ריצות פעילות" value={summary.activeRuns} accent="cyan" icon="network" />
+        {/* VC-E: 4 primary KPIs = active/pending/failed state (action-driving);
+            zero stays neutral. Passive cost total moves to "מדדים נוספים". */}
+        <KpiCard
+          title="סוכנים בצי"
+          value={summary.total}
+          accent="blue"
+          icon="bot"
+          muted={summary.total === 0}
+        />
+        <KpiCard
+          title="ריצות פעילות"
+          value={summary.activeRuns}
+          accent="blue"
+          icon="network"
+          muted={summary.activeRuns === 0}
+        />
         <KpiCard
           title="אישורים ממתינים"
           value={summary.pendingApprovals}
-          accent="violet"
+          accent="warning"
           icon="shield"
+          muted={summary.pendingApprovals === 0}
         />
         <KpiCard
-          title="עלות נמדדת"
-          value={
-            rows.some((r) => r.measuredUsageILS !== null)
-              ? `${rows.reduce((s, r) => s + (r.measuredUsageILS ?? 0), 0)} ₪`
-              : "טרם נמדד"
-          }
-          accent="success"
-          icon="gauge"
+          title="ריצות שנכשלו"
+          value={fleetFailures}
+          accent="danger"
+          icon="alert"
+          muted={fleetFailures === 0}
         />
       </div>
+
+      <details data-testid="agents-more-metrics" className="os-more-metrics">
+        <summary>מדדים נוספים</summary>
+        <div className="os-more-metrics__grid">
+          <div className="os-more-metrics__item">
+            <span>עלות נמדדת</span>
+            <span className="os-num">{measuredCostLabel}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>סה״כ ריצות מוצלחות</span>
+            <span className="os-num">{fleetSuccesses}</span>
+          </div>
+        </div>
+      </details>
 
       <Panel variant="panel" style={{ padding: "var(--os-space-5)" }}>
         <SectionTitle
           title="הצי המנוהל"
           subtitle="כל הערכים נגזרים מרשומות אמיתיות — תור, ריצות, כשלים ואישורים"
           icon="bot"
+          action={
+            confirmStopAll ? (
+              <div style={{ display: "flex", gap: "var(--os-space-2)" }}>
+                <OsButton
+                  variant="danger"
+                  size="sm"
+                  onClick={() => void emergencyStopAll()}
+                  data-testid="agents-emergency-all"
+                >
+                  אישור השבתת {activeAgentCount} סוכנים
+                </OsButton>
+                <OsButton variant="ghost" size="sm" onClick={() => setConfirmStopAll(false)}>
+                  ביטול
+                </OsButton>
+              </div>
+            ) : activeAgentCount > 0 ? (
+              <OsButton variant="danger" size="sm" onClick={() => setConfirmStopAll(true)}>
+                השבתת חירום מערכתית
+              </OsButton>
+            ) : null
+          }
         />
         <div
           style={{
@@ -591,34 +656,38 @@ export default function AgentsPage(): ReactElement {
                   : "לא השתתף בריצה עדיין"}
                 {row.lastError ? ` · כשל אחרון: ${row.lastError.code}` : ""}
               </div>
-              <div style={{ display: "flex", gap: "var(--os-space-2)", flexWrap: "wrap" }}>
-                <OsButton variant="ghost" size="sm" onClick={() => setSelectedId(row.agent.id)}>
-                  פרטים
-                </OsButton>
-                {busyAgent === row.agent.id ? (
-                  <OsButton variant="danger" size="sm" disabled disabledReason="מעדכן…">
-                    השבתת חירום
+              {/* VC-E: row actions behind a quiet menu — no permanent red button per row */}
+              <details className="os-row-menu">
+                <summary aria-label={`פעולות עבור ${row.agent.name}`}>פעולות</summary>
+                <div className="os-row-menu__items">
+                  <OsButton variant="ghost" size="sm" onClick={() => setSelectedId(row.agent.id)}>
+                    פרטים
                   </OsButton>
-                ) : row.agent.status === AGENT_DISABLED_STATUS ? (
-                  <OsButton
-                    variant="success"
-                    size="sm"
-                    onClick={() => void toggleDisable(row.agent)}
-                    data-testid="agent-enable"
-                  >
-                    הפעל מחדש
-                  </OsButton>
-                ) : (
-                  <OsButton
-                    variant="danger"
-                    size="sm"
-                    onClick={() => void toggleDisable(row.agent)}
-                    data-testid="agent-disable"
-                  >
-                    השבתת חירום
-                  </OsButton>
-                )}
-              </div>
+                  {busyAgent === row.agent.id ? (
+                    <OsButton variant="danger" size="sm" disabled disabledReason="מעדכן…">
+                      השבתת חירום
+                    </OsButton>
+                  ) : row.agent.status === AGENT_DISABLED_STATUS ? (
+                    <OsButton
+                      variant="success"
+                      size="sm"
+                      onClick={() => void toggleDisable(row.agent)}
+                      data-testid="agent-enable"
+                    >
+                      הפעל מחדש
+                    </OsButton>
+                  ) : (
+                    <OsButton
+                      variant="danger"
+                      size="sm"
+                      onClick={() => void toggleDisable(row.agent)}
+                      data-testid="agent-disable"
+                    >
+                      השבתת חירום
+                    </OsButton>
+                  )}
+                </div>
+              </details>
             </Panel>
           ))}
         </div>

@@ -1,0 +1,36 @@
+/* VC-E agents module styles — quiet row actions menu (no permanent red button
+   on every fleet card). Module-scoped; shared design-system CSS untouched. */
+.os-row-menu > summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--os-space-3);
+  padding: var(--os-space-3) var(--os-space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--os-radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--os-text-sm);
+  inline-size: max-content;
+  transition: border-color var(--os-transition-fast), color var(--os-transition-fast);
+}
+.os-row-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.os-row-menu > summary::after {
+  content: "▾";
+  color: var(--text-muted);
+}
+.os-row-menu[open] > summary {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+.os-row-menu[open] > summary::after {
+  content: "▴";
+}
+.os-row-menu__items {
+  display: flex;
+  gap: var(--os-space-2);
+  flex-wrap: wrap;
+  margin-block-start: var(--os-space-3);
+}
