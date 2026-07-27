@@ -83,18 +83,17 @@ function NavCopilotCard(): ReactElement {
     <button
       type="button"
       onClick={openCopilot}
-      className="os-copilot os-copilot--button"
+      className="os-copilot os-copilot--compact"
       aria-label="פתיחת AI Copilot"
       data-testid="shell-open-copilot"
     >
-      <GlowOrb size={56} accent="violet" />
-      <div>
-        <div className="os-copilot__title">AI Copilot</div>
-        <div className="os-copilot__sub">העוזר החכם שלך</div>
+      {/* VC-B: compact, static AI marker — no permanently glowing/animated orb */}
+      <GlowOrb size={24} accent="violet" animated={false} />
+      <div className="os-copilot__labels">
+        <span className="os-copilot__title">AI Copilot</span>
+        <span className="os-copilot__sub">שאל כל דבר…</span>
       </div>
-      <div className="os-copilot__form" aria-hidden="true">
-        <span className="os-copilot__input">שאל כל דבר…</span>
-      </div>
+      <OsIcon name="chevron-forward" size={14} aria-hidden="true" />
     </button>
   );
 }
@@ -113,33 +112,31 @@ function OsShellInner(): ReactElement {
     });
   }, []);
 
+  const activeId = activeItemForPath(location.pathname);
+  const activeGroupId = groupOfPath(location.pathname)?.id;
+
+  // VC-B: only the active group is expanded by default; unrelated groups stay
+  // collapsed. An explicit user toggle is persisted and overrides the default.
+  const effectiveOpenGroups = useMemo(() => {
+    const eff: Record<string, boolean> = {};
+    for (const g of NAV_GROUPS) {
+      const stored = shellState.openGroups[g.id];
+      eff[g.id] = typeof stored === "boolean" ? stored : g.id === activeGroupId;
+    }
+    return eff;
+  }, [shellState.openGroups, activeGroupId]);
+
   const toggleGroup = useCallback(
     (groupId: string) => {
-      const open = shellState.openGroups[groupId] !== false;
+      const open = effectiveOpenGroups[groupId] ?? false;
       updateShellState({ openGroups: { ...shellState.openGroups, [groupId]: !open } });
     },
-    [shellState.openGroups, updateShellState],
+    [effectiveOpenGroups, shellState.openGroups, updateShellState],
   );
 
   const toggleRail = useCallback(() => {
     updateShellState({ railCollapsed: !shellState.railCollapsed });
   }, [shellState.railCollapsed, updateShellState]);
-
-  // ── active route → auto-expand its group (runs on route change) ──
-  const activeId = activeItemForPath(location.pathname);
-  const activeGroupId = groupOfPath(location.pathname)?.id;
-  useEffect(() => {
-    if (!activeGroupId) return;
-    setShellState((prev) => {
-      if (prev.openGroups[activeGroupId] !== false) return prev;
-      const next = {
-        ...prev,
-        openGroups: { ...prev.openGroups, [activeGroupId]: true },
-      };
-      saveShellState(next);
-      return next;
-    });
-  }, [activeGroupId]);
 
   // ── derived badges ──
   const badges = useNavBadges();
@@ -155,7 +152,7 @@ function OsShellInner(): ReactElement {
             label: item.label,
             icon: item.icon,
             href: item.path,
-            ...(typeof badge === "number" ? { badge } : {}),
+            ...(typeof badge === "number" && badge > 0 ? { badge } : {}), // VC-B: hide zero badges
           };
         }),
       })),
@@ -228,7 +225,7 @@ function OsShellInner(): ReactElement {
     <ToastProvider>
       <AppShell
         navGroups={navGroups}
-        openGroups={shellState.openGroups}
+        openGroups={effectiveOpenGroups}
         onToggleGroup={toggleGroup}
         activeNavId={activeId}
         activeRoute={location.pathname}
@@ -279,7 +276,7 @@ function OsShellInner(): ReactElement {
         >
           <RightPrimaryNavigation
             groups={navGroups}
-            openGroups={shellState.openGroups}
+            openGroups={effectiveOpenGroups}
             onToggleGroup={toggleGroup}
             activeId={activeId}
             renderLink={renderLink}
