@@ -5,11 +5,11 @@
 // change writes an Activity so badges/notifications derive from the same
 // repositories.
 import { useMemo, useState } from "react";
-import type { CSSProperties, ReactElement } from "react";
+import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { PageRail } from "@/app/rail";
 import {
+  Drawer,
   EmptyState,
-  KpiCard,
   Modal,
   OsButton,
   Panel,
@@ -49,11 +49,35 @@ import {
 } from "./lib";
 import type { TaskX } from "@/integration/domainExtensions";
 
-const kpiRowStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-  gap: "var(--os-space-5)",
-};
+// VC-C: compact operational summary — one quiet stat, amber only when action
+// is required (overdue / waiting-for-approval), neutral (muted) at zero. 0 is
+// not success and not attention.
+function SummaryStat({
+  label,
+  value,
+  attention = false,
+}: {
+  label: string;
+  value: number;
+  attention?: boolean;
+}): ReactElement {
+  const active = attention && value > 0;
+  return (
+    <div style={{ display: "grid", gap: 2, minInlineSize: 92 }}>
+      <span style={{ color: "var(--os-muted)", fontSize: "var(--os-text-xs)" }}>{label}</span>
+      <span
+        className="os-num"
+        style={{
+          fontSize: "var(--os-text-lg)",
+          fontWeight: 600,
+          color: active ? "var(--os-warning)" : value === 0 ? "var(--os-muted)" : "var(--os-text)",
+        }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
 
 function todayISO(): string {
   // local-time "today" — must match the wall clock in the header, not UTC
@@ -116,6 +140,7 @@ export default function TasksPage(): ReactElement {
   const [createOpen, setCreateOpen] = useState(false);
   const [createMeetingOpen, setCreateMeetingOpen] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
+  const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [ownerFilter, setOwnerFilter] = useState("all");
 
   const tasks = useMemo(() => tasksQ.data ?? [], [tasksQ.data]);
@@ -187,46 +212,63 @@ export default function TasksPage(): ReactElement {
         }
       />
 
-      <div style={kpiRowStyle}>
-        <KpiCard title="לביצוע היום" value={todayTasks.length} accent="cyan" icon="target" />
-        <KpiCard
-          title="באיחור"
-          value={overdue.length}
-          accent="danger"
-          icon="alert"
-          glow={overdue.length > 0}
-        />
-        <KpiCard
-          title="ממתין לאישור"
-          value={grouped["ממתין לאישור"].length}
-          accent="violet"
-          icon="shield"
-        />
-        <KpiCard title="פגישות היום" value={todayMeetings.length} accent="blue" icon="clock" />
-        <KpiCard title="הושלמו השבוע" value={doneThisWeek} accent="success" icon="check" />
+      {/* VC-C: work queue first. Compact toolbar — ownership filter + queue count
+          + the three action-driving figures (no decorative KPI strip). Passive
+          totals fold into "מדדים נוספים". */}
+      <div
+        style={{
+          display: "flex",
+          gap: "var(--os-space-5)",
+          alignItems: "center",
+          flexWrap: "wrap",
+          justifyContent: "space-between",
+        }}
+      >
+        <div style={{ display: "flex", gap: "var(--os-space-3)", alignItems: "center", flexWrap: "wrap" }}>
+          <select
+            className="os-qc-input"
+            style={{ maxInlineSize: 220 }}
+            aria-label="סינון לפי בעלים"
+            value={ownerFilter}
+            onChange={(e) => setOwnerFilter(e.target.value)}
+          >
+            <option value="all">כל הבעלים (כולל סוכנים)</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
+            ))}
+          </select>
+          <span style={{ color: "var(--os-muted)", fontSize: "var(--os-text-xs)" }}>
+            {items.length} פריטי עבודה על הלוח
+          </span>
+        </div>
+        <div style={{ display: "flex", gap: "var(--os-space-6)", alignItems: "baseline" }}>
+          <SummaryStat label="לביצוע היום" value={todayTasks.length} />
+          <SummaryStat label="באיחור" value={overdue.length} attention />
+          <SummaryStat label="ממתין לאישור" value={grouped["ממתין לאישור"].length} attention />
+        </div>
       </div>
 
-      <div style={{ display: "flex", gap: "var(--os-space-4)", alignItems: "center" }}>
-        <select
-          className="os-qc-input"
-          style={{ maxInlineSize: 220 }}
-          aria-label="סינון לפי בעלים"
-          value={ownerFilter}
-          onChange={(e) => setOwnerFilter(e.target.value)}
-        >
-          <option value="all">כל הבעלים (כולל סוכנים)</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.name}
-            </option>
-          ))}
-        </select>
-        <span style={{ color: "var(--os-muted)", fontSize: "var(--os-text-xs)" }}>
-          {items.length} פריטי עבודה על הלוח
-        </span>
-      </div>
+      <details className="os-more-metrics">
+        <summary>מדדים נוספים</summary>
+        <div className="os-more-metrics__grid">
+          <div className="os-more-metrics__item">
+            <span>פגישות היום</span>
+            <span className="os-num">{todayMeetings.length}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>הושלמו השבוע</span>
+            <span className="os-num">{doneThisWeek}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>סה״כ פריטי עבודה</span>
+            <span className="os-num">{items.length}</span>
+          </div>
+        </div>
+      </details>
 
-      {/* kanban board */}
+      {/* kanban board — the work queue */}
       <div className="os-table-scroll" style={{ overflowX: "auto" }}>
         <div
           style={{
@@ -245,7 +287,7 @@ export default function TasksPage(): ReactElement {
               users={users}
               agents={agents}
               today={today}
-              onEdit={setEditTask}
+              onOpen={setDetailTask}
             />
           ))}
         </div>
@@ -323,6 +365,19 @@ export default function TasksPage(): ReactElement {
           )}
         </Panel>
       </div>
+
+      {detailTask && (
+        <TaskDetailDrawer
+          task={detailTask}
+          users={users}
+          today={today}
+          onEdit={(t) => {
+            setDetailTask(null);
+            setEditTask(t);
+          }}
+          onClose={() => setDetailTask(null)}
+        />
+      )}
 
       {(createOpen || editTask) && (
         <TaskModal
@@ -431,14 +486,14 @@ function KanbanColumn({
   users,
   agents,
   today,
-  onEdit,
+  onOpen,
 }: {
   state: WorkState;
   items: readonly WorkItem[];
   users: readonly User[];
   agents: readonly Agent[];
   today: string;
-  onEdit: (task: Task) => void;
+  onOpen: (task: Task) => void;
 }): ReactElement {
   return (
     <Panel style={{ padding: "var(--os-space-4)", display: "grid", gap: "var(--os-space-3)" }}>
@@ -449,17 +504,11 @@ function KanbanColumn({
         </span>
       </div>
       {items.length === 0 && (
-        <div style={{ color: "var(--os-muted)", fontSize: "var(--os-text-2xs)" }}>אין פריטים</div>
+        <div style={{ color: "var(--os-muted)", fontSize: "var(--os-text-xs)" }}>אין פריטים</div>
       )}
       {items.map((item, i) =>
         item.kind === "human" ? (
-          <HumanTaskCard
-            key={item.task.id}
-            task={item.task}
-            users={users}
-            today={today}
-            onEdit={onEdit}
-          />
+          <HumanTaskCard key={item.task.id} task={item.task} users={users} today={today} onOpen={onOpen} />
         ) : (
           <AgentTaskCard key={`ag-${i}`} item={item.agentTask} agents={agents} />
         ),
@@ -468,93 +517,68 @@ function KanbanColumn({
   );
 }
 
+// VC-C: card is a quiet summary that opens the detail drawer on click. No
+// permanent per-card action control (state change lives in the drawer); border
+// stays neutral, an amber inline-start rule marks only action-required (overdue).
 function HumanTaskCard({
   task,
   users,
   today,
-  onEdit,
+  onOpen,
 }: {
   task: Task;
   users: readonly User[];
   today: string;
-  onEdit: (task: Task) => void;
+  onOpen: (task: Task) => void;
 }): ReactElement {
-  const { toast } = useToast();
-  const invalidate = useInvalidateCollections();
-  const [busy, setBusy] = useState(false);
   const overdue = isOverdue(task, today);
   const ownership = taskOwnership(task);
   const owner = users.find((u) => u.id === task.ownerId);
-  const clean = cleanDescription(task);
-  const shared = isSharedTask(task);
-
-  async function moveTo(next: WorkState): Promise<void> {
-    setBusy(true);
-    try {
-      // W6 m001: canonical fields — the description stays clean, no ⟦…⟧ markers
-      const repo = getRepository<TaskX>("tasks");
-      await repo.update(task.id, {
-        status: baseStatusFor(next),
-        description: clean,
-        workState: next,
-        ownership: shared ? "משותפת" : "אנושית",
-        updatedAt: new Date().toISOString(),
-      });
-      await logTaskActivity(`המשימה «${task.title}» עברה למצב «${next}»`, `task:${task.id}`);
-      await invalidate(["tasks", "activities"]);
-      toast(`המשימה עברה ל«${next}»`, "success");
-    } finally {
-      setBusy(false);
-    }
-  }
+  const highPriority = task.priority === "גבוהה";
 
   return (
-    <div
+    <button
+      type="button"
+      onClick={() => onOpen(task)}
+      title="פרטי המשימה"
       style={{
-        background: "var(--os-raised)",
-        border: overdue ? "1px solid var(--os-danger-border)" : "1px solid var(--os-border)",
-        borderRadius: "var(--os-radius-md)",
-        padding: "var(--os-space-4)",
+        all: "unset",
+        boxSizing: "border-box",
+        cursor: "pointer",
         display: "grid",
         gap: 6,
+        inlineSize: "100%",
+        background: "var(--os-raised)",
+        border: "1px solid var(--os-border)",
+        borderInlineStartWidth: overdue ? 3 : 1,
+        borderInlineStartColor: overdue ? "var(--os-warning)" : "var(--os-border)",
+        borderRadius: "var(--os-radius-md)",
+        padding: "var(--os-space-4)",
       }}
     >
-      <button
-        type="button"
-        onClick={() => onEdit(task)}
-        style={{
-          all: "unset",
-          cursor: "pointer",
-          fontWeight: 600,
-          fontSize: "var(--os-text-sm)",
-          color: "var(--os-text)",
-        }}
-        title="עריכת המשימה"
-      >
+      <span style={{ fontWeight: 600, fontSize: "var(--os-text-sm)", color: "var(--os-text)" }}>
         {task.title}
-      </button>
-      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-        <span
-          className={`os-chip ${ownership === "משימה משותפת" ? "os-chip--violet" : "os-chip--blue"}`}
-        >
-          {ownership}
-        </span>
-        <span
-          className={`os-chip ${
-            task.priority === "גבוהה"
-              ? "os-chip--danger"
-              : task.priority === "בינונית"
-                ? "os-chip--warning"
-                : "os-chip--muted"
-          }`}
-        >
-          {task.priority}
-        </span>
-      </div>
-      <div
+      </span>
+      <span style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+        {/* ownership: violet only when shared (agent involved); otherwise plain */}
+        {ownership === "משימה משותפת" ? (
+          <span className="os-chip os-chip--violet">{ownership}</span>
+        ) : (
+          <span style={{ color: "var(--os-muted)", fontSize: "var(--os-text-xs)" }}>{ownership}</span>
+        )}
+        {/* priority chip only when it needs attention (high); else plain text */}
+        {highPriority ? (
+          <span className="os-chip os-chip--warning">עדיפות גבוהה</span>
+        ) : (
+          <span style={{ color: "var(--os-muted)", fontSize: "var(--os-text-xs)" }}>
+            עדיפות {task.priority}
+          </span>
+        )}
+      </span>
+      <span
         style={{
-          fontSize: "var(--os-text-2xs)",
-          color: overdue ? "var(--os-danger)" : "var(--os-muted)",
+          fontSize: "var(--os-text-xs)",
+          color: overdue ? "var(--os-warning)" : "var(--os-muted)",
         }}
       >
         יעד: <span className="os-num">{fmtDate(task.due)}</span>
@@ -569,21 +593,122 @@ function HumanTaskCard({
             </span>
           </>
         )}
+      </span>
+    </button>
+  );
+}
+
+// ── task detail drawer (progressive disclosure: summary → detail → action) ────
+function TaskDetailDrawer({
+  task,
+  users,
+  today,
+  onEdit,
+  onClose,
+}: {
+  task: Task;
+  users: readonly User[];
+  today: string;
+  onEdit: (task: Task) => void;
+  onClose: () => void;
+}): ReactElement {
+  const { toast } = useToast();
+  const invalidate = useInvalidateCollections();
+  const [busy, setBusy] = useState(false);
+  const overdue = isOverdue(task, today);
+  const ownership = taskOwnership(task);
+  const owner = users.find((u) => u.id === task.ownerId);
+  const clean = cleanDescription(task);
+  const shared = isSharedTask(task);
+  const state = taskWorkState(task);
+
+  async function moveTo(next: WorkState): Promise<void> {
+    if (next === state) return;
+    setBusy(true);
+    try {
+      // W6 m001: canonical fields — the description stays clean, no ⟦…⟧ markers
+      const repo = getRepository<TaskX>("tasks");
+      await repo.update(task.id, {
+        status: baseStatusFor(next),
+        description: clean,
+        workState: next,
+        ownership: shared ? "משותפת" : "אנושית",
+        updatedAt: new Date().toISOString(),
+      });
+      await logTaskActivity(`המשימה «${task.title}» עברה למצב «${next}»`, `task:${task.id}`);
+      await invalidate(["tasks", "activities"]);
+      toast(`המשימה עברה ל«${next}»`, "success");
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Drawer open onClose={onClose} title={task.title}>
+      <div style={{ display: "grid", gap: "var(--os-space-4)", fontSize: "var(--os-text-sm)" }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+          <StatusChip status={STATE_CHIP[state]} label={state} />
+          {ownership === "משימה משותפת" && <span className="os-chip os-chip--violet">{ownership}</span>}
+          {task.priority === "גבוהה" && <span className="os-chip os-chip--warning">עדיפות גבוהה</span>}
+        </div>
+
+        {clean.trim() !== "" && (
+          <DrawerField label="תיאור">
+            <span style={{ whiteSpace: "pre-wrap" }}>{clean}</span>
+          </DrawerField>
+        )}
+        <DrawerField label="בעלים">{owner?.name ?? task.ownerId}</DrawerField>
+        <DrawerField label="עדיפות">{task.priority}</DrawerField>
+        <DrawerField label="תאריך יעד">
+          <span className="os-num" style={{ color: overdue ? "var(--os-warning)" : undefined }}>
+            {fmtDate(task.due)}
+          </span>
+          {overdue && <span style={{ color: "var(--os-warning)" }}> · באיחור</span>}
+        </DrawerField>
+        {task.relatedRef && (
+          <DrawerField label="רשומה מקושרת">
+            <span dir="ltr" className="os-num">
+              {task.relatedRef}
+            </span>
+          </DrawerField>
+        )}
+
+        <label style={{ display: "grid", gap: 4 }}>
+          <span style={{ color: "var(--os-muted)", fontSize: "var(--os-text-xs)" }}>שינוי מצב</span>
+          <select
+            className="os-qc-input"
+            aria-label={`שינוי מצב עבור ${task.title}`}
+            value={state}
+            disabled={busy}
+            onChange={(e) => void moveTo(e.target.value as WorkState)}
+          >
+            {WORK_STATES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div style={{ display: "flex", gap: "var(--os-space-3)", marginBlockStart: "var(--os-space-2)" }}>
+          <OsButton icon="wrench" {...busyDisabled(busy)} onClick={() => onEdit(task)}>
+            עריכת המשימה
+          </OsButton>
+          <OsButton variant="ghost" onClick={onClose}>
+            סגירה
+          </OsButton>
+        </div>
       </div>
-      <select
-        className="os-qc-input"
-        style={{ blockSize: 28, fontSize: "var(--os-text-2xs)", paddingBlock: 2 }}
-        aria-label={`שינוי מצב עבור ${task.title}`}
-        value={taskWorkState(task)}
-        disabled={busy}
-        onChange={(e) => void moveTo(e.target.value as WorkState)}
-      >
-        {WORK_STATES.map((s) => (
-          <option key={s} value={s}>
-            {s}
-          </option>
-        ))}
-      </select>
+    </Drawer>
+  );
+}
+
+function DrawerField({ label, children }: { label: string; children: ReactNode }): ReactElement {
+  return (
+    <div style={{ display: "grid", gap: 2 }}>
+      <span style={{ color: "var(--os-muted)", fontSize: "var(--os-text-xs)" }}>{label}</span>
+      <span>{children}</span>
     </div>
   );
 }
@@ -596,11 +721,13 @@ function AgentTaskCard({
   agents: readonly Agent[];
 }): ReactElement {
   const agent = agents.find((a) => a.id === item.agentId);
+  // Agent tasks are view-only here (managed on the agents screen). Neutral border
+  // — the violet chip already carries the agent (AI) semantic; no accent border.
   return (
     <div
       style={{
         background: "var(--os-raised)",
-        border: "1px solid var(--os-violet-border)",
+        border: "1px solid var(--os-border)",
         borderRadius: "var(--os-radius-md)",
         padding: "var(--os-space-4)",
         display: "grid",
@@ -610,7 +737,9 @@ function AgentTaskCard({
       <div style={{ fontWeight: 600, fontSize: "var(--os-text-sm)" }}>{item.title}</div>
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
         <span className="os-chip os-chip--violet">משימת סוכן</span>
-        <span className="os-chip os-chip--muted">{agent?.name ?? item.agentId}</span>
+        <span style={{ color: "var(--os-muted)", fontSize: "var(--os-text-xs)" }}>
+          {agent?.name ?? item.agentId}
+        </span>
       </div>
       <div style={{ fontSize: "var(--os-text-2xs)", color: "var(--os-muted)" }}>
         ניהול משימות סוכן מתבצע במסך הסוכנים (גל 5) — כאן לצפייה בלבד.
