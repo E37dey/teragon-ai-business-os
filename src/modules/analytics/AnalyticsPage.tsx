@@ -20,6 +20,7 @@ import {
   SectionTitle,
   Tabs,
   useToast,
+  type IconName,
   type OsAccent,
 } from "@/design-system";
 import type {
@@ -89,23 +90,37 @@ import { MetricChart } from "./MetricChart";
 import { ANALYTICS_PRINT_CSS, ReportRunPrintView } from "./reportPrint";
 import { downloadTextFile, fmtPointValue, latestMeasured, shortDateHe } from "./lib";
 
+// VC-F density: the page opens on ONE group (business outcomes) — never all six
+// simultaneously. The grouped nav (segmented control) reaches the other five.
 const DEFAULT_FILTER: AnalyticsFilter = {
   rangePreset: "90d",
-  group: null,
+  group: "ו",
   ownerId: null,
   entityType: null,
   status: null,
   comparePrevious: true,
 };
 
-const GROUP_ACCENT: Readonly<Record<AnalyticsGroupKey, OsAccent>> = {
-  א: "cyan",
-  ב: "blue",
-  ג: "warning",
-  ד: "success",
-  ה: "violet",
-  ו: "blue",
+// VC-F: the 4 primary business metrics + the single primary trend chart shown
+// above the grouped breakdown. Chosen because they drive the operator workflow
+// (funnel → conversion → approved revenue → automation reliability).
+const PRIMARY_METRIC_KEYS = [
+  "leads_new",
+  "quotation_conversion",
+  "approved_revenue",
+  "automation_success",
+] as const;
+const PRIMARY_CHART_KEY = "approved_revenue";
+const PRIMARY_KPI_ICON: Readonly<Record<string, IconName>> = {
+  leads_new: "users",
+  quotation_conversion: "target",
+  approved_revenue: "gauge",
+  automation_success: "bot",
 };
+
+// VC-F: charts render a SINGLE steel-blue series by default (accent="blue" ⇒
+// var(--accent-primary-text)). No per-group rainbow accents.
+const SERIES_ACCENT: OsAccent = "blue";
 
 const kpiRowStyle: CSSProperties = {
   display: "grid",
@@ -284,6 +299,24 @@ export default function AnalyticsPage(): ReactElement {
     }
     return map;
   }, [filter.comparePrevious, filter.rangePreset, metrics, filteredSources, nowISO]);
+
+  // VC-F: the 4 primary business metrics + primary trend chart — computed
+  // independently of the active group so the executive summary is always shown.
+  const primaryDefs = useMemo(
+    () =>
+      PRIMARY_METRIC_KEYS.map((k) => metricByKey(k)).filter(
+        (d): d is AnalyticsMetricDef => d !== undefined,
+      ),
+    [],
+  );
+  const chartDef = useMemo(() => metricByKey(PRIMARY_CHART_KEY) ?? null, []);
+  const primarySeries = useMemo(() => {
+    const map = new Map<string, MetricSeries>();
+    for (const d of primaryDefs) map.set(d.key, computeSeries(d, filteredSources, filter.rangePreset));
+    if (chartDef !== null && !map.has(chartDef.key))
+      map.set(chartDef.key, computeSeries(chartDef, filteredSources, filter.rangePreset));
+    return map;
+  }, [primaryDefs, chartDef, filteredSources, filter.rangePreset]);
 
   const findings: MetricAuditFinding[] = useMemo(() => {
     const cur = wholeRange(nowISO, filter.rangePreset);
@@ -466,19 +499,6 @@ export default function AnalyticsPage(): ReactElement {
         }
       />
 
-      <div style={kpiRowStyle}>
-        <KpiCard title="מדדים בקטלוג" value={ANALYTICS_METRICS.length} accent="blue" icon="gauge" />
-        <KpiCard title="מחושבים ממקורות אמת" value={computableCount} accent="success" icon="check" />
-        <KpiCard
-          title="ללא מדידה כעת"
-          value={unmeasuredNow}
-          accent="warning"
-          icon="alert"
-          glow={unmeasuredNow > 0}
-        />
-        <KpiCard title="ממצאי מבקר המדדים" value={findings.length} accent="danger" icon="shield" />
-      </div>
-
       <Tabs
         items={[
           { id: "metrics", label: "מדדים" },
@@ -500,6 +520,22 @@ export default function AnalyticsPage(): ReactElement {
             onChange={setFilter}
             onReset={() => setFilter(DEFAULT_FILTER)}
             onSave={() => setSaveOpen(true)}
+          />
+
+          {/* VC-F: 4 primary business metrics + ONE steel-blue primary trend chart */}
+          <PrimarySummary
+            defs={primaryDefs}
+            series={primarySeries}
+            chartDef={chartDef}
+            tableMode={tableMode}
+            onDrill={openDrill}
+          />
+
+          {/* VC-F: grouped metric navigation — reach the other groups one at a
+              time instead of rendering all six simultaneously */}
+          <GroupNav
+            active={filter.group}
+            onPick={(g) => setFilter({ ...filter, group: g })}
           />
 
           {visibleGroups.length === 0 && (
@@ -533,7 +569,7 @@ export default function AnalyticsPage(): ReactElement {
                         series={series}
                         comparison={comparisons.get(m.key) ?? null}
                         tableMode={tableMode}
-                        accent={GROUP_ACCENT[g]}
+                        accent={SERIES_ACCENT}
                         onDrill={openDrill}
                       />
                     );
@@ -541,6 +577,16 @@ export default function AnalyticsPage(): ReactElement {
               </div>
             </section>
           ))}
+
+          {/* VC-F: detailed definitions, calculation methods, source records and
+              passive catalogue totals live here — never in the primary view */}
+          <MetricsMoreDisclosure
+            groupDefs={metrics}
+            catalogCount={ANALYTICS_METRICS.length}
+            computableCount={computableCount}
+            unmeasuredNow={unmeasuredNow}
+            findingsCount={findings.length}
+          />
         </>
       )}
 
@@ -729,19 +775,6 @@ function FilterBar({
         {(Object.keys(RANGE_PRESET_HE) as AnalyticsRangePreset[]).map((p) => (
           <option key={p} value={p}>
             {RANGE_PRESET_HE[p]}
-          </option>
-        ))}
-      </select>
-      <select
-        style={selectStyle}
-        value={filter.group ?? ""}
-        onChange={(e) => onChange({ ...filter, group: e.target.value === "" ? null : (e.target.value as AnalyticsGroupKey) })}
-        aria-label="קבוצת מדדים"
-      >
-        <option value="">כל הקבוצות</option>
-        {ANALYTICS_GROUP_ORDER.map((g) => (
-          <option key={g} value={g}>
-            {ANALYTICS_GROUP_TITLES[g]}
           </option>
         ))}
       </select>
@@ -951,6 +984,215 @@ function MetricCard({
         </p>
       )}
     </Panel>
+  );
+}
+
+// VC-F: grouped metric navigation — a calm segmented control. One group is
+// always active (steel), the rest quiet. Replaces rendering all six at once.
+function GroupNav({
+  active,
+  onPick,
+}: {
+  active: AnalyticsGroupKey | null;
+  onPick: (g: AnalyticsGroupKey) => void;
+}): ReactElement {
+  return (
+    <div
+      role="tablist"
+      aria-label="קבוצות מדדים"
+      style={{ display: "flex", flexWrap: "wrap", gap: "var(--os-space-2)" }}
+    >
+      {ANALYTICS_GROUP_ORDER.map((g) => {
+        const isActive = active === g;
+        return (
+          <button
+            key={g}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onPick(g)}
+            style={{
+              cursor: "pointer",
+              border: `1px solid ${isActive ? "var(--accent-primary-border)" : "var(--os-border)"}`,
+              background: isActive ? "var(--accent-primary-soft)" : "transparent",
+              color: isActive ? "var(--accent-primary-text)" : "var(--os-text-2)",
+              borderRadius: "8px",
+              padding: "0.4rem 0.8rem",
+              fontSize: "0.9rem",
+              fontWeight: isActive ? 600 : 500,
+            }}
+          >
+            {ANALYTICS_GROUP_TITLES[g]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// VC-F: the executive summary — exactly 4 primary metrics + ONE steel-blue
+// trend chart (with the accessible table alternative). Zero renders muted
+// (0 is not success); null renders the honest "טרם נמדד".
+function PrimarySummary({
+  defs,
+  series,
+  chartDef,
+  tableMode,
+  onDrill,
+}: {
+  defs: readonly AnalyticsMetricDef[];
+  series: Map<string, MetricSeries>;
+  chartDef: AnalyticsMetricDef | null;
+  tableMode: boolean;
+  onDrill: (def: AnalyticsMetricDef, period: AnalyticsPeriod, contextHe: string) => void;
+}): ReactElement {
+  const chartSeries = chartDef === null ? null : (series.get(chartDef.key) ?? null);
+  return (
+    <div style={{ display: "grid", gap: "var(--os-space-5)" }}>
+      <div style={kpiRowStyle}>
+        {defs.map((def) => {
+          const latest = latestMeasured(series.get(def.key)?.points ?? []);
+          const isZero = latest !== null && latest.value === 0;
+          return (
+            <KpiCard
+              key={def.key}
+              title={def.titleHe}
+              value={latest === null ? NOT_MEASURED_HE : fmtPointValue(latest.value, def.unit)}
+              accent="blue"
+              icon={PRIMARY_KPI_ICON[def.key]}
+              muted={latest === null || isZero}
+            />
+          );
+        })}
+      </div>
+      {chartDef !== null && chartSeries !== null && (
+        <Panel variant="raised" style={{ padding: "var(--os-space-4)", display: "grid", gap: "var(--os-space-3)" }}>
+          <SectionTitle icon="gauge" title={`מגמה — ${chartDef.titleHe}`} />
+          {tableMode ? (
+            <DataTable
+              columns={[
+                {
+                  key: "periodStart",
+                  header: "מתאריך",
+                  render: (p: MetricSeries["points"][number]) => (
+                    <span className="os-num" dir="ltr">{p.periodStart.slice(0, 10)}</span>
+                  ),
+                },
+                {
+                  key: "value",
+                  header: "ערך",
+                  render: (p: MetricSeries["points"][number]) =>
+                    p.value === null ? (
+                      <span className="os-chip os-chip--muted">{NOT_MEASURED_HE}</span>
+                    ) : (
+                      <span className="os-num">{fmtPointValue(p.value, p.unit)}</span>
+                    ),
+                },
+                {
+                  key: "sampleSize",
+                  header: "מדגם",
+                  render: (p: MetricSeries["points"][number]) =>
+                    p.sampleSize === null ? "—" : <span className="os-num">{p.sampleSize}</span>,
+                },
+              ]}
+              rows={chartSeries.points}
+              rowKey="periodStart"
+              onRowClick={(p) =>
+                onDrill(
+                  chartDef,
+                  { startISO: p.periodStart, endISO: p.periodEnd, labelHe: "" },
+                  `${fmtPointValue(p.value, chartDef.unit)} · ${p.calculationMethod}`,
+                )
+              }
+              emptyText="אין נקודות מדודות בטווח"
+            />
+          ) : (
+            <MetricChart
+              points={chartSeries.points}
+              accent={SERIES_ACCENT}
+              unit={chartDef.unit}
+              onPointClick={(i) => {
+                const p = chartSeries.points[i];
+                if (p !== undefined)
+                  onDrill(
+                    chartDef,
+                    { startISO: p.periodStart, endISO: p.periodEnd, labelHe: "" },
+                    `נקודה ${i + 1}: ${fmtPointValue(p.value, chartDef.unit)} · ${p.calculationMethod}`,
+                  );
+              }}
+            />
+          )}
+        </Panel>
+      )}
+    </div>
+  );
+}
+
+// VC-F: passive catalogue totals + the detailed definitions / calculation
+// methods / sources for the active group — moved out of the primary view.
+function MetricsMoreDisclosure({
+  groupDefs,
+  catalogCount,
+  computableCount,
+  unmeasuredNow,
+  findingsCount,
+}: {
+  groupDefs: readonly AnalyticsMetricDef[];
+  catalogCount: number;
+  computableCount: number;
+  unmeasuredNow: number;
+  findingsCount: number;
+}): ReactElement {
+  return (
+    <details className="os-more-metrics">
+      <summary>מדדים נוספים · הגדרות ומקורות</summary>
+      <div className="os-more-metrics__grid">
+        <div className="os-more-metrics__item">
+          <span>מדדים בקטלוג</span>
+          <span className="os-num">{catalogCount}</span>
+        </div>
+        <div className="os-more-metrics__item">
+          <span>מחושבים ממקורות אמת</span>
+          <span className="os-num">{computableCount}</span>
+        </div>
+        <div className="os-more-metrics__item">
+          <span>ללא מדידה כעת</span>
+          <span className="os-num">{unmeasuredNow}</span>
+        </div>
+        <div className="os-more-metrics__item">
+          <span>ממצאי מבקר המדדים</span>
+          <span className="os-num">{findingsCount}</span>
+        </div>
+      </div>
+      <div style={{ padding: "0 var(--os-space-5) var(--os-space-4)", display: "grid", gap: "var(--os-space-3)" }}>
+        {groupDefs.map((d) => (
+          <div
+            key={d.key}
+            style={{
+              display: "grid",
+              gap: 2,
+              borderBlockStart: "1px solid var(--border-subtle)",
+              paddingBlockStart: "var(--os-space-3)",
+            }}
+          >
+            <span style={{ fontSize: "0.9rem", color: "var(--os-text-1)", fontWeight: 600 }}>
+              {d.titleHe} · {d.unit}
+            </span>
+            <span style={{ fontSize: "var(--os-text-sm, 13px)", color: "var(--os-text-2)" }}>
+              שיטת חישוב: {d.calculationMethodHe}
+            </span>
+            <span style={{ fontSize: "var(--os-text-sm, 13px)", color: "var(--os-text-3)" }}>
+              מקור: {d.sourceHe}
+            </span>
+            {d.limitationsHe.length > 0 && (
+              <span style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-text-3)" }}>
+                מגבלות: {d.limitationsHe.join(" · ")}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </details>
   );
 }
 
