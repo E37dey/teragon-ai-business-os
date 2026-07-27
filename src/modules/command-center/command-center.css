@@ -1,0 +1,13 @@
+/* VC-C — command-center density/hierarchy (module-scoped).
+   The operational agent network must read as SUBDUED unless an agent is
+   actually working: an idle agent keeps its identity but drops its role
+   accent frame, glow and colored name so the whole band stays calm and only
+   the genuinely active agents draw the eye. We do NOT glow every agent. */
+.os-agent.cc-agent--idle {
+  border-color: var(--os-border);
+  box-shadow: none;
+}
+.os-agent.cc-agent--idle .os-agent__icon,
+.os-agent.cc-agent--idle .os-agent__name {
+  color: var(--os-text-2);
+}

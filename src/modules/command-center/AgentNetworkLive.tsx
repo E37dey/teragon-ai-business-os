@@ -20,6 +20,7 @@ import type { AIProviderHealth } from "@/ai/contracts/AIProvider";
 import { agentQueueSizes, pendingApprovals } from "@/agents";
 import { ProviderStateBadge, getAgentEngine } from "@/components/ai";
 import { dateTimeHe } from "@/modules/quotations/fmt";
+import "./command-center.css";
 
 const AGENT_ACCENT: Record<string, OsAccent> = {
   "ag-orchestrator": "blue",
@@ -139,12 +140,17 @@ export function AgentNetworkLive({
           const lastDone = agentTasks
             .filter((t) => t.agentId === a.id)
             .sort((x, y) => y.updatedAt.localeCompare(x.updatedAt))[0];
+          // VC-C: only an agent that is actually working keeps its role accent.
+          // Idle agents (no in-flight task) render subdued — the network does
+          // not glow every card, so an active agent genuinely stands out.
+          const active = Boolean(current);
           return (
             <AgentCard
               key={a.id}
               name={a.name}
               role={a.purpose.split(":")[0] ?? a.purpose}
               accent={AGENT_ACCENT[a.id] ?? "blue"}
+              className={active ? "" : "cc-agent--idle"}
               owner={ownerName}
               {...(current
                 ? { input: current.title }
