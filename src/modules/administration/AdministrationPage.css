@@ -1,0 +1,58 @@
+/* VC-F (administration) — per-row quiet actions menu.
+   Secondary/destructive row actions (תפקיד · שינוי הרשאה · השעיה/החזרה) live
+   behind a calm "פעולות" disclosure instead of permanent per-row buttons.
+   In-flow (not absolutely positioned) so it is never clipped by the table's
+   horizontal-scroll container. */
+.os-row-actions-cell {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.os-row-actions {
+  position: relative;
+}
+
+.os-row-actions > summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: var(--os-text-sm, 13px);
+  color: var(--text-secondary);
+  border-radius: var(--os-radius-sm, 6px);
+}
+.os-row-actions > summary::-webkit-details-marker {
+  display: none;
+}
+.os-row-actions > summary::after {
+  content: "▾";
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.os-row-actions[open] > summary::after {
+  content: "▴";
+}
+.os-row-actions > summary:hover,
+.os-row-actions[open] > summary {
+  background: var(--surface-2, rgba(255, 255, 255, 0.05));
+  color: var(--text-primary);
+}
+
+.os-row-actions__menu {
+  display: grid;
+  gap: 4px;
+  margin-block-start: 6px;
+  min-width: 168px;
+  padding: var(--os-space-2, 8px);
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--os-radius-md, 8px);
+}
+.os-row-actions__menu > * {
+  width: 100%;
+  justify-content: flex-start;
+}

@@ -5,6 +5,7 @@
 // מזויפות. מכבד את מצב ההדגמה לבוחן (useDemoModeGuard).
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactElement, ReactNode } from "react";
+import "./AdministrationPage.css";
 import {
   DataTable,
   EmptyState,
@@ -598,6 +599,7 @@ export default function AdministrationPage(): ReactElement {
   const pendingRequests = requests.filter((r) => r.status === "ממתין");
   const pendingReviews = reviews.filter((r) => r.status === "ממתין");
   const disabledAgentCount = agents.filter((a) => a.status === "מושבת").length;
+  const emergencyActiveCount = actives.length + (disabledAgentCount > 0 ? 1 : 0);
 
   const refresh = async (): Promise<void> => {
     await invalidate([...ADMIN_COLLECTIONS]);
@@ -701,63 +703,71 @@ export default function AdministrationPage(): ReactElement {
       key: "actions",
       header: "פעולות",
       render: (r) => (
-        <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
+        // VC-F: primary "עריכה" stays reachable; secondary + emergency-style
+        // actions (תפקיד · שינוי הרשאה · השעיה) move behind a quiet disclosure
+        // so a destructive red button is not permanently shown on every row.
+        <span className="os-row-actions-cell">
           <OsButton variant="ghost" size="sm" onClick={() => setModal({ kind: "edit-user", row: r })}>
             עריכה
           </OsButton>
-          <OsButton variant="ghost" size="sm" data-testid={`assign-role-${r.user.id}`}
-            onClick={() => guarded("הקצאת תפקיד", () => setModal({ kind: "assign-role", row: r }))}>
-            תפקיד
-          </OsButton>
-          <OsButton variant="cyan" size="sm" data-testid={`request-change-${r.user.id}`}
-            onClick={() => guarded("בקשת שינוי הרשאות", () => setModal({ kind: "request-user-change", row: r }))}>
-            שינוי הרשאה
-          </OsButton>
-          {r.suspended ? (
-            <OsButton variant="success" size="sm"
-              onClick={() =>
-                guarded("החזרת גישה", () =>
-                  setModal({
-                    kind: "confirm",
-                    props: {
-                      title: `החזרת גישה — ${r.user.name}`,
-                      bodyHe: "גישת ההדגמה תוחזר והפעולה תירשם ב-Audit.",
-                      confirmLabelHe: "החזרת גישה",
-                      onConfirm: async () => {
-                        await makeService().reactivateUser(r.user.id, CURRENT_ACTOR_ID);
-                        toast("הגישה הוחזרה", "success");
-                        await refresh();
-                      },
-                    },
-                  }),
-                )
-              }>
-              החזרה
-            </OsButton>
-          ) : (
-            <OsButton variant="danger" size="sm" data-testid={`suspend-${r.user.id}`}
-              onClick={() =>
-                guarded("השעיית גישה", () =>
-                  setModal({
-                    kind: "confirm",
-                    props: {
-                      title: `השעיית גישה — ${r.user.name}`,
-                      bodyHe: "גישת ההדגמה תושעה (סטטוס «לא פעיל») והפעולה תירשם ב-Audit.",
-                      confirmLabelHe: "השעיה",
-                      requireReason: true,
-                      danger: true,
-                      onConfirm: async (reason) => {
-                        await makeService().suspendUser(r.user.id, CURRENT_ACTOR_ID, reason);
-                        toast("הגישה הושעתה", "warning");
-                        await refresh();
-                      },
-                    },
-                  }),
-                )
-              }>
-              השעיה
-            </OsButton>
-          )}
+          <details className="os-row-actions" data-testid={`user-actions-${r.user.id}`}>
+            <summary aria-label={`פעולות נוספות עבור ${r.user.name}`}>פעולות</summary>
+            <div className="os-row-actions__menu" role="menu">
+              <OsButton variant="ghost" size="sm" data-testid={`assign-role-${r.user.id}`}
+                onClick={() => guarded("הקצאת תפקיד", () => setModal({ kind: "assign-role", row: r }))}>
+                הקצאת תפקיד
+              </OsButton>
+              <OsButton variant="ghost" size="sm" data-testid={`request-change-${r.user.id}`}
+                onClick={() => guarded("בקשת שינוי הרשאות", () => setModal({ kind: "request-user-change", row: r }))}>
+                שינוי הרשאה
+              </OsButton>
+              {r.suspended ? (
+                <OsButton variant="success" size="sm"
+                  onClick={() =>
+                    guarded("החזרת גישה", () =>
+                      setModal({
+                        kind: "confirm",
+                        props: {
+                          title: `החזרת גישה — ${r.user.name}`,
+                          bodyHe: "גישת ההדגמה תוחזר והפעולה תירשם ב-Audit.",
+                          confirmLabelHe: "החזרת גישה",
+                          onConfirm: async () => {
+                            await makeService().reactivateUser(r.user.id, CURRENT_ACTOR_ID);
+                            toast("הגישה הוחזרה", "success");
+                            await refresh();
+                          },
+                        },
+                      }),
+                    )
+                  }>
+                  החזרת גישה
+                </OsButton>
+              ) : (
+                <OsButton variant="danger" size="sm" data-testid={`suspend-${r.user.id}`}
+                  onClick={() =>
+                    guarded("השעיית גישה", () =>
+                      setModal({
+                        kind: "confirm",
+                        props: {
+                          title: `השעיית גישה — ${r.user.name}`,
+                          bodyHe: "גישת ההדגמה תושעה (סטטוס «לא פעיל») והפעולה תירשם ב-Audit.",
+                          confirmLabelHe: "השעיה",
+                          requireReason: true,
+                          danger: true,
+                          onConfirm: async (reason) => {
+                            await makeService().suspendUser(r.user.id, CURRENT_ACTOR_ID, reason);
+                            toast("הגישה הושעתה", "warning");
+                            await refresh();
+                          },
+                        },
+                      }),
+                    )
+                  }>
+                  השעיית גישה
+                </OsButton>
+              )}
+            </div>
+          </details>
         </span>
       ),
     },
@@ -1042,24 +1052,37 @@ export default function AdministrationPage(): ReactElement {
         </span>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "var(--os-space-3)" }}>
-        <KpiCard title="משתמשים" value={rows.length} accent="blue" icon="users" />
-        <KpiCard title="תפקידים קנוניים" value={roles.length} accent="cyan" icon="shield" />
-        <KpiCard title="בקשות שינוי ממתינות" value={pendingRequests.length} accent="violet" icon="inbox" />
-        <KpiCard title="סקירות גישה ממתינות" value={pendingReviews.length} accent="warning" icon="clock" />
-        <KpiCard title="מצבי חירום פעילים" value={actives.length + (disabledAgentCount > 0 ? 1 : 0)} accent="danger" icon="alert" />
+      {/* VC-F: four action-driving KPIs only; a zero renders neutral grey (0 is
+          not success and not attention). The passive registry count (9 canonical
+          roles) moves into "מדדים נוספים". */}
+      <div data-testid="administration-metrics" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "var(--os-space-3)" }}>
+        <KpiCard title="מצבי חירום פעילים" value={emergencyActiveCount} accent="danger" icon="alert" muted={emergencyActiveCount === 0} />
+        <KpiCard title="סקירות גישה ממתינות" value={pendingReviews.length} accent="warning" icon="clock" muted={pendingReviews.length === 0} />
+        <KpiCard title="בקשות שינוי ממתינות" value={pendingRequests.length} accent="warning" icon="inbox" muted={pendingRequests.length === 0} />
+        <KpiCard title="משתמשים" value={rows.length} accent="blue" icon="users" muted={rows.length === 0} />
       </div>
+
+      <details data-testid="administration-more-metrics" className="os-more-metrics">
+        <summary>מדדים נוספים</summary>
+        <div className="os-more-metrics__grid">
+          <div className="os-more-metrics__item">
+            <span>תפקידים קנוניים</span>
+            <span className="os-num">{roles.length}</span>
+          </div>
+        </div>
+      </details>
 
       <Tabs
         items={[
-          { id: "users", label: "משתמשים", badge: rows.length },
-          { id: "roles", label: "תפקידים", badge: roles.length },
+          // VC-F: show a count badge only when > 0 (hide zero badges).
+          { id: "users", label: "משתמשים", badge: rows.length || undefined },
+          { id: "roles", label: "תפקידים", badge: roles.length || undefined },
           { id: "permissions", label: "הרשאות" },
           { id: "organizations", label: "ארגונים" },
-          { id: "reviews", label: "סקירת גישה", badge: pendingReviews.length },
-          { id: "requests", label: "בקשות שינוי", badge: pendingRequests.length },
-          { id: "emergency", label: "מצב חירום", badge: actives.length },
-          { id: "audit", label: "Audit", badge: adminAudit.length },
+          { id: "reviews", label: "סקירת גישה", badge: pendingReviews.length || undefined },
+          { id: "requests", label: "בקשות שינוי", badge: pendingRequests.length || undefined },
+          { id: "emergency", label: "מצב חירום", badge: emergencyActiveCount || undefined },
+          { id: "audit", label: "Audit", badge: adminAudit.length || undefined },
         ]}
         activeId={tab}
         onChange={setTab}
