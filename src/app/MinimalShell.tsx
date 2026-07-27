@@ -16,7 +16,7 @@ export default function MinimalShell() {
         minHeight: "100vh",
         display: "flex",
         flexDirection: "row",
-        background: "#030812",
+        background: "var(--bg-app)",
         color: "#98A8BD",
         fontFamily: "system-ui, sans-serif",
       }}
@@ -64,7 +64,7 @@ export default function MinimalShell() {
         })}
       </nav>
 
-      <main style={{ flexGrow: 1, background: "#030812" }}>
+      <main style={{ flexGrow: 1, background: "var(--bg-app)" }}>
         <Outlet />
       </main>
     </div>

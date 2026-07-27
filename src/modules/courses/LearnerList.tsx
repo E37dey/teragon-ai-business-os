@@ -41,7 +41,7 @@ export function LearnerList({
             <div className="courses-learner-card__head">
               <span className="courses-learner-card__name">{enr.studentName}</span>
               {pct !== null ? (
-                <span className="os-num" style={{ color: "var(--os-cyan)" }}>
+                <span className="os-num" style={{ color: "var(--accent-primary-text)" }}>
                   {pct}%
                 </span>
               ) : (

@@ -1,60 +1,138 @@
 /**
  * TERAGON AI BUSINESS OS — Design Tokens
- * Source of truth: docs/VISUAL_DNA.md (mandatory palette — do not alter hex values).
- * RTL-first: consumers must use CSS logical properties (margin-inline-start etc.).
  *
- * NOTE FOR ARCHITECT (index.html is NOT owned by the design agent):
- * please add to <head> for best font loading performance:
- *   <link rel="preconnect" href="https://fonts.googleapis.com">
- *   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
- *   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&family=Assistant:wght@400;600;700&display=swap" rel="stylesheet">
- * The @import below is a functional fallback until then (display=swap included).
+ * QUIET ENTERPRISE INTELLIGENCE (Visual Calm v2 — post-release/visual-calm-v2).
+ * This supersedes the earlier high-intensity "cyber command center" palette
+ * mandated by docs/VISUAL_DNA.md. Per the operator's Visual Calm directive,
+ * the canonical system is now ~85% neutral surfaces/typography, ~10% brand
+ * accent, ~5% semantic status — color communicates meaning, never decoration.
+ *
+ * ARCHITECTURE: the canonical tokens (--bg-*, --surface-*, --text-*, --accent-*,
+ * --success/--warning/--danger/--info) are the single source of truth. The
+ * legacy --os-* tokens are REMAPPED onto them, so every existing component
+ * (43 files referencing the old cyan accent, 28 glow usages) calms at the
+ * source with no per-component edits. New code should prefer the canonical
+ * names below.
+ *
+ * RTL-first: consumers must use CSS logical properties (margin-inline-start etc.).
  */
 @import url("https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&family=Assistant:wght@400;600;700&display=swap");
 
 :root,
 .theme-os {
-  /* ── Surfaces (mandatory palette) ─────────────────────────── */
-  --os-bg: #030812;
-  --os-nav: #050b15;
-  --os-panel: #07111f;
-  --os-raised: #0a1627;
-  --os-highlight: #0c1c31;
+  /* ══════════════════════════════════════════════════════════════
+     CANONICAL CALM SYSTEM (single source of truth)
+     ══════════════════════════════════════════════════════════════ */
 
-  /* ── Borders (mandatory palette) ──────────────────────────── */
-  --os-border: rgba(112, 158, 220, 0.17);
-  --os-border-strong: rgba(112, 158, 220, 0.28);
+  /* ── Backgrounds ──────────────────────────────────────────── */
+  --bg-app: #070d15;
+  --bg-navigation: #09111c;
+  --bg-workspace: #0a1420;
 
-  /* ── Text (mandatory palette) ─────────────────────────────── */
-  --os-text: #f5f8fd;
-  --os-text-2: #98a8bd;
-  --os-muted: #75879f; /* Wave 2: lightened from #65758b — axe WCAG AA contrast (≥4.5:1) on all shell surfaces */
+  /* ── Surfaces (progressive elevation, not glow) ───────────── */
+  --surface-1: #0d1723;
+  --surface-2: #111e2d;
+  --surface-3: #172536;
+  --surface-selected: #1a2b3b;
 
-  /* ── Accents (mandatory palette) ──────────────────────────── */
-  --os-blue: #287bff;
-  --os-cyan: #20c4e8;
-  --os-violet: #7655ff;
-  --os-success: #21c981;
-  --os-warning: #e7a93d;
-  --os-danger: #ec5d68;
+  /* ── Borders (neutral slate — NOT blue) ───────────────────── */
+  --border-subtle: rgba(148, 163, 184, 0.1);
+  --border-default: rgba(148, 163, 184, 0.16);
+  --border-strong: rgba(148, 163, 184, 0.24);
 
-  /* ── Accent tints (derived, for chips / soft fills) ───────── */
-  --os-blue-soft: rgba(40, 123, 255, 0.12);
-  --os-cyan-soft: rgba(32, 196, 232, 0.12);
-  --os-violet-soft: rgba(118, 85, 255, 0.12);
-  --os-success-soft: rgba(33, 201, 129, 0.12);
-  --os-warning-soft: rgba(231, 169, 61, 0.12);
-  --os-danger-soft: rgba(236, 93, 104, 0.12);
+  /* ── Text (never pure white for body) ─────────────────────── */
+  --text-primary: #e5ebf2;
+  --text-secondary: #a7b2c1;
+  --text-muted: #8593a5; /* calm slate; lifted from spec #748194 to hold WCAG AA (≥4.5:1) on --surface-1 */
+  --text-disabled: #586575;
 
-  --os-blue-border: rgba(40, 123, 255, 0.45);
-  --os-cyan-border: rgba(32, 196, 232, 0.45);
-  --os-violet-border: rgba(118, 85, 255, 0.45);
-  --os-success-border: rgba(33, 201, 129, 0.45);
-  --os-warning-border: rgba(231, 169, 61, 0.45);
-  --os-danger-border: rgba(236, 93, 104, 0.45);
+  /* ── Brand accent (steel-blue — the only decorative color) ── */
+  --accent-primary: #4d91a3;
+  --accent-primary-hover: #5aa0b1;
+  --accent-primary-soft: rgba(77, 145, 163, 0.14);
+  --accent-primary-text: #7fc0d1; /* readable steel on dark surfaces (links/active labels) */
+  --accent-primary-border: rgba(77, 145, 163, 0.32);
 
-  /* violet reads too dark on near-black surfaces — readable text variant */
-  --os-violet-text: #a18dff;
+  /* ── AI violet (reserved for Copilot / agents / AI evidence) ─ */
+  --accent-ai: #7268c9;
+  --accent-ai-soft: rgba(114, 104, 201, 0.13);
+  --accent-ai-text: #a99fe6; /* readable violet on dark surfaces */
+  --accent-ai-border: rgba(114, 104, 201, 0.32);
+
+  /* ── Semantic status (soft, meaning-only) ──────────────────
+     NOTE: the SOLID base values are lifted slightly from the spec hexes
+     (#57936f / #b8606a) so they clear WCAG AA (≥4.5:1) when used as text/icon
+     on dark surfaces — the spec palette is "approximate", AA is mandatory.
+     The soft fills + borders below keep the calm spec intensity (separate
+     rgba literals), so surfaces are unchanged. */
+  --success: #6bb083;
+  --success-soft: rgba(87, 147, 111, 0.13);
+  --success-text: #7fc59a;
+  --success-border: rgba(87, 147, 111, 0.32);
+
+  --warning: #ca9a55; /* lifted from #b98e4e for AA-as-text; soft fill unchanged */
+  --warning-soft: rgba(185, 142, 78, 0.14);
+  --warning-text: #d9b177;
+  --warning-border: rgba(185, 142, 78, 0.32);
+
+  --danger: #cf7b84;
+  --danger-soft: rgba(184, 96, 106, 0.14);
+  --danger-text: #e08c95;
+  --danger-border: rgba(184, 96, 106, 0.32);
+
+  --info: #5783a5;
+  --info-soft: rgba(87, 131, 165, 0.13);
+  --info-text: #86b0cf;
+  --info-border: rgba(87, 131, 165, 0.32);
+
+  /* ══════════════════════════════════════════════════════════════
+     LEGACY --os-* TOKENS — remapped onto the canonical system.
+     Do not hand-tune these; change the canonical values above.
+     ══════════════════════════════════════════════════════════════ */
+
+  /* ── Surfaces ─────────────────────────────────────────────── */
+  --os-bg: var(--bg-app);
+  --os-nav: var(--bg-navigation);
+  --os-panel: var(--surface-1);
+  --os-raised: var(--surface-2);
+  --os-highlight: var(--surface-3);
+
+  /* ── Borders ──────────────────────────────────────────────── */
+  --os-border: var(--border-default);
+  --os-border-strong: var(--border-strong);
+
+  /* ── Text ─────────────────────────────────────────────────── */
+  --os-text: var(--text-primary);
+  --os-text-2: var(--text-secondary);
+  --os-muted: var(--text-muted);
+
+  /* ── Accents (cyan + blue both collapse to the single steel accent) ── */
+  --os-blue: var(--accent-primary);
+  --os-cyan: var(--accent-primary);
+  --os-violet: var(--accent-ai);
+  --os-success: var(--success);
+  --os-warning: var(--warning);
+  --os-danger: var(--danger);
+
+  /* ── Accent tints (soft fills / chips) ────────────────────── */
+  --os-blue-soft: var(--accent-primary-soft);
+  --os-cyan-soft: var(--accent-primary-soft);
+  --os-violet-soft: var(--accent-ai-soft);
+  --os-success-soft: var(--success-soft);
+  --os-warning-soft: var(--warning-soft);
+  --os-danger-soft: var(--danger-soft);
+
+  /* ── Accent borders (calmed from 0.45 → 0.32) ─────────────── */
+  --os-blue-border: var(--accent-primary-border);
+  --os-cyan-border: var(--accent-primary-border);
+  --os-violet-border: var(--accent-ai-border);
+  --os-success-border: var(--success-border);
+  --os-warning-border: var(--warning-border);
+  --os-danger-border: var(--danger-border);
+
+  /* readable accent text variants on near-black surfaces */
+  --os-violet-text: var(--accent-ai-text);
+  --os-cyan-text: var(--accent-primary-text);
 
   /* ── Spacing scale (dense enterprise) ─────────────────────── */
   --os-space-0: 0;
@@ -68,6 +146,7 @@
   --os-space-8: 24px;
   --os-space-9: 32px;
   --os-space-10: 40px;
+  --os-space-11: 48px;
 
   /* ── Radius scale ─────────────────────────────────────────── */
   --os-radius-xs: 4px;
@@ -81,47 +160,63 @@
   --os-font: "Heebo", "Assistant", "Rubik", -apple-system, "Segoe UI", sans-serif;
   --os-font-mono: "JetBrains Mono", "Consolas", "Courier New", monospace;
 
-  /* dense enterprise type scale (11-28px) */
-  --os-text-2xs: 11px;
-  --os-text-xs: 12px;
-  --os-text-sm: 13px;
-  --os-text-md: 14px;
-  --os-text-lg: 16px;
-  --os-text-xl: 20px;
-  --os-text-2xl: 28px;
+  /* calm enterprise type scale — operational body ≥14px */
+  --os-text-2xs: 11px; /* decorative/superscript only — never operational text */
+  --os-text-xs: 12px; /* metadata floor */
+  --os-text-sm: 13px; /* secondary floor */
+  --os-text-md: 14px; /* operational body floor */
+  --os-text-base: 15px; /* comfortable body */
+  --os-text-lg: 17px; /* card / section title */
+  --os-text-xl: 19px; /* section title */
+  --os-text-2xl: 24px; /* page title */
+  --os-text-kpi: 30px; /* KPI number */
 
-  --os-leading-tight: 1.25;
-  --os-leading-normal: 1.45;
+  --os-leading-tight: 1.3;
+  --os-leading-normal: 1.55; /* calm reading (was 1.45) */
+  --os-leading-relaxed: 1.65;
+  --os-measure: 72ch; /* max paragraph width */
 
   --os-weight-regular: 400;
   --os-weight-medium: 500;
   --os-weight-semibold: 600;
   --os-weight-bold: 700;
 
-  /* ── Shadows / restrained glow (per accent) ───────────────── */
-  --os-shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.35), 0 4px 14px rgba(0, 0, 0, 0.25);
-  --os-shadow-raised: 0 2px 6px rgba(0, 0, 0, 0.45), 0 8px 24px rgba(0, 0, 0, 0.3);
-  --os-shadow-overlay: 0 8px 32px rgba(0, 0, 0, 0.65), 0 2px 8px rgba(0, 0, 0, 0.5);
+  /* ── Depth: quiet shadows (black alpha, NOT colored glow) ─── */
+  --os-shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3), 0 3px 10px rgba(0, 0, 0, 0.2);
+  --os-shadow-raised: 0 2px 6px rgba(0, 0, 0, 0.4), 0 8px 22px rgba(0, 0, 0, 0.28);
+  --os-shadow-overlay: 0 8px 32px rgba(0, 0, 0, 0.62), 0 2px 8px rgba(0, 0, 0, 0.48);
 
-  --os-glow-blue: 0 0 0 1px var(--os-blue-border), 0 0 14px rgba(40, 123, 255, 0.18);
-  --os-glow-cyan: 0 0 0 1px var(--os-cyan-border), 0 0 14px rgba(32, 196, 232, 0.18);
-  --os-glow-violet: 0 0 0 1px var(--os-violet-border), 0 0 14px rgba(118, 85, 255, 0.18);
-  --os-glow-success: 0 0 0 1px var(--os-success-border), 0 0 14px rgba(33, 201, 129, 0.18);
-  --os-glow-warning: 0 0 0 1px var(--os-warning-border), 0 0 14px rgba(231, 169, 61, 0.18);
-  --os-glow-danger: 0 0 0 1px var(--os-danger-border), 0 0 14px rgba(236, 93, 104, 0.18);
+  /* ── Glow REMOVED from default state ───────────────────────
+     Legacy --os-glow-* now resolve to a plain hairline ring — NO neon halo —
+     so all 28 legacy usages (cards, nav, tabs, rows) calm globally. Reserve
+     real (still subtle, ≤0.12) glow for the few allowed live/critical states
+     via --os-glow-active-* below. */
+  --os-glow-blue: inset 0 0 0 1px var(--accent-primary-border);
+  --os-glow-cyan: inset 0 0 0 1px var(--accent-primary-border);
+  --os-glow-violet: inset 0 0 0 1px var(--accent-ai-border);
+  --os-glow-success: inset 0 0 0 1px var(--success-border);
+  --os-glow-warning: inset 0 0 0 1px var(--warning-border);
+  --os-glow-danger: inset 0 0 0 1px var(--danger-border);
 
-  /* focus ring (cyan) */
-  --os-focus-ring: 0 0 0 2px rgba(32, 196, 232, 0.55);
+  /* Allowed exceptional glow — active Copilot / live agent / critical alert */
+  --os-glow-active-ai: 0 0 0 1px var(--accent-ai-border), 0 0 12px rgba(114, 104, 201, 0.12);
+  --os-glow-active-live: 0 0 0 1px var(--accent-primary-border), 0 0 12px rgba(77, 145, 163, 0.12);
+  --os-glow-critical: 0 0 0 1px var(--danger-border), 0 0 12px rgba(184, 96, 106, 0.12);
+
+  /* focus ring — steel-blue (was cyan) */
+  --os-focus-ring: 0 0 0 2px rgba(77, 145, 163, 0.6);
 
   /* ── Borders (composed) ───────────────────────────────────── */
   --os-border-thin: 1px solid var(--os-border);
+  --os-border-subtle-line: 1px solid var(--border-subtle);
   --os-border-strong-line: 1px solid var(--os-border-strong);
+  --os-divider: 1px solid var(--border-subtle);
 
-  /* ── Transitions ──────────────────────────────────────────── */
+  /* ── Transitions (calm, 120–180ms for state; 200 base) ────── */
   --os-ease: cubic-bezier(0.4, 0, 0.2, 1);
-  --os-transition-fast: 120ms var(--os-ease);
-  --os-transition-base: 200ms var(--os-ease);
-  --os-transition-slow: 320ms var(--os-ease);
+  --os-transition-fast: 140ms var(--os-ease);
+  --os-transition-base: 180ms var(--os-ease);
+  --os-transition-slow: 220ms var(--os-ease);
 
   /* ── Layout dimensions (app shell) ────────────────────────── */
   --os-nav-width: 220px;
@@ -133,4 +228,14 @@
   --os-z-drawer: 50;
   --os-z-modal: 60;
   --os-z-toast: 70;
+}
+
+/* Respect reduced-motion globally — no decorative/continuous animation. */
+@media (prefers-reduced-motion: reduce) {
+  :root,
+  .theme-os {
+    --os-transition-fast: 0ms;
+    --os-transition-base: 0ms;
+    --os-transition-slow: 0ms;
+  }
 }

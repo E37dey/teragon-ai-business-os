@@ -154,35 +154,36 @@
   flex: none;
 }
 
+/* Calm chips: soft fill + readable -text variant (WCAG AA on dark surfaces). */
 .os-chip--success {
-  color: var(--os-success);
+  color: var(--success-text);
   background: var(--os-success-soft);
-  border-color: rgba(33, 201, 129, 0.28);
+  border-color: var(--success-border);
 }
 .os-chip--blue {
-  color: #4d93ff; /* lightened from --os-blue for WCAG contrast on dark chips (axe) */
+  color: var(--accent-primary-text);
   background: var(--os-blue-soft);
-  border-color: rgba(40, 123, 255, 0.28);
+  border-color: var(--accent-primary-border);
 }
 .os-chip--cyan {
-  color: var(--os-cyan);
+  color: var(--accent-primary-text);
   background: var(--os-cyan-soft);
-  border-color: rgba(32, 196, 232, 0.28);
+  border-color: var(--accent-primary-border);
 }
 .os-chip--violet {
   color: var(--os-violet-text);
   background: var(--os-violet-soft);
-  border-color: rgba(118, 85, 255, 0.28);
+  border-color: var(--accent-ai-border);
 }
 .os-chip--warning {
-  color: var(--os-warning);
+  color: var(--warning-text);
   background: var(--os-warning-soft);
-  border-color: rgba(231, 169, 61, 0.28);
+  border-color: var(--warning-border);
 }
 .os-chip--danger {
-  color: var(--os-danger);
+  color: var(--danger-text);
   background: var(--os-danger-soft);
-  border-color: rgba(236, 93, 104, 0.28);
+  border-color: var(--danger-border);
 }
 .os-chip--muted {
   /* W7-G trivial a11y fix: --os-muted fails WCAG AA (axe color-contrast,
@@ -422,12 +423,12 @@
 
 .os-btn--danger {
   background: var(--os-danger-soft);
-  color: var(--os-danger);
+  color: var(--danger-text);
   border-color: var(--os-danger-border);
 }
 .os-btn--danger:hover:not(:disabled) {
-  background: rgba(236, 93, 104, 0.2);
-  box-shadow: var(--os-glow-danger);
+  background: var(--danger-soft);
+  border-color: var(--danger);
 }
 
 .os-btn--ghost {
@@ -1456,13 +1457,13 @@
 }
 
 .os-nav__link--active {
-  color: var(--os-cyan);
-  background: var(--os-highlight);
-  border-color: var(--os-cyan-border);
-  box-shadow: var(--os-glow-cyan);
+  color: var(--accent-primary-text);
+  background: var(--surface-selected);
+  border-color: var(--accent-primary-border);
+  box-shadow: none;
 }
 
-/* active glow bar on the inline-start edge */
+/* active indicator bar on the inline-start edge — single calm steel treatment, no glow */
 .os-nav__link--active::before {
   content: "";
   position: absolute;
@@ -1471,8 +1472,7 @@
   block-size: 60%;
   inline-size: 3px;
   border-radius: var(--os-radius-full);
-  background: var(--os-cyan);
-  box-shadow: 0 0 8px rgba(32, 196, 232, 0.7);
+  background: var(--accent-primary);
 }
 
 .os-nav__icon {
@@ -1500,8 +1500,8 @@
 }
 
 .os-nav__link--active .os-nav__badge {
-  color: var(--os-cyan);
-  border-color: var(--os-cyan-border);
+  color: var(--accent-primary-text);
+  border-color: var(--accent-primary-border);
 }
 
 /* ── Copilot card (bottom of nav) ── */
