@@ -419,12 +419,6 @@ function CommandCenterInner(): ReactElement {
   }
 
   const maxFunnel = funnel[0]?.count ?? 0;
-  const lastMonth = months[months.length - 1];
-  const prevMonth = months[months.length - 2];
-  const revenueDelta =
-    lastMonth && prevMonth && prevMonth.approved > 0
-      ? Math.round(((lastMonth.approved - prevMonth.approved) / prevMonth.approved) * 100)
-      : null;
 
   return (
     <div style={stack("var(--os-space-5)")} data-testid="command-center">
@@ -501,47 +495,73 @@ function CommandCenterInner(): ReactElement {
         </div>
       </div>
 
-      {/* KPI strip — all values from dashboardKpis selectors */}
-      <div style={gridStyle("repeat(auto-fit, minmax(160px, 1fr))", "var(--os-space-3)")}>
-        <KpiCard title="לידים פתוחים" value={kpis.openLeads} accent="blue" icon="users" />
+      {/* VC-C — four PRIMARY KPIs only: the operational counts that genuinely
+          drive the operator's next action. Zero stays neutral (muted) because a
+          zero count is neither success nor attention. Amber marks a metric only
+          when there is real work to act on; pending approvals is the single
+          most important item, so it alone carries the restrained accent glow.
+          Passive analytics (revenue, pipeline value, course %) moved to
+          "מדדים נוספים" — quieter, but never deleted. */}
+      <div
+        style={gridStyle("repeat(auto-fit, minmax(180px, 1fr))", "var(--os-space-4)")}
+        data-testid="command-kpis"
+      >
         <KpiCard
-          title="שווי צבר פתוח"
-          value={ils(kpis.pipeline.openValue)}
-          accent="cyan"
-          icon="briefcase"
+          title="אישורים ממתינים להחלטה"
+          value={kpis.pendingApprovalCount}
+          accent="warning"
+          icon="shield"
+          muted={kpis.pendingApprovalCount === 0}
+          glow={kpis.pendingApprovalCount > 0}
         />
         <KpiCard
-          title="הכנסות מאושרות"
-          value={ils(kpis.pipeline.approvedValue)}
-          accent="success"
-          icon="target"
-          {...(revenueDelta !== null ? { delta: revenueDelta, deltaLabel: "מהחודש הקודם" } : {})}
-          {...(months.length > 1 ? { spark: months.map((m) => m.approved) } : {})}
-          glow
-        />
-        <KpiCard
-          title="קריאות פתוחות"
+          title="קריאות שירות פתוחות"
           value={kpis.openTicketCount}
           accent="warning"
           icon="wrench"
+          muted={kpis.openTicketCount === 0}
         />
         <KpiCard
-          title="אישורים ממתינים"
-          value={kpis.pendingApprovalCount}
-          accent="violet"
-          icon="shield"
+          title="לידים פתוחים"
+          value={kpis.openLeads}
+          accent="blue"
+          icon="users"
+          muted={kpis.openLeads === 0}
         />
         <KpiCard
-          title="השלמת שלבי קורס"
-          value={
-            kpis.courseCompletion.completionPercent === null
-              ? "טרם נמדד"
-              : `${kpis.courseCompletion.completionPercent}%`
-          }
-          accent="cyan"
+          title="שלבים ממתינים לבדיקת מדריך"
+          value={kpis.courseCompletion.awaitingInstructor}
+          accent="warning"
           icon="graduation"
+          muted={kpis.courseCompletion.awaitingInstructor === 0}
         />
       </div>
+
+      <details className="os-more-metrics" data-testid="command-more-metrics">
+        <summary>מדדים נוספים ותובנות</summary>
+        <div className="os-more-metrics__grid">
+          <div className="os-more-metrics__item">
+            <span>שווי צבר פתוח</span>
+            <span className="os-num">{ils(kpis.pipeline.openValue)}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>הכנסות מאושרות</span>
+            <span className="os-num">{ils(kpis.pipeline.approvedValue)}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>השלמת שלבי קורס</span>
+            <span className="os-num">
+              {kpis.courseCompletion.completionPercent === null
+                ? "טרם נמדד"
+                : `${kpis.courseCompletion.completionPercent}%`}
+            </span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>תלמידים חסומים / זקוקים לעזרה</span>
+            <span className="os-num">{kpis.courseCompletion.blockedStudents}</span>
+          </div>
+        </div>
+      </details>
 
       {/* W8-E — management band (Phase 8.13): derived attention items, click-through */}
       <ManagementBand />
