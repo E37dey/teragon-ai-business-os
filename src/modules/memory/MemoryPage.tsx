@@ -12,6 +12,7 @@ import {
   Panel,
   SearchInput,
   SectionTitle,
+  Tabs,
   useToast,
 } from "@/design-system";
 import { PageRail } from "@/app/rail";
@@ -226,6 +227,7 @@ export default function MemoryPage(): ReactElement {
   const [layer, setLayer] = useState<MemoryLayer | null>(null);
   const [folder, setFolder] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [centerTab, setCenterTab] = useState<"list" | "graph">("list");
   const [busy, setBusy] = useState(false);
 
   const recordsQ = useCollection<MemoryRecord | MemoryRecordV2>("memoryRecords");
@@ -400,49 +402,68 @@ export default function MemoryPage(): ReactElement {
         </div>
       </div>
 
-      {/* metrics — ALL derived */}
+      {/* VC-E: four primary KPIs only — each drives the human-approval workflow
+          (governance state). Zero stays neutral (0 is not success and not
+          attention → muted). Passive totals move to "מדדים נוספים". */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-          gap: "var(--os-space-3)",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: "var(--os-space-4)",
         }}
         data-testid="memory-metrics"
       >
         <KpiCard
-          title="פריטים מאושרים"
-          value={metrics.approvedRecords}
-          accent="cyan"
-          icon="memory"
-        />
-        <KpiCard
           title="הצעות ממתינות"
           value={metrics.pendingProposals}
-          accent="violet"
+          accent="warning"
           icon="shield"
-        />
-        <KpiCard title="קישורים" value={metrics.totalLinks} accent="blue" icon="network" />
-        <KpiCard
-          title="קישורים לא פתורים"
-          value={metrics.unresolvedLinks}
-          accent={metrics.unresolvedLinks > 0 ? "warning" : "success"}
-          icon="alert"
-        />
-        <KpiCard
-          title="סתירות פתוחות"
-          value={metrics.openConflicts}
-          accent={metrics.openConflicts > 0 ? "danger" : "success"}
-          icon="alert"
+          muted={metrics.pendingProposals === 0}
         />
         <KpiCard
           title="סקירות שהגיע זמנן"
           value={metrics.reviewsDue}
           accent="warning"
           icon="clock"
+          muted={metrics.reviewsDue === 0}
         />
-        <KpiCard title="ייבואים היום" value={metrics.importsToday} accent="blue" icon="inbox" />
-        <KpiCard title="שימושי AI היום" value={metrics.aiUsesToday} accent="success" icon="brain" />
+        <KpiCard
+          title="קישורים לא פתורים"
+          value={metrics.unresolvedLinks}
+          accent="warning"
+          icon="alert"
+          muted={metrics.unresolvedLinks === 0}
+        />
+        <KpiCard
+          title="סתירות פתוחות"
+          value={metrics.openConflicts}
+          accent="danger"
+          icon="alert"
+          muted={metrics.openConflicts === 0}
+        />
       </div>
+
+      <details data-testid="memory-more-metrics" className="os-more-metrics">
+        <summary>מדדים נוספים</summary>
+        <div className="os-more-metrics__grid">
+          <div className="os-more-metrics__item">
+            <span>פריטים מאושרים</span>
+            <span className="os-num">{metrics.approvedRecords}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>קישורים</span>
+            <span className="os-num">{metrics.totalLinks}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>ייבואים היום</span>
+            <span className="os-num">{metrics.importsToday}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>שימושי AI היום</span>
+            <span className="os-num">{metrics.aiUsesToday}</span>
+          </div>
+        </div>
+      </details>
 
       {/* workspace: browser (right) · list+graph (center) · note (left) */}
       <div
@@ -535,10 +556,19 @@ export default function MemoryPage(): ReactElement {
           </div>
         </Panel>
 
-        {/* list + graph */}
-        <div style={stack("var(--os-space-4)")}>
-          <Panel variant="panel" style={{ padding: "var(--os-space-4)" }}>
-            <SectionTitle title={`פריטי זיכרון (${visible.length})`} icon="memory" />
+        {/* list · graph — one surface; reading (list) is the default focus,
+            the graph lives behind a tab so it never dominates normal reading */}
+        <Panel variant="panel" style={{ padding: "var(--os-space-4)" }}>
+          <Tabs
+            ariaLabel="תצוגת פריטי זיכרון"
+            activeId={centerTab}
+            onChange={(id) => setCenterTab(id as "list" | "graph")}
+            items={[
+              { id: "list", label: `פריטים (${visible.length})` },
+              { id: "graph", label: "גרף קישורים", badge: graph.unresolvedCount || undefined },
+            ]}
+          />
+          {centerTab === "list" ? (
             <div style={{ marginBlockStart: "var(--os-space-3)", ...stack("var(--os-space-2)") }}>
               <SearchInput
                 value={query}
@@ -586,23 +616,25 @@ export default function MemoryPage(): ReactElement {
                 )}
               </div>
             </div>
-          </Panel>
-
-          <Panel variant="panel" style={{ padding: "var(--os-space-4)" }}>
-            <SectionTitle
-              title="גרף קישורים"
-              subtitle={`${graph.edges.length} קישורים פתורים · ${graph.unresolvedCount} לא פתורים`}
-              icon="network"
-            />
-            <div style={{ marginBlockStart: "var(--os-space-3)" }}>
+          ) : (
+            <div style={{ marginBlockStart: "var(--os-space-3)" }} data-testid="memory-graph-tab">
+              <div
+                style={{
+                  color: "var(--os-text-2)",
+                  fontSize: "var(--os-text-2xs, 11px)",
+                  marginBlockEnd: "var(--os-space-2)",
+                }}
+              >
+                {graph.edges.length} קישורים פתורים · {graph.unresolvedCount} לא פתורים
+              </div>
               <LinkGraphView
                 graph={graph}
                 selectedId={selected?.id ?? null}
                 onSelect={setSelectedId}
               />
             </div>
-          </Panel>
-        </div>
+          )}
+        </Panel>
 
         {/* selected note */}
         <Panel variant="panel" style={{ padding: "var(--os-space-4)" }}>
