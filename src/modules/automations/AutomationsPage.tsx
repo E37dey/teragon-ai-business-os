@@ -7,6 +7,7 @@ import { useState } from "react";
 import type { CSSProperties, ReactElement } from "react";
 import {
   DataTable,
+  Drawer,
   EmptyState,
   KpiCard,
   OsButton,
@@ -79,6 +80,8 @@ export default function AutomationsPage(): ReactElement {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [envelopes, setEnvelopes] = useState<Record<string, AIResponseEnvelopeV2>>({});
   const [busy, setBusy] = useState(false);
+  // VC-E: full run history + usage live in a drawer (secondary disclosure)
+  const [runsOpen, setRunsOpen] = useState(false);
 
   const automationsQ = useCollection<Automation>("automations");
   const runsQ = useCollection<AutomationRun>("automationRuns");
@@ -191,11 +194,16 @@ export default function AutomationsPage(): ReactElement {
   }
 
   const enabledCount = automations.filter((a) => a.enabled).length;
+  const disabledCount = automations.length - enabledCount;
+  const requiresApprovalCount = automations.filter((a) => a.requiresApproval).length;
   const totalRuns = runs.length;
   const failedRuns = runs.filter((r) => r.outcome === "כישלון").length;
+  const succeededRuns = runs.filter((r) => r.outcome === "הצלחה").length;
   const pendingAutoApprovals = approvals.filter(
     (a) => a.status === "ממתין" && a.subjectRef.startsWith("automation:"),
   ).length;
+  const selectedFailedRuns = selectedRuns.filter((r) => r.outcome === "כישלון").length;
+  const lastRun = selectedRuns[0] ?? null;
 
   const runCols: DataTableColumn<AutomationRun>[] = [
     { key: "id", header: "ריצה", render: (r) => <span className="os-ltr">{r.id}</span> },
@@ -229,7 +237,7 @@ export default function AutomationsPage(): ReactElement {
                 color: "var(--os-text-2)",
               }}
             >
-              תמונת מצב
+              דורש תשומת לב
             </div>
             <div
               style={{
@@ -240,18 +248,28 @@ export default function AutomationsPage(): ReactElement {
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>אוטומציות פעילות</span>
-                <span className="os-num">
-                  {enabledCount}/{automations.length}
+                <span>בקשות אישור פתוחות</span>
+                <span
+                  className="os-num"
+                  style={{
+                    color: pendingAutoApprovals > 0 ? "var(--os-warning, #E7A93D)" : undefined,
+                    fontWeight: pendingAutoApprovals > 0 ? 600 : undefined,
+                  }}
+                >
+                  {pendingAutoApprovals}
                 </span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>ריצות שנרשמו</span>
-                <span className="os-num">{totalRuns}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>אישורי הרצה ממתינים</span>
-                <span className="os-num">{pendingAutoApprovals}</span>
+                <span>ריצות כושלות</span>
+                <span
+                  className="os-num"
+                  style={{
+                    color: failedRuns > 0 ? "var(--os-danger, #EC5D68)" : undefined,
+                    fontWeight: failedRuns > 0 ? 600 : undefined,
+                  }}
+                >
+                  {failedRuns}
+                </span>
               </div>
             </div>
           </div>
@@ -279,23 +297,56 @@ export default function AutomationsPage(): ReactElement {
         </div>
       </div>
 
+      {/* VC-E: ≤4 quiet KPIs — current state + pending approvals. Semantic
+          color ONLY when action is required (pending/failed > 0); state counts
+          stay neutral. Zero is neither success nor attention. */}
       <div
+        data-testid="automations-metrics"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
           gap: "var(--os-space-3)",
         }}
       >
-        <KpiCard title="אוטומציות" value={automations.length} accent="blue" icon="gear" />
-        <KpiCard title="פעילות" value={enabledCount} accent="success" icon="check" />
-        <KpiCard title="ריצות" value={totalRuns} accent="cyan" icon="clock" />
+        <KpiCard title="אוטומציות פעילות" value={enabledCount} icon="gear" muted />
         <KpiCard
-          title="כישלונות"
-          value={failedRuns}
-          accent={failedRuns > 0 ? "danger" : "success"}
-          icon="alert"
+          title="אישורי הרצה ממתינים"
+          value={pendingAutoApprovals}
+          accent="warning"
+          icon="clock"
+          muted={pendingAutoApprovals === 0}
         />
+        <KpiCard
+          title="ריצות שנכשלו"
+          value={failedRuns}
+          accent="danger"
+          icon="alert"
+          muted={failedRuns === 0}
+        />
+        <KpiCard title="דורשות אישור אנושי" value={requiresApprovalCount} icon="shield" muted />
       </div>
+
+      <details data-testid="automations-more-metrics" className="os-more-metrics">
+        <summary>מדדים נוספים</summary>
+        <div className="os-more-metrics__grid">
+          <div className="os-more-metrics__item">
+            <span>סך אוטומציות</span>
+            <span className="os-num">{automations.length}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>אוטומציות מושבתות</span>
+            <span className="os-num">{disabledCount}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>סך ריצות שנרשמו</span>
+            <span className="os-num">{totalRuns}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>ריצות שהצליחו</span>
+            <span className="os-num">{succeededRuns}</span>
+          </div>
+        </div>
+      </details>
 
       <div
         style={{
@@ -366,39 +417,72 @@ export default function AutomationsPage(): ReactElement {
         <div style={stack("var(--os-space-4)")}>
           {selected ? (
             <>
+              {/* PRIMARY — current state action: pending approvals + request execution */}
               <Panel variant="panel" style={{ padding: "var(--os-space-4)" }}>
                 <SectionTitle
-                  title={`ריצות: ${selected.name}`}
-                  subtitle="כל ריצה עם התוצאה ויומן הצעדים שנשמרו"
-                  icon="clock"
+                  title="הרצה ואישורים"
+                  subtitle="פעולה חיצונית מבוצעת רק לאחר אישור; הביצוע יוצר רשומות משימה ופעילות"
+                  icon="shield"
                 />
-                <div style={{ marginBlockStart: "var(--os-space-3)" }}>
-                  <DataTable
-                    columns={runCols}
-                    rows={selectedRuns}
-                    rowKey="id"
-                    emptyText="אין ריצות"
-                    emptyReason="לאוטומציה זו לא נרשמו ריצות עדיין."
-                  />
-                  {selectedRuns.length > 0 && (
-                    <div
-                      style={{
-                        marginBlockStart: "var(--os-space-3)",
-                        display: "grid",
-                        gap: 4,
-                        fontSize: "var(--os-text-2xs, 11px)",
-                        color: "var(--os-text-2)",
-                      }}
+                <div
+                  style={{ ...stack("var(--os-space-3)"), marginBlockStart: "var(--os-space-3)" }}
+                >
+                  <div style={{ display: "flex", gap: "var(--os-space-2)", flexWrap: "wrap" }}>
+                    {selected.requiresApproval || hasExternalStep(selected) ? (
+                      busy || !executionGate.allowed ? (
+                        <OsButton
+                          variant="primary"
+                          disabled
+                          disabledReason={executionGate.reasonHe ?? "בקשה נשלחת…"}
+                          data-testid="request-run-approval-blocked"
+                        >
+                          בקש אישור להרצה
+                        </OsButton>
+                      ) : (
+                        <OsButton
+                          variant="primary"
+                          icon="shield"
+                          onClick={() => void requestExecution()}
+                          data-testid="request-run-approval"
+                        >
+                          בקש אישור להרצה
+                        </OsButton>
+                      )
+                    ) : (
+                      <OsButton
+                        variant="primary"
+                        disabled
+                        disabledReason="אוטומציה פנימית רצה לפי הטריגר המוגדר; הרצה ידנית של אוטומציה פנימית אינה נתמכת עדיין"
+                      >
+                        הרץ עכשיו
+                      </OsButton>
+                    )}
+                    <OsButton
+                      variant="ghost"
+                      disabled
+                      disabledReason="שליחה חיצונית אמיתית (מייל/SMS/רשת) אינה נתמכת במצב הדגמה המקומי"
                     >
-                      <strong style={{ color: "var(--os-text)" }}>
-                        יומן הצעדים של הריצה האחרונה:
-                      </strong>
-                      {(selectedRuns[0]?.stepsLog ?? []).map((s, i) => (
-                        <div key={i}>
-                          <span className="os-num">{i + 1}.</span> {s}
-                        </div>
-                      ))}
+                      שליחה חיצונית אמיתית
+                    </OsButton>
+                  </div>
+                  {selectedApprovals.length === 0 ? (
+                    <div style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-muted)" }}>
+                      אין בקשות אישור לאוטומציה זו עדיין
                     </div>
+                  ) : (
+                    selectedApprovals.map((a) => {
+                      const rid = approvalRunId(a);
+                      return rid ? (
+                        <ApprovalPanel
+                          key={a.id}
+                          runId={rid}
+                          approvalId={a.id}
+                          onChanged={() =>
+                            void invalidate(["approvals", "tasks", "activities", "auditEvents"])
+                          }
+                        />
+                      ) : null;
+                    })
                   )}
                 </div>
               </Panel>
@@ -476,72 +560,54 @@ export default function AutomationsPage(): ReactElement {
                 </div>
               </Panel>
 
-              <Panel variant="panel" style={{ padding: "var(--os-space-4)" }}>
-                <SectionTitle
-                  title="הרצה ואישורים"
-                  subtitle="פעולה חיצונית מבוצעת רק לאחר אישור; הביצוע יוצר רשומות משימה ופעילות"
-                  icon="shield"
-                />
+              {/* SECONDARY — run + usage glance; full history & step log in the drawer */}
+              <Panel variant="raised" style={{ padding: "var(--os-space-4)" }}>
                 <div
-                  style={{ ...stack("var(--os-space-3)"), marginBlockStart: "var(--os-space-3)" }}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: "var(--os-space-3)",
+                    flexWrap: "wrap",
+                  }}
                 >
-                  <div style={{ display: "flex", gap: "var(--os-space-2)", flexWrap: "wrap" }}>
-                    {selected.requiresApproval || hasExternalStep(selected) ? (
-                      busy || !executionGate.allowed ? (
-                        <OsButton
-                          variant="primary"
-                          disabled
-                          disabledReason={executionGate.reasonHe ?? "בקשה נשלחת…"}
-                          data-testid="request-run-approval-blocked"
-                        >
-                          בקש אישור להרצה
-                        </OsButton>
-                      ) : (
-                        <OsButton
-                          variant="primary"
-                          icon="shield"
-                          onClick={() => void requestExecution()}
-                          data-testid="request-run-approval"
-                        >
-                          בקש אישור להרצה
-                        </OsButton>
-                      )
-                    ) : (
-                      <OsButton
-                        variant="primary"
-                        disabled
-                        disabledReason="אוטומציה פנימית רצה לפי הטריגר המוגדר; הרצה ידנית של אוטומציה פנימית אינה נתמכת עדיין"
-                      >
-                        הרץ עכשיו
-                      </OsButton>
+                  <SectionTitle
+                    title="ריצות ושימוש"
+                    subtitle="סקירה קצרה — ההיסטוריה המלאה ויומן הצעדים בנפרד"
+                    icon="clock"
+                  />
+                  <OsButton
+                    variant="ghost"
+                    size="sm"
+                    icon="clock"
+                    onClick={() => setRunsOpen(true)}
+                    data-testid="open-run-history"
+                  >
+                    היסטוריית ריצות מלאה
+                  </OsButton>
+                </div>
+                <div
+                  style={{
+                    marginBlockStart: "var(--os-space-3)",
+                    fontSize: "var(--os-text-sm, 13px)",
+                    color: "var(--os-text-2)",
+                    display: "grid",
+                    gap: 4,
+                  }}
+                >
+                  <div>
+                    <span className="os-num">{selectedRuns.length}</span> ריצות ·{" "}
+                    <span className="os-num">{selectedFailedRuns}</span> נכשלו
+                    {lastRun && (
+                      <>
+                        {" · אחרונה "}
+                        <span className="os-num">{dateTimeHe(lastRun.startedAt)}</span>
+                      </>
                     )}
-                    <OsButton
-                      variant="ghost"
-                      disabled
-                      disabledReason="שליחה חיצונית אמיתית (מייל/SMS/רשת) אינה נתמכת במצב הדגמה המקומי"
-                    >
-                      שליחה חיצונית אמיתית
-                    </OsButton>
                   </div>
-                  {selectedApprovals.length === 0 ? (
-                    <div style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-muted)" }}>
-                      אין בקשות אישור לאוטומציה זו עדיין
-                    </div>
-                  ) : (
-                    selectedApprovals.map((a) => {
-                      const rid = approvalRunId(a);
-                      return rid ? (
-                        <ApprovalPanel
-                          key={a.id}
-                          runId={rid}
-                          approvalId={a.id}
-                          onChanged={() =>
-                            void invalidate(["approvals", "tasks", "activities", "auditEvents"])
-                          }
-                        />
-                      ) : null;
-                    })
-                  )}
+                  <div style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-muted)" }}>
+                    כל הריצות רשומות כ«ריצת מתזמן — ללא מעטפת AI»; השימוש אינו נמדד במצב הדגמה מקומי.
+                  </div>
                 </div>
               </Panel>
             </>
@@ -550,6 +616,47 @@ export default function AutomationsPage(): ReactElement {
           )}
         </div>
       </div>
+
+      {selected && (
+        <Drawer
+          open={runsOpen}
+          onClose={() => setRunsOpen(false)}
+          title={`היסטוריית ריצות ושימוש — ${selected.name}`}
+        >
+          <div style={stack("var(--os-space-4)")}>
+            <DataTable
+              columns={runCols}
+              rows={selectedRuns}
+              rowKey="id"
+              emptyText="אין ריצות"
+              emptyReason="לאוטומציה זו לא נרשמו ריצות עדיין."
+            />
+            {selectedRuns.length > 0 && (
+              <div
+                style={{
+                  display: "grid",
+                  gap: 4,
+                  fontSize: "var(--os-text-2xs, 11px)",
+                  color: "var(--os-text-2)",
+                }}
+              >
+                <strong style={{ color: "var(--os-text)" }}>
+                  יומן הצעדים של הריצה האחרונה:
+                </strong>
+                {(selectedRuns[0]?.stepsLog ?? []).map((s, i) => (
+                  <div key={i}>
+                    <span className="os-num">{i + 1}.</span> {s}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-muted)" }}>
+              שימוש: אינו נמדד — הריצות הן ריצות מתזמן דטרמיניסטיות ללא קריאת ספק AI, ולכן אין
+              נתוני טוקנים או עלות להצגה.
+            </div>
+          </div>
+        </Drawer>
+      )}
     </div>
   );
 }
