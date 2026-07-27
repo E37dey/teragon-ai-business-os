@@ -191,6 +191,7 @@ export default function OrganizationsPage(): ReactElement {
   const totalRevenue = engagements.reduce((s, e) => s + e.revenue, 0);
   const linkedCustomers = engagements.reduce((s, e) => s + e.customers, 0);
   const fleetSize = engagements.reduce((s, e) => s + e.printers, 0);
+  const totalEnrollments = engagements.reduce((s, e) => s + e.enrollments, 0);
 
   const selected = orgs.find((o) => o.id === selectedId) ?? null;
 
@@ -236,7 +237,8 @@ export default function OrganizationsPage(): ReactElement {
         e.openItems > 0 ? (
           <StatusChip status="אזהרה" label={`${e.openItems} פתוחים`} />
         ) : (
-          <StatusChip status="הושלם" label="אין פתוחים" />
+          // 0 open is a neutral state, not "completed" — plain muted text, no green chip.
+          <span style={{ color: "var(--os-muted)" }}>אין פתוחים</span>
         ),
     },
     {
@@ -264,24 +266,36 @@ export default function OrganizationsPage(): ReactElement {
         }
       />
 
-      <div style={kpiRowStyle}>
-        <KpiCard title="ארגונים" value={orgs.length} accent="cyan" icon="building" />
-        <KpiCard title="לקוחות מקושרים" value={linkedCustomers} accent="blue" icon="users" />
-        <KpiCard title="מדפסות בציי ארגונים" value={fleetSize} accent="violet" icon="printer" />
+      {/* VC-D: ≤4 quiet KPIs. Registry counts are neutral (muted) — a total is
+          neither success nor attention, so no per-KPI color and no glow. Only
+          "פריטים פתוחים" carries amber, and only when there is something to act
+          on (0 stays neutral). Passive totals move to "מדדים נוספים". */}
+      <div style={kpiRowStyle} data-testid="organizations-metrics">
+        <KpiCard title="ארגונים" value={orgs.length} icon="building" muted />
+        <KpiCard title="לקוחות מקושרים" value={linkedCustomers} icon="users" muted />
+        <KpiCard title="מדפסות בציי ארגונים" value={fleetSize} icon="printer" muted />
         <KpiCard
           title="פריטים פתוחים"
           value={totalOpen}
           accent="warning"
           icon="alert"
-          glow={totalOpen > 0}
-        />
-        <KpiCard
-          title="הכנסות מארגונים"
-          value={`₪${totalRevenue.toLocaleString("he-IL")}`}
-          accent="success"
-          icon="briefcase"
+          muted={totalOpen === 0}
         />
       </div>
+
+      <details className="os-more-metrics" data-testid="organizations-more-metrics">
+        <summary>מדדים נוספים</summary>
+        <div className="os-more-metrics__grid">
+          <div className="os-more-metrics__item">
+            <span>הכנסות מארגונים</span>
+            <span className="os-num">₪{totalRevenue.toLocaleString("he-IL")}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>קבוצות הדרכה (רישומי קורס)</span>
+            <span className="os-num">{totalEnrollments}</span>
+          </div>
+        </div>
+      </details>
 
       <div style={{ display: "flex", gap: "var(--os-space-4)" }}>
         <select
@@ -363,7 +377,7 @@ function OrgsRail({
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {e.org.name}
             </span>
-            <span className="os-num" style={{ color: "var(--os-success)" }}>
+            <span className="os-num" style={{ color: "var(--os-muted)" }}>
               ₪{e.revenue.toLocaleString("he-IL")}
             </span>
           </div>
