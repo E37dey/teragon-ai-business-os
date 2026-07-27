@@ -1,7 +1,7 @@
 // Wave 3 — ניהול לקוחות ולידים (/crm): TanStack Table over the real leads
 // collection — sorting, filtering, saved views, pagination, row expansion,
 // create + owner assignment + status updates, all persisted via repositories.
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { CSSProperties, ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -15,6 +15,7 @@ import {
 } from "@tanstack/react-table";
 import {
   DataTable,
+  Drawer,
   EmptyState,
   KpiCard,
   Modal,
@@ -51,6 +52,7 @@ import {
   type LeadFilters,
 } from "./selectors";
 import { loadSavedViews, saveSavedViews, type SavedView } from "./savedViews";
+import "./crm.css";
 
 const LEAD_STATUSES: readonly LeadStatus[] = [
   "חדש",
@@ -316,18 +318,30 @@ export default function CrmPage(): ReactElement {
 
   const leads = useMemo(() => leadsQ.data ?? [], [leadsQ.data]);
   const users = useMemo(() => usersQ.data ?? [], [usersQ.data]);
-  const customers = customersQ.data ?? [];
+  const customers = useMemo(() => customersQ.data ?? [], [customersQ.data]);
   const today = todayIso();
 
   const [tab, setTab] = useState<"leads" | "customers">("leads");
   const [filters, setFilters] = useState<LeadFilters>(EMPTY_FILTERS);
   const [sorting, setSorting] = useState<SortingState>([{ id: "followUp", desc: false }]);
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [views, setViews] = useState<SavedView[]>(() => loadSavedViews());
   const [activeView, setActiveView] = useState<string>("");
   const [createKind, setCreateKind] = useState<"lead" | "customer" | null>(null);
   const [createErrors, setCreateErrors] = useState<Record<string, string>>({});
   const [statusLead, setStatusLead] = useState<Lead | null>(null);
+  // selected record + on-demand detail drawers (progressive disclosure —
+  // detail/activity are never a permanent panel). Store ids so the open
+  // drawer always reflects the live record after an update.
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const detailLead = useMemo(
+    () => leads.find((l) => l.id === selectedLeadId) ?? null,
+    [leads, selectedLeadId],
+  );
+  const detailCustomer = useMemo(
+    () => customers.find((c) => c.id === selectedCustomerId) ?? null,
+    [customers, selectedCustomerId],
+  );
 
   const filtered = useMemo(() => filterLeads(leads, filters), [leads, filters]);
   const sources = useMemo(() => leadSources(leads), [leads]);
@@ -336,87 +350,50 @@ export default function CrmPage(): ReactElement {
   const aging = useMemo(() => agingAlerts(leads, today), [leads, today]);
   const hottest = useMemo(() => hottestLeads(leads), [leads]);
   const pipeline = useMemo(() => funnelDistribution(leads), [leads]);
+  const openLeads = useMemo(
+    () => leads.filter((l) => l.status !== "נסגר כלקוח" && l.status !== "לא רלוונטי").length,
+    [leads],
+  );
+
+  // owner reassignment is a SECONDARY action — it lives in the detail drawer,
+  // not as a permanent control in every row.
+  const assignOwner = async (lead: Lead, ownerId: string): Promise<void> => {
+    try {
+      await getRepository<Lead>("leads").update(lead.id, {
+        ownerId,
+        updatedAt: new Date().toISOString(),
+      });
+      await invalidate(["leads"]);
+      toast(
+        `«${lead.name}» הועבר לבעלות ${users.find((u) => u.id === ownerId)?.name ?? ownerId}`,
+        "success",
+      );
+    } catch {
+      toast("שינוי הבעלות נכשל — נסו שוב", "danger");
+    }
+  };
 
   const columns = useMemo(() => {
-    const assignOwner = async (lead: Lead, ownerId: string): Promise<void> => {
-      try {
-        await getRepository<Lead>("leads").update(lead.id, {
-          ownerId,
-          updatedAt: new Date().toISOString(),
-        });
-        await invalidate(["leads"]);
-        toast(
-          `«${lead.name}» הועבר לבעלות ${users.find((u) => u.id === ownerId)?.name ?? ownerId}`,
-          "success",
-        );
-      } catch {
-        toast("שינוי הבעלות נכשל — נסו שוב", "danger");
-      }
-    };
-
     return [
-      columnHelper.display({
-        id: "expand",
-        header: () => "",
-        cell: ({ row }) => (
-          <button
-            type="button"
-            className="os-header__iconbtn"
-            aria-expanded={expanded.has(row.original.id)}
-            aria-label={`הצגת היסטוריית הליד ${row.original.name}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              setExpanded((prev) => {
-                const next = new Set(prev);
-                if (next.has(row.original.id)) next.delete(row.original.id);
-                else next.add(row.original.id);
-                return next;
-              });
-            }}
-            style={{ inlineSize: 24, blockSize: 24 }}
-          >
-            {expanded.has(row.original.id) ? "−" : "+"}
-          </button>
-        ),
-      }),
       columnHelper.accessor("name", { header: "שם" }),
       columnHelper.accessor("status", {
         header: "סטטוס",
+        // status must be scanned across rows ⇒ a display-only chip (updating it
+        // is a secondary action, moved into the row's detail drawer).
         cell: ({ row }) => {
           const { chip, label } = leadChip(row.original.status);
-          return (
-            <button
-              type="button"
-              onClick={() => setStatusLead(row.original)}
-              style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}
-              aria-label={`עדכון סטטוס לליד ${row.original.name}`}
-            >
-              <StatusChip status={chip} label={label} />
-            </button>
-          );
+          return <StatusChip status={chip} label={label} />;
         },
       }),
       columnHelper.accessor("ownerId", {
         header: "בעלים",
-        cell: ({ row }) => (
-          <select
-            style={selStyle}
-            value={row.original.ownerId}
-            aria-label={`בעלות על הליד ${row.original.name}`}
-            onChange={(e) => void assignOwner(row.original, e.target.value)}
-          >
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </select>
-        ),
+        cell: ({ row }) => users.find((u) => u.id === row.original.ownerId)?.name ?? row.original.ownerId,
       }),
       columnHelper.accessor("source", { header: "מקור" }),
       columnHelper.accessor("interest", { header: "תחום עניין" }),
       columnHelper.accessor("followUp", {
         header: "מעקב הבא",
+        // amber ONLY when action is required (past the follow-up date).
         cell: (c) => (
           <span
             className="os-num"
@@ -431,7 +408,7 @@ export default function CrmPage(): ReactElement {
         cell: (c) => <span className="os-num">{dateHe(c.getValue())}</span>,
       }),
     ];
-  }, [users, expanded, today, invalidate, toast]);
+  }, [users, today]);
 
   const table = useReactTable({
     data: filtered,
@@ -597,28 +574,50 @@ export default function CrmPage(): ReactElement {
         </div>
       </div>
 
+      {/* VC-C: 4 quiet primary KPIs that drive the workflow. Neutral by default;
+          amber only where action is required (overdue follow-ups); zero is never
+          success and never attention (muted). Passive analytics → "מדדים נוספים". */}
       <div
+        data-testid="crm-metrics"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
           gap: "var(--os-space-3)",
         }}
       >
+        <KpiCard title="לידים פתוחים" value={openLeads} icon="users" muted />
+        <KpiCard title="חדשים השבוע" value={weekNew} icon="plus" muted />
         <KpiCard
-          title="לידים פתוחים"
-          value={leads.filter((l) => l.status !== "נסגר כלקוח" && l.status !== "לא רלוונטי").length}
-          accent="blue"
-          icon="users"
+          title="חצו מועד מעקב"
+          value={aging.length}
+          accent="warning"
+          icon="alert"
+          muted={aging.length === 0}
         />
-        <KpiCard title="חדשים השבוע" value={weekNew} accent="cyan" icon="plus" />
-        <KpiCard title="חצו מועד מעקב" value={aging.length} accent="warning" icon="alert" />
-        <KpiCard
-          title="אחוז המרה (הוכרעו)"
-          value={conversion === null ? "טרם נמדד" : `${conversion}%`}
-          accent="success"
-          icon="target"
-        />
+        <KpiCard title="לידים חמים" value={hottest.length} icon="target" muted />
       </div>
+
+      <details data-testid="crm-more-metrics" className="os-more-metrics">
+        <summary>מדדים נוספים</summary>
+        <div className="os-more-metrics__grid">
+          <div className="os-more-metrics__item">
+            <span>אחוז המרה (הוכרעו)</span>
+            <span className="os-num">{conversion === null ? "טרם נמדד" : `${conversion}%`}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>סה״כ לידים</span>
+            <span className="os-num">{leads.length}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>סה״כ לקוחות</span>
+            <span className="os-num">{customers.length}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>מקורות פעילים</span>
+            <span className="os-num">{sources.length}</span>
+          </div>
+        </div>
+      </details>
 
       <Tabs
         ariaLabel="לידים או לקוחות"
@@ -757,47 +756,27 @@ export default function CrmPage(): ReactElement {
                     </tr>
                   ) : (
                     table.getRowModel().rows.map((row) => (
-                      <Fragment key={row.id}>
-                        <tr>
-                          {row.getVisibleCells().map((cell) => (
-                            <td key={cell.id}>
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </td>
-                          ))}
-                        </tr>
-                        {expanded.has(row.original.id) && (
-                          <tr>
-                            <td
-                              colSpan={columns.length}
-                              style={{ background: "var(--os-highlight)" }}
-                            >
-                              <div
-                                style={{
-                                  display: "grid",
-                                  gap: 4,
-                                  padding: "var(--os-space-3)",
-                                  fontSize: "var(--os-text-2xs, 12px)",
-                                  color: "var(--os-text-2)",
-                                }}
-                              >
-                                <strong style={{ color: "var(--os-text)" }}>
-                                  היסטוריית פעילות — {row.original.name}
-                                </strong>
-                                {row.original.history.length === 0 ? (
-                                  <span>אין רשומות היסטוריה לליד זה.</span>
-                                ) : (
-                                  row.original.history.map((h, i) => (
-                                    <div key={i}>
-                                      <span className="os-num">{dateHe(h.date)}</span> · {h.text}
-                                    </div>
-                                  ))
-                                )}
-                                {row.original.notes && <div>הערות: {row.original.notes}</div>}
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
+                      <tr
+                        key={row.id}
+                        className={`os-table__row--clickable crm-lead-row${
+                          selectedLeadId === row.original.id ? " is-selected" : ""
+                        }`}
+                        tabIndex={0}
+                        aria-label={`פתיחת פרטי הליד ${row.original.name}`}
+                        onClick={() => setSelectedLeadId(row.original.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelectedLeadId(row.original.id);
+                          }
+                        }}
+                      >
+                        {row.getVisibleCells().map((cell) => (
+                          <td key={cell.id}>
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </td>
+                        ))}
+                      </tr>
                     ))
                   )}
                 </tbody>
@@ -845,11 +824,12 @@ export default function CrmPage(): ReactElement {
         </Panel>
       ) : (
         <Panel variant="panel" style={{ padding: "var(--os-space-5)" }}>
-          <SectionTitle title="לקוחות" subtitle="לחיצה על שורה פותחת את כרטיס הלקוח (360°)" />
+          <SectionTitle title="לקוחות" subtitle="לחיצה על שורה פותחת תצוגת לקוח מהירה — הכרטיס המלא (360°) לפי דרישה" />
           <DataTable<Customer>
             rows={customers}
             rowKey="id"
-            onRowClick={(c) => void navigate(`/customers/${c.id}`)}
+            onRowClick={(c) => setSelectedCustomerId(c.id)}
+            rowClassName={(c) => (selectedCustomerId === c.id ? "crm-row--selected" : "")}
             emptyText="אין לקוחות להצגה"
             emptyReason="טרם נוצרו לקוחות במערכת."
             columns={[
@@ -917,6 +897,140 @@ export default function CrmPage(): ReactElement {
         />
       )}
       {statusLead && <StatusModal lead={statusLead} onClose={() => setStatusLead(null)} />}
+
+      {/* Lead detail — on demand, in a drawer (not a permanent panel). Holds the
+          secondary actions (status update, owner reassignment) and the activity
+          history behind an accordion. */}
+      <Drawer
+        open={detailLead !== null}
+        onClose={() => setSelectedLeadId(null)}
+        title={detailLead ? `ליד — ${detailLead.name}` : "ליד"}
+      >
+        {detailLead && (
+          <>
+            <div className="crm-drawer__field">
+              <span className="crm-drawer__label">סטטוס</span>
+              <span className="crm-drawer__value">
+                <StatusChip
+                  status={leadChip(detailLead.status).chip}
+                  label={leadChip(detailLead.status).label}
+                />
+              </span>
+            </div>
+            <div className="crm-drawer__field">
+              <span className="crm-drawer__label">מקור</span>
+              <span className="crm-drawer__value">{detailLead.source}</span>
+            </div>
+            <div className="crm-drawer__field">
+              <span className="crm-drawer__label">תחום עניין</span>
+              <span className="crm-drawer__value">{detailLead.interest}</span>
+            </div>
+            <div className="crm-drawer__field">
+              <span className="crm-drawer__label">מעקב הבא</span>
+              <span className="crm-drawer__value os-num">{dateHe(detailLead.followUp)}</span>
+            </div>
+            <div className="crm-drawer__field">
+              <label className="crm-drawer__label" htmlFor="crm-drawer-owner">
+                בעלים
+              </label>
+              <select
+                id="crm-drawer-owner"
+                style={selStyle}
+                value={detailLead.ownerId}
+                aria-label={`שיוך בעלים לליד ${detailLead.name}`}
+                onChange={(e) => void assignOwner(detailLead, e.target.value)}
+              >
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <details className="crm-drawer__disclosure">
+              <summary>היסטוריית פעילות ({detailLead.history.length})</summary>
+              <div
+                style={{
+                  display: "grid",
+                  gap: 6,
+                  marginBlockStart: "var(--os-space-3)",
+                  fontSize: "var(--os-text-md, 14px)",
+                  color: "var(--os-text-2)",
+                }}
+              >
+                {detailLead.history.length === 0 ? (
+                  <span>אין רשומות היסטוריה לליד זה.</span>
+                ) : (
+                  detailLead.history.map((h, i) => (
+                    <div key={i}>
+                      <span className="os-num">{dateHe(h.date)}</span> · {h.text}
+                    </div>
+                  ))
+                )}
+                {detailLead.notes && <div>הערות: {detailLead.notes}</div>}
+              </div>
+            </details>
+
+            <div className="crm-drawer__actions">
+              <OsButton onClick={() => setStatusLead(detailLead)}>עדכון סטטוס</OsButton>
+            </div>
+          </>
+        )}
+      </Drawer>
+
+      {/* Customer quick view — summary in a drawer; the full 360° card opens on
+          demand (activity/evidence live there, never a permanent panel here). */}
+      <Drawer
+        open={detailCustomer !== null}
+        onClose={() => setSelectedCustomerId(null)}
+        title={detailCustomer ? `לקוח — ${detailCustomer.name}` : "לקוח"}
+      >
+        {detailCustomer && (
+          <>
+            <div className="crm-drawer__field">
+              <span className="crm-drawer__label">סוג</span>
+              <span className="crm-drawer__value">{detailCustomer.type}</span>
+            </div>
+            <div className="crm-drawer__field">
+              <span className="crm-drawer__label">עיר</span>
+              <span className="crm-drawer__value">{detailCustomer.city}</span>
+            </div>
+            <div className="crm-drawer__field">
+              <span className="crm-drawer__label">הכנסות</span>
+              <span className="crm-drawer__value os-num">
+                {detailCustomer.revenue.toLocaleString("he-IL")} ₪
+              </span>
+            </div>
+            <div className="crm-drawer__field">
+              <span className="crm-drawer__label">מצב קשר</span>
+              <span className="crm-drawer__value">{detailCustomer.contactState}</span>
+            </div>
+
+            <details className="crm-drawer__disclosure">
+              <summary>פעילות ומסמכים</summary>
+              <div
+                style={{
+                  marginBlockStart: "var(--os-space-3)",
+                  fontSize: "var(--os-text-md, 14px)",
+                  color: "var(--os-text-2)",
+                }}
+              >
+                היסטוריית הפעילות, המסמכים והראיות של הלקוח מוצגים בכרטיס הלקוח המלא.
+              </div>
+            </details>
+
+            <div className="crm-drawer__actions">
+              <OsButton
+                variant="cyan"
+                onClick={() => void navigate(`/customers/${detailCustomer.id}`)}
+              >
+                פתח כרטיס לקוח מלא (360°)
+              </OsButton>
+            </div>
+          </>
+        )}
+      </Drawer>
     </div>
   );
 }

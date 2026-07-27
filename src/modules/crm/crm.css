@@ -1,0 +1,72 @@
+/* VC-C — /crm density calm. Scoped to the CRM module only; shared token/
+   component styles are never touched here. One selected-row steel accent,
+   quiet interactions, honest neutral surfaces. */
+
+/* Single steel accent for the ONE selected record (leads + customers tables).
+   Subtle steel-tinted fill + one inline-start accent line — no glow, no
+   colorful row background. */
+.crm-lead-row.is-selected > td,
+.crm-row--selected > td {
+  background: var(--surface-selected);
+}
+.crm-lead-row.is-selected > td:first-child,
+.crm-row--selected > td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent-primary);
+}
+/* keep the selected accent stable under hover (quiet hover elsewhere) */
+.crm-lead-row.is-selected:hover > td,
+.crm-row--selected:hover > td {
+  background: var(--surface-selected);
+}
+
+/* clickable lead rows are keyboard-reachable — calm steel focus ring, no glow */
+.crm-lead-row {
+  cursor: pointer;
+}
+.crm-lead-row:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
+/* Drawer body — readable body text (≥14px), quiet field labels. */
+.crm-drawer__field {
+  display: grid;
+  gap: 2px;
+  margin-block-end: var(--os-space-4);
+  font-size: var(--os-text-md, 14px);
+}
+.crm-drawer__label {
+  font-size: var(--os-text-2xs, 11px);
+  color: var(--text-muted, var(--os-muted));
+}
+.crm-drawer__value {
+  color: var(--text-primary, var(--os-text));
+}
+.crm-drawer__disclosure {
+  border-block-start: 1px solid var(--border-subtle, var(--os-border));
+  padding-block-start: var(--os-space-4);
+  margin-block-start: var(--os-space-2);
+}
+.crm-drawer__disclosure > summary {
+  cursor: pointer;
+  font-size: var(--os-text-md, 14px);
+  color: var(--text-secondary, var(--os-text-2));
+  list-style: none;
+}
+.crm-drawer__disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.crm-drawer__disclosure > summary::before {
+  content: "▸";
+  margin-inline-end: var(--os-space-3);
+  color: var(--text-muted, var(--os-muted));
+}
+.crm-drawer__disclosure[open] > summary::before {
+  content: "▾";
+}
+.crm-drawer__actions {
+  display: flex;
+  gap: var(--os-space-2);
+  flex-wrap: wrap;
+  margin-block-start: var(--os-space-4);
+}
