@@ -22,6 +22,12 @@ export interface KpiCardProps {
   glow?: boolean;
   /** Optional icon from the typed set. */
   icon?: IconName;
+  /**
+   * Neutral tone — render the icon in muted grey with no semantic color.
+   * Use when the value carries no positive/attention meaning right now
+   * (e.g. a zero count: 0 is NOT success and NOT attention).
+   */
+  muted?: boolean;
   className?: string;
 }
 
@@ -38,9 +44,11 @@ export function KpiCard({
   accent = "blue",
   glow = false,
   icon,
+  muted = false,
   className = "",
 }: KpiCardProps): ReactElement {
   const dir = delta == null ? null : delta > 0 ? "up" : delta < 0 ? "down" : "flat";
+  const iconColor = muted ? "var(--text-muted)" : OS_ACCENT_HEX[accent];
 
   return (
     <Panel
@@ -53,7 +61,7 @@ export function KpiCard({
         {icon && (
           <span
             className="os-kpi__icon"
-            style={{ color: OS_ACCENT_HEX[accent] }}
+            style={{ color: iconColor }}
             aria-hidden="true"
           >
             <OsIcon name={icon} size={14} />

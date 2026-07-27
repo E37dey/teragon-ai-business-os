@@ -1519,6 +1519,50 @@
   text-align: center;
 }
 
+/* VC-C+: reusable calm "מדדים נוספים" disclosure — moves analytical totals
+   out of the primary view without deleting them. */
+.os-more-metrics {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--os-radius-md);
+  background: var(--surface-1);
+}
+.os-more-metrics > summary {
+  cursor: pointer;
+  padding: var(--os-space-4) var(--os-space-5);
+  font-size: var(--os-text-sm);
+  color: var(--text-secondary);
+  list-style: none;
+}
+.os-more-metrics > summary::-webkit-details-marker {
+  display: none;
+}
+.os-more-metrics > summary::before {
+  content: "▸";
+  margin-inline-end: var(--os-space-4);
+  color: var(--text-muted);
+}
+.os-more-metrics[open] > summary::before {
+  content: "▾";
+}
+.os-more-metrics__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0 var(--os-space-7);
+  padding: 0 var(--os-space-5) var(--os-space-4);
+}
+.os-more-metrics__item {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--os-space-4);
+  padding: var(--os-space-4) 0;
+  border-block-start: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: var(--os-text-sm);
+}
+.os-more-metrics__item .os-num {
+  color: var(--text-primary);
+}
+
 /* VC-B: inactive Copilot = compact quiet button (violet reserved for ACTIVE) */
 .os-copilot--compact {
   flex-direction: row;

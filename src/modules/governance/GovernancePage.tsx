@@ -562,23 +562,67 @@ export default function GovernancePage(): ReactElement {
         </span>
       </div>
 
+      {/* VC-E: four primary KPIs only (action-driving); zero stays neutral (0 is
+          not success and not attention). Passive totals move to "מדדים נוספים". */}
       <div
         data-testid="governance-metrics"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-          gap: "var(--os-space-3)",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: "var(--os-space-4)",
         }}
       >
-        <KpiCard title="מדיניות פעילה" value={metrics.activePolicies} accent="success" icon="check" />
-        <KpiCard title="ממתינות לבדיקה" value={metrics.pendingPolicies} accent="violet" icon="shield" />
-        <KpiCard title="טיוטות מדיניות" value={metrics.draftPolicies} accent="blue" icon="doc" />
-        <KpiCard title="סיכונים פתוחים" value={metrics.openRisks} accent="warning" icon="alert" />
-        <KpiCard title="תקריות פתוחות" value={metrics.openIncidents} accent="danger" icon="alert" />
-        <KpiCard title="אישורים ממתינים" value={metrics.pendingApprovals} accent="cyan" icon="clock" />
-        <KpiCard title="אירועי ביקורת" value={metrics.auditEvents} accent="blue" icon="book" />
-        <KpiCard title="ממצאי מבקר" value={metrics.findings} accent="warning" icon="gauge" />
+        <KpiCard
+          title="מדיניויות ממתינות לבדיקה"
+          value={metrics.pendingPolicies}
+          accent="warning"
+          icon="shield"
+          muted={metrics.pendingPolicies === 0}
+        />
+        <KpiCard
+          title="סיכונים הדורשים טיפול"
+          value={metrics.openRisks}
+          accent="warning"
+          icon="alert"
+          muted={metrics.openRisks === 0}
+        />
+        <KpiCard
+          title="אירועים פתוחים"
+          value={metrics.openIncidents}
+          accent="danger"
+          icon="alert"
+          muted={metrics.openIncidents === 0}
+        />
+        <KpiCard
+          title="פעולות ממשל ממתינות לאישור"
+          value={metrics.pendingApprovals}
+          accent="warning"
+          icon="clock"
+          muted={metrics.pendingApprovals === 0}
+        />
       </div>
+
+      <details data-testid="governance-more-metrics" className="os-more-metrics">
+        <summary>מדדים נוספים</summary>
+        <div className="os-more-metrics__grid">
+          <div className="os-more-metrics__item">
+            <span>מדיניות פעילה</span>
+            <span className="os-num">{metrics.activePolicies}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>טיוטות מדיניות</span>
+            <span className="os-num">{metrics.draftPolicies}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>אירועי ביקורת</span>
+            <span className="os-num">{metrics.auditEvents}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>ממצאי מבקר</span>
+            <span className="os-num">{metrics.findings}</span>
+          </div>
+        </div>
+      </details>
 
       {/* zone 1 — active policies */}
       <Panel variant="panel" style={{ padding: "var(--os-space-5)" }} data-testid="zone-policies">

@@ -15,12 +15,16 @@ export type OsTierAccent = "cyan" | "blue" | "violet";
 export type OsStatus =
   "פעיל" | "ממתין" | "דורש אישור" | "חסום" | "מושבת" | "הושלם" | "אזהרה" | "מושהה";
 
-/** Accent hex values for inline SVG needs (sparklines). Mirrors tokens.css. */
+/**
+ * Accent colors for inline SVG / icon needs (KPI icons, sparklines).
+ * Visual Calm v2: resolves to the calm readable token variants (not raw hex),
+ * so icons/series follow the canonical palette and stay AA-legible on dark.
+ */
 export const OS_ACCENT_HEX: Record<OsAccent, string> = {
-  blue: "#287BFF",
-  cyan: "#20C4E8",
-  violet: "#7655FF",
-  success: "#21C981",
-  warning: "#E7A93D",
-  danger: "#EC5D68",
+  blue: "var(--accent-primary-text)",
+  cyan: "var(--accent-primary-text)",
+  violet: "var(--accent-ai-text)",
+  success: "var(--success-text)",
+  warning: "var(--warning-text)",
+  danger: "var(--danger-text)",
 };
