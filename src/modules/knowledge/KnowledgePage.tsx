@@ -22,6 +22,7 @@ import {
   Panel,
   SectionTitle,
   StatusChip,
+  Tabs,
   useToast,
   type DataTableColumn,
   type OsStatus,
@@ -167,6 +168,7 @@ export default function KnowledgePage(): ReactElement {
   const [reviewDue, setReviewDue] = useState<ReviewDueFilter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editorFor, setEditorFor] = useState<"new" | string | null>(null);
+  const [queueTab, setQueueTab] = useState<"questions" | "conflicts">("questions");
 
   const nowISO = new Date().toISOString();
 
@@ -179,6 +181,7 @@ export default function KnowledgePage(): ReactElement {
 
   const authoritativeCount = articles.filter((a) => isAuthoritative(a, nowISO)).length;
   const pendingCount = articles.filter((a) => a.approval.state === "ממתין לבדיקה").length;
+  const expiredCount = expiredArticles(articles, nowISO).length;
   const conflictsOpen = openConflicts(conflicts);
   const questionsOpen = openQuestions(questions);
   const selected = articles.find((a) => a.id === selectedId) ?? null;
@@ -225,19 +228,61 @@ export default function KnowledgePage(): ReactElement {
         }
       />
 
+      {/* VC-E: ≤4 primary KPIs — only the action-driving counts. Each stays quiet
+          (muted, no glow) at zero: 0 is neither success nor attention. Passive
+          totals move to "מדדים נוספים". */}
       <div style={kpiRowStyle}>
-        <KpiCard title="מאמרים" value={articles.length} accent="blue" icon="book" />
-        <KpiCard title="מאושרים ותקפים" value={authoritativeCount} accent="success" icon="check" />
-        <KpiCard title="ממתינים לבדיקה" value={pendingCount} accent="violet" icon="clock" />
+        <KpiCard
+          title="ממתינים לבדיקה"
+          value={pendingCount}
+          accent="warning"
+          icon="clock"
+          muted={pendingCount === 0}
+        />
         <KpiCard
           title="סתירות פתוחות"
           value={conflictsOpen.length}
+          accent="danger"
+          icon="alert"
+          muted={conflictsOpen.length === 0}
+        />
+        <KpiCard
+          title="שאלות ללא מענה"
+          value={questionsOpen.length}
+          accent="warning"
+          icon="mic"
+          muted={questionsOpen.length === 0}
+        />
+        <KpiCard
+          title="פג תוקף הבדיקה"
+          value={expiredCount}
           accent="warning"
           icon="alert"
-          glow={conflictsOpen.length > 0}
+          muted={expiredCount === 0}
         />
-        <KpiCard title="שאלות פתוחות" value={questionsOpen.length} accent="cyan" icon="mic" />
       </div>
+
+      <details className="os-more-metrics">
+        <summary>מדדים נוספים</summary>
+        <div className="os-more-metrics__grid">
+          <div className="os-more-metrics__item">
+            <span>סה״כ מאמרים</span>
+            <span className="os-num">{articles.length}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>מאושרים ותקפים</span>
+            <span className="os-num">{authoritativeCount}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>מקורות רשומים</span>
+            <span className="os-num">{sources.length}</span>
+          </div>
+          <div className="os-more-metrics__item">
+            <span>גרסאות חתומות</span>
+            <span className="os-num">{versions.length}</span>
+          </div>
+        </div>
+      </details>
 
       {/* category nav */}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -294,9 +339,24 @@ export default function KnowledgePage(): ReactElement {
 
       <ArticlesTable articles={filtered} nowISO={nowISO} onSelect={setSelectedId} />
 
-      <QuestionsPanel questions={questionsOpen} articles={articles} />
-
-      <ContradictionPanel conflicts={conflictsOpen} articles={articles} />
+      {/* VC-E progressive disclosure: the two governance queues share one strip so
+          neither dominates the reading column — both stay one click away. */}
+      <div style={{ display: "grid", gap: "var(--os-space-4)" }}>
+        <Tabs
+          items={[
+            { id: "questions", label: "שאלות ללא מענה", badge: questionsOpen.length || undefined },
+            { id: "conflicts", label: "סתירות בידע", badge: conflictsOpen.length || undefined },
+          ]}
+          activeId={queueTab}
+          onChange={(id) => setQueueTab(id as "questions" | "conflicts")}
+          ariaLabel="תורי ממשל הידע"
+        />
+        {queueTab === "questions" ? (
+          <QuestionsPanel questions={questionsOpen} articles={articles} />
+        ) : (
+          <ContradictionPanel conflicts={conflictsOpen} articles={articles} />
+        )}
+      </div>
 
       {selected && (
         <ArticleDrawer
