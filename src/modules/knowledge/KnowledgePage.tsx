@@ -430,7 +430,7 @@ function ArticlesTable({
       header: "תוקף",
       render: (a) =>
         isAuthoritative(a, nowISO) ? (
-          <span style={{ color: "var(--os-success)", fontSize: "var(--os-text-xs)" }}>תקף</span>
+          <span style={{ color: "var(--success-text)", fontSize: "var(--os-text-xs)" }}>תקף</span>
         ) : (
           <span style={{ color: "var(--os-muted)", fontSize: "var(--os-text-xs)" }}>
             {nonAuthoritativeReasonHe(a, nowISO)}
@@ -538,7 +538,7 @@ function ArticleDrawer({
           <span className="os-chip os-chip--blue os-num">גרסה {article.version}</span>
           {article.demo && <span className="os-chip os-chip--muted">{DEMO_DATA_LABEL}</span>}
           {authoritative ? (
-            <span style={{ color: "var(--os-success)", fontSize: "var(--os-text-xs)" }}>
+            <span style={{ color: "var(--success-text)", fontSize: "var(--os-text-xs)" }}>
               מקור מוסמך — כשיר כראיה
             </span>
           ) : (
@@ -857,10 +857,10 @@ function ArticleDrawer({
                   diffs.map((d) => (
                     <Panel key={d.field} variant="raised" style={{ padding: "var(--os-space-3)" }}>
                       <b style={{ fontSize: "var(--os-text-xs)" }}>{d.labelHe}</b>
-                      <div style={{ fontSize: "var(--os-text-xs)", color: "var(--os-danger)" }}>
+                      <div style={{ fontSize: "var(--os-text-xs)", color: "var(--danger-text)" }}>
                         − {d.before}
                       </div>
-                      <div style={{ fontSize: "var(--os-text-xs)", color: "var(--os-success)" }}>
+                      <div style={{ fontSize: "var(--os-text-xs)", color: "var(--success-text)" }}>
                         + {d.after}
                       </div>
                     </Panel>
@@ -883,7 +883,7 @@ function ArticleDrawer({
                 🤖 {u.byAgent} · <span className="os-num">v{u.articleVersion}</span> ·{" "}
                 {u.inRecommendation}
                 {u.supersededByVersion !== null && (
-                  <span style={{ color: "var(--os-warning)", fontSize: "var(--os-text-2xs)" }}>
+                  <span style={{ color: "var(--warning-text)", fontSize: "var(--os-text-2xs)" }}>
                     {" "}
                     · הוחלף בגרסה v{u.supersededByVersion}
                   </span>
@@ -1132,7 +1132,7 @@ function QuestionsPanel({
                 ) : null;
               })()}
             {answer.sources.length === 0 && (
-              <div style={{ color: "var(--os-warning)", fontSize: "var(--os-text-xs)" }}>
+              <div style={{ color: "var(--warning-text)", fontSize: "var(--os-text-xs)" }}>
                 אין מקור מאושר — אפשר להציע טיוטת מאמר חדשה (מחייבת אישור אנושי).
               </div>
             )}
@@ -1561,7 +1561,7 @@ function RailRow({
       }}
     >
       <span style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-xs)" }}>{label}</span>
-      <span className="os-num" style={{ color: warn ? "var(--os-warning)" : "var(--os-text)" }}>
+      <span className="os-num" style={{ color: warn ? "var(--warning-text)" : "var(--os-text)" }}>
         {value}
       </span>
     </div>

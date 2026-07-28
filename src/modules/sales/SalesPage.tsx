@@ -231,13 +231,13 @@ export default function SalesPage(): ReactElement {
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span>זכיות</span>
-                <span className="os-num" style={{ color: "var(--os-success)" }}>
+                <span className="os-num" style={{ color: "var(--success-text)" }}>
                   {conversion.won}
                 </span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span>הפסדים</span>
-                <span className="os-num" style={{ color: "var(--os-danger)" }}>
+                <span className="os-num" style={{ color: "var(--danger-text)" }}>
                   {conversion.lost}
                 </span>
               </div>
@@ -260,7 +260,7 @@ export default function SalesPage(): ReactElement {
                 stuck.map(({ opp, daysOverdue }) => (
                   <div key={opp.id} style={{ display: "flex", justifyContent: "space-between" }}>
                     <span>{opp.name}</span>
-                    <span className="os-num" style={{ color: "var(--os-danger)" }}>
+                    <span className="os-num" style={{ color: "var(--danger-text)" }}>
                       {daysOverdue} ימים
                     </span>
                   </div>
@@ -402,7 +402,7 @@ export default function SalesPage(): ReactElement {
                           <span
                             className="os-num"
                             style={
-                              o.expectedClose < today ? { color: "var(--os-danger)" } : undefined
+                              o.expectedClose < today ? { color: "var(--danger-text)" } : undefined
                             }
                           >
                             {dateHe(o.expectedClose)}

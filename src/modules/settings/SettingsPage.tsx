@@ -247,7 +247,7 @@ export default function SettingsPage(): ReactElement {
 
       {group === "demo" && (
         <Panel variant="raised" style={{ padding: "var(--os-space-4)", display: "grid", gap: "var(--os-space-4)" }}>
-          <div style={{ color: "var(--os-warning)", fontSize: "var(--os-text-sm)" }}>
+          <div style={{ color: "var(--warning-text)", fontSize: "var(--os-text-sm)" }}>
             כל הנתונים במערכת הם נתוני הדגמה סינתטיים ודטרמיניסטיים — אין כאן נתוני לקוחות אמיתיים.
           </div>
           <div style={{ display: "flex", gap: "var(--os-space-3)", flexWrap: "wrap" }}>
@@ -490,7 +490,7 @@ function SettingsRail({
         </div>
         <div style={railRow}>
           <span>ממתינות לאישור</span>
-          <span className="os-num" style={{ color: pendingCount > 0 ? "var(--os-warning)" : "var(--os-muted)" }}>
+          <span className="os-num" style={{ color: pendingCount > 0 ? "var(--warning-text)" : "var(--os-muted)" }}>
             {pendingCount}
           </span>
         </div>

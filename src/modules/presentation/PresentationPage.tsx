@@ -300,7 +300,7 @@ export default function PresentationPage(): ReactElement {
   // ── render ───────────────────────────────────────────────────────────────
   if (sectionsQ.isError || notesQ.isError) {
     return (
-      <Panel style={{ padding: "var(--os-space-6)", color: "var(--os-danger)" }}>
+      <Panel style={{ padding: "var(--os-space-6)", color: "var(--danger-text)" }}>
         שגיאה בטעינת המצגת — נסו לרענן.
       </Panel>
     );
@@ -341,7 +341,7 @@ export default function PresentationPage(): ReactElement {
       {!guard.ok && (
         <Panel
           className="pres-no-print"
-          style={{ padding: "var(--os-space-4)", color: "var(--os-danger)" }}
+          style={{ padding: "var(--os-space-4)", color: "var(--danger-text)" }}
           data-testid="exactly5-problems"
         >
           {guard.problemsHe.map((p) => (
@@ -480,7 +480,7 @@ function OverviewView({
                 placeItems: "center",
                 borderRadius: "var(--os-radius-full)",
                 background: "var(--os-cyan-soft)",
-                color: "var(--os-cyan)",
+                color: "var(--os-cyan-text)",
                 fontWeight: 800,
               }}
             >
@@ -497,7 +497,7 @@ function OverviewView({
                 </span>
                 <span
                   data-testid={`rehearsal-${s.id}`}
-                  style={{ color: verdict.over ? "var(--os-warning)" : "var(--os-text-2)" }}
+                  style={{ color: verdict.over ? "var(--warning-text)" : "var(--os-text-2)" }}
                 >
                   {verdict.labelHe}
                 </span>
@@ -586,7 +586,7 @@ function PresentOverlay(props: {
         <span
           className="os-num"
           data-testid="progress-indicator"
-          style={{ color: "var(--os-cyan)", fontWeight: 800, fontSize: "var(--os-text-md)" }}
+          style={{ color: "var(--os-cyan-text)", fontWeight: 800, fontSize: "var(--os-text-md)" }}
         >
           {sectionIndex + 1} / {sections.length}
         </span>
@@ -598,7 +598,7 @@ function PresentOverlay(props: {
                 inlineSize: 8,
                 blockSize: 8,
                 borderRadius: "50%",
-                background: i === sectionIndex ? "var(--os-cyan)" : "var(--os-border)",
+                background: i === sectionIndex ? "var(--os-cyan-text)" : "var(--os-border)",
               }}
             />
           ))}
@@ -607,7 +607,7 @@ function PresentOverlay(props: {
           className="os-num"
           data-testid="countdown"
           style={{
-            color: overallExpired ? "var(--os-danger)" : "var(--os-text)",
+            color: overallExpired ? "var(--danger-text)" : "var(--os-text)",
             fontWeight: 700,
           }}
           title="ספירה לאחור — 10 דקות"
@@ -620,9 +620,9 @@ function PresentOverlay(props: {
           style={{
             color:
               verdict === "חריגה"
-                ? "var(--os-danger)"
+                ? "var(--danger-text)"
                 : verdict === "מתקרב לחריגה"
-                  ? "var(--os-warning)"
+                  ? "var(--warning-text)"
                   : "var(--os-text-2)",
           }}
           title="זמן בשקף הנוכחי"
@@ -655,7 +655,7 @@ function PresentOverlay(props: {
       {/* the slide */}
       <div style={{ display: "grid", gap: "var(--os-space-4)", alignContent: "start", minBlockSize: 0 }}>
         <div style={{ textAlign: "center", display: "grid", gap: 6 }}>
-          <span style={{ color: "var(--os-cyan)", fontSize: "var(--os-text-sm)", fontWeight: 600 }}>
+          <span style={{ color: "var(--os-cyan-text)", fontSize: "var(--os-text-sm)", fontWeight: 600 }}>
             TERAGON AI BUSINESS OS · מצגת ההגשה
           </span>
           <h1
@@ -757,9 +757,9 @@ function PresentOverlay(props: {
                 borderInlineStartWidth: 3,
                 borderInlineStartColor:
                   n.emphasis === "מסר מרכזי"
-                    ? "var(--os-cyan)"
+                    ? "var(--os-cyan-text)"
                     : n.emphasis === "הערת כנות"
-                      ? "var(--os-warning)"
+                      ? "var(--warning-text)"
                       : "var(--os-border)",
                 color: "var(--os-text-2)",
                 fontSize: "var(--os-text-sm)",
@@ -769,7 +769,7 @@ function PresentOverlay(props: {
               {n.emphasis !== "רגיל" && (
                 <div
                   style={{
-                    color: n.emphasis === "מסר מרכזי" ? "var(--os-cyan)" : "var(--os-warning)",
+                    color: n.emphasis === "מסר מרכזי" ? "var(--os-cyan-text)" : "var(--warning-text)",
                     fontSize: "var(--os-text-2xs)",
                     fontWeight: 700,
                     marginBlockEnd: 4,
@@ -805,7 +805,7 @@ function BackupImageView({ section }: { section: PresentationSection }): ReactEl
         alt={img.captionHe}
         style={{ inlineSize: "100%", blockSize: "auto", borderRadius: "var(--os-radius-md)", border: "1px solid var(--os-border)" }}
       />
-      <span style={{ color: "var(--os-warning)", fontSize: "var(--os-text-xs)" }}>
+      <span style={{ color: "var(--warning-text)", fontSize: "var(--os-text-xs)" }}>
         הערת כנות: {img.honestyNoteHe}
       </span>
       <span dir="ltr" style={{ color: "var(--os-muted)", fontSize: "var(--os-text-2xs)" }}>

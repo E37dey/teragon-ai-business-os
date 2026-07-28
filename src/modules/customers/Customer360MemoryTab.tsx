@@ -40,8 +40,8 @@ const stack = (gap = "var(--os-space-3)"): CSSProperties => ({ display: "grid", 
 
 const chipStyle = (danger: boolean): CSSProperties => ({
   fontSize: "var(--os-text-2xs, 11px)",
-  border: `1px solid ${danger ? "var(--os-danger)" : "var(--os-border)"}`,
-  color: danger ? "var(--os-danger)" : "var(--os-text-2)",
+  border: `1px solid ${danger ? "var(--danger-text)" : "var(--os-border)"}`,
+  color: danger ? "var(--danger-text)" : "var(--os-text-2)",
   borderRadius: "var(--os-radius-full, 999px)",
   paddingBlock: 1,
   paddingInline: 8,
@@ -102,7 +102,7 @@ function MemoryDetailCard({
           ? `אושר על ידי ${detail.approvedBy}`
           : "ללא אישור בשם (ייבוא דור 1)"}{" "}
         ·{" "}
-        <Link to={detail.memoryRoute} style={{ color: "var(--os-cyan)" }}>
+        <Link to={detail.memoryRoute} style={{ color: "var(--os-cyan-text)" }}>
           לגרסאות ולפריט המלא ←
         </Link>
       </div>
@@ -157,7 +157,7 @@ function MemoryDetailCard({
                   <span className="os-ltr" style={{ color: "var(--os-muted)" }}>
                     ({e.refId})
                   </span>
-                  {!e.verified && <span style={{ color: "var(--os-warning)" }}> · לא אומת</span>}
+                  {!e.verified && <span style={{ color: "var(--warning-text)" }}> · לא אומת</span>}
                 </span>
               ))
             )}
@@ -390,7 +390,7 @@ export function Customer360MemoryTab({ customer }: { customer: Customer }): Reac
               >
                 <span>«{p.title}»</span>
                 <span style={chipStyle(false)}>{p.status}</span>
-                <Link to={`/memory?proposal=${p.id}`} style={{ color: "var(--os-cyan)" }}>
+                <Link to={`/memory?proposal=${p.id}`} style={{ color: "var(--os-cyan-text)" }}>
                   לתור האישורים ←
                 </Link>
               </div>

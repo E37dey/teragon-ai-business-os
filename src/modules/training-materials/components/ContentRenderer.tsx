@@ -4,10 +4,10 @@ import { Link } from "react-router-dom";
 import type { ContentBlock, MaterialContentSection } from "@/domain/training-materials";
 
 const toneColor: Record<"info" | "warning" | "success" | "danger", string> = {
-  info: "var(--os-cyan)",
-  warning: "var(--os-warning)",
-  success: "var(--os-success)",
-  danger: "var(--os-danger)",
+  info: "var(--os-cyan-text)",
+  warning: "var(--warning-text)",
+  success: "var(--success-text)",
+  danger: "var(--danger-text)",
 };
 
 const headingStyle: CSSProperties = {
@@ -74,7 +74,7 @@ export function BlockView({ block }: { block: ContentBlock }): ReactElement {
       return (
         <div style={{ display: "grid", gap: 4 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
-            <span className="os-num" style={{ color: "var(--os-cyan)", fontSize: "var(--os-text-xs)" }} dir="ltr">
+            <span className="os-num" style={{ color: "var(--os-cyan-text)", fontSize: "var(--os-text-xs)" }} dir="ltr">
               {fmtSec(block.fromSec)}–{fmtSec(block.toSec)}
             </span>
             <span style={{ color: "var(--os-text)", fontWeight: 600, fontSize: "var(--os-text-sm)" }}>
@@ -97,7 +97,7 @@ export function BlockView({ block }: { block: ContentBlock }): ReactElement {
             borderRadius: "var(--os-radius-sm)",
           }}
         >
-          <Link to={block.route} style={{ color: "var(--os-cyan)", fontSize: "var(--os-text-sm)", fontWeight: 600 }}>
+          <Link to={block.route} style={{ color: "var(--os-cyan-text)", fontSize: "var(--os-text-sm)", fontWeight: 600 }}>
             ← {block.label} <span dir="ltr">({block.route})</span>
           </Link>
           <span style={{ color: "var(--os-muted)", fontSize: "var(--os-text-xs)" }}>{block.note}</span>
@@ -116,12 +116,12 @@ export function BlockView({ block }: { block: ContentBlock }): ReactElement {
           }}
         >
           <div style={{ color: "var(--os-text)", fontWeight: 600 }}>{block.scenario}</div>
-          <div style={{ color: "var(--os-cyan)" }}>«{block.promptHe}»</div>
+          <div style={{ color: "var(--os-cyan-text)" }}>«{block.promptHe}»</div>
           <div style={{ color: "var(--os-muted)", fontSize: "var(--os-text-xs)" }}>
             פעולה: <span dir="ltr">{block.operation}</span>
           </div>
           <div style={{ color: "var(--os-text-2)" }}>צפוי: {block.expectedOutcome}</div>
-          <div style={{ color: "var(--os-warning)", fontSize: "var(--os-text-xs)" }}>⚠ {block.caution}</div>
+          <div style={{ color: "var(--warning-text)", fontSize: "var(--os-text-xs)" }}>⚠ {block.caution}</div>
         </div>
       );
   }

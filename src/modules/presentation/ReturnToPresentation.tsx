@@ -46,7 +46,7 @@ export function ReturnToPresentation(): ReactElement | null {
         borderRadius: "var(--os-radius-full)",
         border: "1px solid var(--os-cyan)",
         background: "var(--os-panel)",
-        color: "var(--os-cyan)",
+        color: "var(--os-cyan-text)",
         fontWeight: 700,
         fontSize: "var(--os-text-sm)",
         cursor: "pointer",

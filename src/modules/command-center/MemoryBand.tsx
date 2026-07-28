@@ -56,7 +56,7 @@ export function MemoryBand(): ReactElement {
           data-testid={`cc-memory-item-${item.id}`}
         >
           <span>{item.labelHe}</span>
-          <span className="os-num" style={{ color: "var(--os-cyan)" }}>
+          <span className="os-num" style={{ color: "var(--os-cyan-text)" }}>
             {item.value}
           </span>
         </Link>

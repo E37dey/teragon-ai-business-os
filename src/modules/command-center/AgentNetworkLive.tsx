@@ -115,10 +115,10 @@ export function AgentNetworkLive({
         <span>
           אישורים ממתינים: <span className="os-num">{pending.length}</span>
         </span>
-        <span style={{ color: openConflicts.length > 0 ? "var(--os-warning)" : undefined }}>
+        <span style={{ color: openConflicts.length > 0 ? "var(--warning-text)" : undefined }}>
           קונפליקטים פתוחים: <span className="os-num">{openConflicts.length}</span>
         </span>
-        <Link to="/agents/collaboration" style={{ color: "var(--os-cyan)" }}>
+        <Link to="/agents/collaboration" style={{ color: "var(--os-cyan-text)" }}>
           לחדר התיאום ←
         </Link>
       </div>
@@ -181,11 +181,11 @@ export function AgentNetworkLive({
             fontSize: "var(--os-text-2xs, 11px)",
           }}
         >
-          <strong style={{ color: "var(--os-warning)" }}>קונפליקטים הממתינים להכרעה אנושית:</strong>
+          <strong style={{ color: "var(--warning-text)" }}>קונפליקטים הממתינים להכרעה אנושית:</strong>
           {openConflicts.map((c) => (
             <div key={c.id} style={{ color: "var(--os-text-2)" }}>
               {c.description}{" "}
-              <Link to="/agents/collaboration" style={{ color: "var(--os-cyan)" }}>
+              <Link to="/agents/collaboration" style={{ color: "var(--os-cyan-text)" }}>
                 להכרעה ←
               </Link>
             </div>

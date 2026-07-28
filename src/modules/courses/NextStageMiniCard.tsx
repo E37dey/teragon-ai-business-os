@@ -79,7 +79,7 @@ export function NextStageDrawerBody({
           </div>
         </>
       ) : (
-        <div style={{ color: "var(--os-success)" }}>המסלול הושלם — אין שלב הבא. 🎓</div>
+        <div style={{ color: "var(--success-text)" }}>המסלול הושלם — אין שלב הבא. 🎓</div>
       )}
       <div className="courses-next__count">
         <span className="os-num">{courseUpcoming.length}</span> מפגשים קרובים

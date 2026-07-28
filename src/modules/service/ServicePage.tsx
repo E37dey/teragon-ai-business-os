@@ -580,7 +580,7 @@ function TicketWorkbench({
           <b style={{ color: "var(--os-text)" }}>{ticket.issue}</b> — {ticket.description}
         </div>
         {ticket.solution && (
-          <div style={{ fontSize: "var(--os-text-sm)", color: "var(--os-success)" }}>
+          <div style={{ fontSize: "var(--os-text-sm)", color: "var(--success-text)" }}>
             פתרון/עדכון: {ticket.solution}
           </div>
         )}
@@ -683,7 +683,7 @@ function TicketWorkbench({
                     gap: 8,
                     alignItems: "center",
                     fontSize: "var(--os-text-sm)",
-                    color: done ? "var(--os-success)" : "var(--os-text-2)",
+                    color: done ? "var(--success-text)" : "var(--os-text-2)",
                     cursor: done || busy || isClosedStatus(ticket.status) ? "default" : "pointer",
                   }}
                 >

@@ -25,9 +25,9 @@ export interface EnvelopeCardProps {
 }
 
 const STATUS_COLOR: Record<AIResponseEnvelopeV2["status"], string> = {
-  הצלחה: "var(--os-success)",
-  נכשל: "var(--os-danger)",
-  חלקי: "var(--os-warning)",
+  הצלחה: "var(--success-text)",
+  נכשל: "var(--danger-text)",
+  חלקי: "var(--warning-text)",
   בוטל: "var(--os-muted)",
 };
 

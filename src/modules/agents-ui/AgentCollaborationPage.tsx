@@ -59,11 +59,11 @@ const RUN_STATUS_CHIP: Record<AgentRun["status"], OsStatus> = {
 };
 
 const NODE_COLOR: Record<RunGraphNode["kind"], string> = {
-  run: "var(--os-blue)",
-  agent: "var(--os-cyan)",
-  task: "var(--os-violet)",
-  conflict: "var(--os-warning)",
-  approval: "var(--os-success)",
+  run: "var(--os-cyan-text)",
+  agent: "var(--os-cyan-text)",
+  task: "var(--os-violet-text)",
+  conflict: "var(--warning-text)",
+  approval: "var(--success-text)",
 };
 
 const KIND_LABEL_HE: Record<RunGraphNode["kind"], string> = {
@@ -187,8 +187,8 @@ export default function AgentCollaborationPage(): ReactElement {
   const hasPendingApproval = (records?.approvals ?? []).some((a) => a.status === "ממתין");
   const nodeBorderColor = (node: { id: string; kind: RunGraphNode["kind"] }): string => {
     if (node.id === selectedNodeId) return "var(--accent-primary, var(--os-blue))";
-    if (node.kind === "conflict" && hasOpenConflict) return "var(--os-warning)";
-    if (node.kind === "approval" && hasPendingApproval) return "var(--os-violet)";
+    if (node.kind === "conflict" && hasOpenConflict) return "var(--warning-text)";
+    if (node.kind === "approval" && hasPendingApproval) return "var(--os-violet-text)";
     return "var(--os-border)";
   };
 
@@ -331,7 +331,7 @@ export default function AgentCollaborationPage(): ReactElement {
                 style={{
                   fontSize: "var(--os-text-2xs, 11px)",
                   fontWeight: 600,
-                  color: "var(--os-warning)",
+                  color: "var(--warning-text)",
                 }}
               >
                 קונפליקטים ({records.conflicts.length})
@@ -362,7 +362,7 @@ export default function AgentCollaborationPage(): ReactElement {
                             </span>
                           </div>
                         ))}
-                        <div style={{ color: "var(--os-warning)" }}>
+                        <div style={{ color: "var(--warning-text)" }}>
                           ראיות חסרות: {detail.missingEvidenceHe.join(" · ")}
                         </div>
                         <div>
@@ -406,7 +406,7 @@ export default function AgentCollaborationPage(): ReactElement {
                         </div>
                       </div>
                     ) : (
-                      <div style={{ color: "var(--os-success)" }}>
+                      <div style={{ color: "var(--success-text)" }}>
                         הוכרע: {c.resolution} · {c.resolvedAt ? dateTimeHe(c.resolvedAt) : ""}
                       </div>
                     )}
@@ -736,8 +736,8 @@ export default function AgentCollaborationPage(): ReactElement {
               {(
                 [
                   { label: "ריצה · סוכן · משימה", color: "var(--os-border)" },
-                  { label: "קונפליקט פתוח", color: "var(--os-warning)" },
-                  { label: "אישור ממתין", color: "var(--os-violet)" },
+                  { label: "קונפליקט פתוח", color: "var(--warning-text)" },
+                  { label: "אישור ממתין", color: "var(--os-violet-text)" },
                   { label: "נבחר", color: "var(--accent-primary, var(--os-blue))" },
                 ] as const
               ).map((item) => (
@@ -808,7 +808,7 @@ export default function AgentCollaborationPage(): ReactElement {
                           style={{
                             display: "flex",
                             justifyContent: "space-between",
-                            color: "var(--os-cyan)",
+                            color: "var(--os-cyan-text)",
                           }}
                         >
                           <span>
@@ -851,7 +851,7 @@ export default function AgentCollaborationPage(): ReactElement {
                     style={{
                       color:
                         t.type === "ConflictDetected"
-                          ? "var(--os-warning)"
+                          ? "var(--warning-text)"
                           : t.type === "ApprovalRequested"
                             ? "var(--os-violet-text, var(--os-violet))"
                             : "var(--os-text-2)",

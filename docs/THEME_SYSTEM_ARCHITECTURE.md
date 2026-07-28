@@ -33,3 +33,6 @@ The right navigation must stay dark in light mode. Its chrome consumes a **fixed
 
 ## Fonts / CSP
 External Google Fonts removed (index.html + tokens.css); system Hebrew stack `"Segoe UI", "Arial Hebrew", Arial, sans-serif`. Zero external font requests. CSP unchanged and not weakened.
+
+## System-wide rollout (post-baseline)
+The theme system was rolled out and validated across all 30 canonical routes in both themes: every route-specific base-token-as-text / undefined-token / hardcoded value was converted to semantic `-text` variants (see THEME_HARDCODED_COLOR_AUDIT). Result: light 30/30 and dark 30/30 axe-clean at 1440+1920, 1706/1706 tests, print always-light. See THEME_SYSTEM_ROLLOUT_REPORT.

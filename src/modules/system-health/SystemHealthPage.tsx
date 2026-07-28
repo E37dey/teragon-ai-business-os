@@ -564,7 +564,7 @@ function HealthRail({
           attention.map((c) => (
             <div key={c.componentId} style={railRow}>
               <span>{c.nameHe}</span>
-              <span style={{ color: "var(--os-warning)" }}>{c.state}</span>
+              <span style={{ color: "var(--warning-text)" }}>{c.state}</span>
             </div>
           ))
         )}
@@ -577,7 +577,7 @@ function HealthRail({
           failed.map((c) => (
             <div key={c.componentId} style={railRow}>
               <span>{c.nameHe}</span>
-              <span style={{ color: "var(--os-danger)" }}>{c.state}</span>
+              <span style={{ color: "var(--danger-text)" }}>{c.state}</span>
             </div>
           ))
         )}
@@ -586,13 +586,13 @@ function HealthRail({
         <div style={railTitle}>ממשל</div>
         <div style={railRow}>
           <span>אישורים ממתינים</span>
-          <span className="os-num" style={{ color: pendingCount > 0 ? "var(--os-warning)" : "var(--os-muted)" }}>
+          <span className="os-num" style={{ color: pendingCount > 0 ? "var(--warning-text)" : "var(--os-muted)" }}>
             {pendingCount}
           </span>
         </div>
         <div style={railRow}>
           <span>תורים חסומים לאישור</span>
-          <span className="os-num" style={{ color: blockedQueues > 0 ? "var(--os-warning)" : "var(--os-muted)" }}>
+          <span className="os-num" style={{ color: blockedQueues > 0 ? "var(--warning-text)" : "var(--os-muted)" }}>
             {blockedQueues}
           </span>
         </div>

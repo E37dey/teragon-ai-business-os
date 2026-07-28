@@ -15,12 +15,12 @@ export function RoutedPlaceholder({ title, wave }: { title: string; wave: number
 export function NotFoundPage() {
   const location = useLocation();
   return (
-    <div dir="rtl" style={{ padding: "2.5rem", color: "#98A8BD" }}>
-      <h1 style={{ color: "#F5F8FD", fontSize: "1.6rem", margin: 0 }}>העמוד לא נמצא</h1>
+    <div dir="rtl" style={{ padding: "2.5rem", color: "var(--os-text-2)" }}>
+      <h1 style={{ color: "var(--os-text)", fontSize: "1.6rem", margin: 0 }}>העמוד לא נמצא</h1>
       <p>
         הנתיב <code dir="ltr">{location.pathname}</code> אינו קיים במערכת.
       </p>
-      <Link to="/" style={{ color: "#20C4E8" }}>
+      <Link to="/" style={{ color: "var(--os-cyan-text)" }}>
         חזרה למרכז הפיקוד
       </Link>
     </div>

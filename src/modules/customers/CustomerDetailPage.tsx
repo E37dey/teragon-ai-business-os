@@ -169,7 +169,7 @@ export default function CustomerDetailPage(): ReactElement {
         title="לקוח לא נמצא"
         reason={`אין לקוח עם המזהה «${id ?? ""}» במאגר. ייתכן שנמחק או שהקישור שגוי.`}
         action={
-          <Link to="/customers" style={{ color: "var(--os-cyan)" }}>
+          <Link to="/customers" style={{ color: "var(--os-cyan-text)" }}>
             חזרה לרשימת הלקוחות
           </Link>
         }
@@ -250,7 +250,7 @@ export default function CustomerDetailPage(): ReactElement {
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span>הכנסות מצטברות</span>
-                <span className="os-num" style={{ color: "var(--os-success)" }}>
+                <span className="os-num" style={{ color: "var(--success-text)" }}>
                   {ils(customer.revenue)}
                 </span>
               </div>
@@ -322,7 +322,7 @@ export default function CustomerDetailPage(): ReactElement {
         >
           <span
             style={{
-              color: actionRequired ? "var(--os-warning)" : "var(--os-muted)",
+              color: actionRequired ? "var(--warning-text)" : "var(--os-muted)",
               fontWeight: 600,
               whiteSpace: "nowrap",
             }}
@@ -427,7 +427,7 @@ export default function CustomerDetailPage(): ReactElement {
                     paddingBlockEnd: 6,
                   }}
                 >
-                  <span className="os-num" style={{ color: "var(--os-cyan)", minInlineSize: 84 }}>
+                  <span className="os-num" style={{ color: "var(--os-cyan-text)", minInlineSize: 84 }}>
                     {dateTimeHe(e.at)}
                   </span>
                   <span style={{ color: "var(--os-muted)", minInlineSize: 80 }}>{e.kind}</span>

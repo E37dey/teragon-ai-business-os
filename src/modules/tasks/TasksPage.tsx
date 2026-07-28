@@ -70,7 +70,7 @@ function SummaryStat({
         style={{
           fontSize: "var(--os-text-lg)",
           fontWeight: 600,
-          color: active ? "var(--os-warning)" : value === 0 ? "var(--os-muted)" : "var(--os-text)",
+          color: active ? "var(--warning-text)" : value === 0 ? "var(--os-muted)" : "var(--os-text)",
         }}
       >
         {value}
@@ -310,7 +310,7 @@ export default function TasksPage(): ReactElement {
             <div style={{ display: "grid", gap: 8 }}>
               {todayMeetings.map((m) => (
                 <div key={m.id} style={{ display: "flex", gap: 10, fontSize: "var(--os-text-sm)" }}>
-                  <span className="os-num" style={{ color: "var(--os-cyan)", minInlineSize: 44 }}>
+                  <span className="os-num" style={{ color: "var(--os-cyan-text)", minInlineSize: 44 }}>
                     {fmtTime(m.scheduledAt)}
                   </span>
                   <span>
@@ -323,7 +323,7 @@ export default function TasksPage(): ReactElement {
               ))}
               {todayTasks.map((t) => (
                 <div key={t.id} style={{ display: "flex", gap: 10, fontSize: "var(--os-text-sm)" }}>
-                  <span style={{ color: "var(--os-warning)", minInlineSize: 44 }}>משימה</span>
+                  <span style={{ color: "var(--warning-text)", minInlineSize: 44 }}>משימה</span>
                   <span>{t.title}</span>
                 </div>
               ))}
@@ -338,7 +338,7 @@ export default function TasksPage(): ReactElement {
             <div style={{ display: "grid", gap: "var(--os-space-4)" }}>
               {weekMeetings.map(([day, list]) => (
                 <div key={day}>
-                  <div style={{ color: "var(--os-cyan)", fontSize: "var(--os-text-xs)" }}>
+                  <div style={{ color: "var(--os-cyan-text)", fontSize: "var(--os-text-xs)" }}>
                     {new Date(`${day}T00:00:00`).toLocaleDateString("he-IL", {
                       weekday: "long",
                       day: "2-digit",
@@ -441,7 +441,7 @@ function TasksRail({
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {t.title}
             </span>
-            <span className="os-num" style={{ color: "var(--os-danger)" }}>
+            <span className="os-num" style={{ color: "var(--danger-text)" }}>
               {fmtDate(t.due)}
             </span>
           </div>
@@ -551,7 +551,7 @@ function HumanTaskCard({
         background: "var(--os-raised)",
         border: "1px solid var(--os-border)",
         borderInlineStartWidth: overdue ? 3 : 1,
-        borderInlineStartColor: overdue ? "var(--os-warning)" : "var(--os-border)",
+        borderInlineStartColor: overdue ? "var(--warning-text)" : "var(--os-border)",
         borderRadius: "var(--os-radius-md)",
         padding: "var(--os-space-4)",
       }}
@@ -578,7 +578,7 @@ function HumanTaskCard({
       <span
         style={{
           fontSize: "var(--os-text-xs)",
-          color: overdue ? "var(--os-warning)" : "var(--os-muted)",
+          color: overdue ? "var(--warning-text)" : "var(--os-muted)",
         }}
       >
         יעד: <span className="os-num">{fmtDate(task.due)}</span>
@@ -661,10 +661,10 @@ function TaskDetailDrawer({
         <DrawerField label="בעלים">{owner?.name ?? task.ownerId}</DrawerField>
         <DrawerField label="עדיפות">{task.priority}</DrawerField>
         <DrawerField label="תאריך יעד">
-          <span className="os-num" style={{ color: overdue ? "var(--os-warning)" : undefined }}>
+          <span className="os-num" style={{ color: overdue ? "var(--warning-text)" : undefined }}>
             {fmtDate(task.due)}
           </span>
-          {overdue && <span style={{ color: "var(--os-warning)" }}> · באיחור</span>}
+          {overdue && <span style={{ color: "var(--warning-text)" }}> · באיחור</span>}
         </DrawerField>
         {task.relatedRef && (
           <DrawerField label="רשומה מקושרת">

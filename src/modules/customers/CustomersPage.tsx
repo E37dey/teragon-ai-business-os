@@ -136,7 +136,7 @@ export default function CustomersPage(): ReactElement {
               {topByRevenue.map((c) => (
                 <div key={c.id} style={{ display: "flex", justifyContent: "space-between" }}>
                   <span>{c.name}</span>
-                  <span className="os-num" style={{ color: "var(--os-success)" }}>
+                  <span className="os-num" style={{ color: "var(--success-text)" }}>
                     {ils(c.revenue)}
                   </span>
                 </div>
@@ -152,7 +152,7 @@ export default function CustomersPage(): ReactElement {
                 waiting.map((c) => (
                   <div key={c.id} style={{ display: "flex", justifyContent: "space-between" }}>
                     <span>{c.name}</span>
-                    <span style={{ color: "var(--os-warning)" }}>ממתין</span>
+                    <span style={{ color: "var(--warning-text)" }}>ממתין</span>
                   </div>
                 ))
               )}

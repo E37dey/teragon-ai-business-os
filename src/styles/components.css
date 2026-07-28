@@ -634,11 +634,11 @@
 }
 .os-agent--blue .os-agent__icon,
 .os-agent--blue .os-agent__name {
-  color: var(--os-blue);
+  color: var(--os-cyan-text);
 }
 .os-agent--cyan .os-agent__icon,
 .os-agent--cyan .os-agent__name {
-  color: var(--os-cyan);
+  color: var(--os-cyan-text);
 }
 .os-agent--violet .os-agent__icon,
 .os-agent--violet .os-agent__name {
@@ -646,15 +646,15 @@
 }
 .os-agent--success .os-agent__icon,
 .os-agent--success .os-agent__name {
-  color: var(--os-success);
+  color: var(--success-text);
 }
 .os-agent--warning .os-agent__icon,
 .os-agent--warning .os-agent__name {
-  color: var(--os-warning);
+  color: var(--warning-text);
 }
 .os-agent--danger .os-agent__icon,
 .os-agent--danger .os-agent__name {
-  color: var(--os-danger);
+  color: var(--danger-text);
 }
 
 .os-agent__name {

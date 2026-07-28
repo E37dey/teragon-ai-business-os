@@ -397,7 +397,7 @@ export default function CrmPage(): ReactElement {
         cell: (c) => (
           <span
             className="os-num"
-            style={c.getValue() < today ? { color: "var(--os-warning)" } : undefined}
+            style={c.getValue() < today ? { color: "var(--warning-text)" } : undefined}
           >
             {dateHe(c.getValue())}
           </span>

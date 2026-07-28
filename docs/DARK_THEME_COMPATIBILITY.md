@@ -22,3 +22,6 @@ All dark canonical colors are copied verbatim from 269f9e0: `--bg-app #070d15`, 
 - `/courses /crm /service /agents /governance /analytics` at 1440 + 1920: **0 axe serious, 0 critical, 0 color-contrast, 0 horizontal overflow**.
 - The toggle persists dark across full reloads (repo + mirror); `data-theme=dark` applied before paint (no flash).
 - Screenshots: `docs/screenshots/theme-dark/<route>-<size>.png`.
+
+## System-wide sweep result
+In the full both-theme rollout sweep, **dark scored 30/30 clean** (0 serious/critical/contrast, 0 overflow) at 1440 and 1920 across every canonical route — confirming no dark regression from the light-mode fixes. All light-mode contrast fixes used the `-text` variants (unchanged in dark) or workspace-surface swaps (near-identical in dark).

@@ -22,7 +22,7 @@ export function MetricChart({ points, accent, unit, onPointClick }: MetricChartP
   const stroke = OS_ACCENT_HEX[accent];
   if (measured.length === 0) {
     return (
-      <div className="os-num" style={{ color: "var(--os-text-3)", fontSize: "0.8rem" }} dir="rtl">
+      <div className="os-num" style={{ color: "var(--os-muted)", fontSize: "0.8rem" }} dir="rtl">
         אין נקודות מדודות בטווח — אין קו לצייר
       </div>
     );
@@ -72,7 +72,7 @@ export function MetricChart({ points, accent, unit, onPointClick }: MetricChartP
             cx={x(i)}
             cy={y(p.value)}
             r={4}
-            fill="var(--os-bg-raised, #0A1627)"
+            fill="var(--os-raised)"
             stroke={stroke}
             strokeWidth={1.6}
             style={{ cursor: "pointer" }}

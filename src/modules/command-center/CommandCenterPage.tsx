@@ -617,7 +617,7 @@ function CommandCenterInner(): ReactElement {
                     (axe link-in-text-block, W9-C a11y fix) */}
                 <Link
                   to="/agents/collaboration"
-                  style={{ color: "var(--os-cyan)", textDecoration: "underline" }}
+                  style={{ color: "var(--os-cyan-text)", textDecoration: "underline" }}
                 >
                   להרצת תרחיש בחדר התיאום ←
                 </Link>
@@ -630,7 +630,7 @@ function CommandCenterInner(): ReactElement {
                     {/* underline: see a11y note above (axe link-in-text-block) */}
                     <Link
                       to="/agents/collaboration"
-                      style={{ color: "var(--os-cyan)", textDecoration: "underline" }}
+                      style={{ color: "var(--os-cyan-text)", textDecoration: "underline" }}
                     >
                       לריצה בחדר התיאום ←
                     </Link>
@@ -782,7 +782,7 @@ function CommandCenterInner(): ReactElement {
                 >
                   <span
                     className="os-num"
-                    style={{ minInlineSize: 42, color: "var(--os-cyan)", fontWeight: 600 }}
+                    style={{ minInlineSize: 42, color: "var(--os-cyan-text)", fontWeight: 600 }}
                   >
                     {e.time ?? "היום"}
                   </span>
@@ -803,7 +803,7 @@ function CommandCenterInner(): ReactElement {
             subtitle="לידים פתוחים שמועד המעקב שלהם הגיע"
             icon="alert"
             action={
-              <Link to="/crm" style={{ color: "var(--os-cyan)", fontSize: "var(--os-text-2xs)" }}>
+              <Link to="/crm" style={{ color: "var(--os-cyan-text)", fontSize: "var(--os-text-2xs)" }}>
                 ל-CRM ←
               </Link>
             }
@@ -833,7 +833,7 @@ function CommandCenterInner(): ReactElement {
                     {l.name}
                     <span style={{ color: "var(--os-muted)" }}> · {l.interest}</span>
                   </span>
-                  <span className="os-num" style={{ color: "var(--os-warning)" }}>
+                  <span className="os-num" style={{ color: "var(--warning-text)" }}>
                     {dateHe(l.followUp)}
                   </span>
                 </div>
@@ -938,7 +938,7 @@ function CommandCenterInner(): ReactElement {
                 <div style={{ fontSize: "var(--os-text-2xs, 12px)", color: "var(--os-text-2)" }}>
                   <strong style={{ color: "var(--os-text)" }}>ריצת סוכן: </strong>
                   {relatedRun ? (
-                    <Link to="/agents/collaboration" style={{ color: "var(--os-cyan)" }}>
+                    <Link to="/agents/collaboration" style={{ color: "var(--os-cyan-text)" }}>
                       {relatedRun.goal} ({relatedRun.status}) — לחדר התיאום ←
                     </Link>
                   ) : (

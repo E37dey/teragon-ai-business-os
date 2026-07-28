@@ -338,7 +338,7 @@ export function ApprovalPanel({
       {lastError !== null && (
         <div
           role="alert"
-          style={{ fontSize: "var(--os-text-2xs, 12px)", color: "var(--os-danger)" }}
+          style={{ fontSize: "var(--os-text-2xs, 12px)", color: "var(--danger-text)" }}
         >
           {lastError}
         </div>

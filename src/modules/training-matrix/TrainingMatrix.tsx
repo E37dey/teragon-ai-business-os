@@ -64,7 +64,7 @@ function successMetricCell(p: PersonaV2): ReactNode {
       <span style={{ fontSize: "var(--os-text-2xs)", color: "var(--os-text-2)" }}>
         יעד:{" "}
         {m.numericTarget !== null ? (
-          <b className="os-num" style={{ color: "var(--os-cyan)" }}>
+          <b className="os-num" style={{ color: "var(--os-cyan-text)" }}>
             {m.numericTarget}
             {m.unit ?? ""}
           </b>

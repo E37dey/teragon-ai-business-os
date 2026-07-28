@@ -35,7 +35,7 @@ export function MicrolearningPreview({
     <div style={{ display: "grid", gap: "var(--os-space-5)" }}>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <StatusChip status="ממתין" label={concept.label} />
-        <span style={{ color: "var(--os-warning)", fontSize: "var(--os-text-xs)" }}>
+        <span style={{ color: "var(--warning-text)", fontSize: "var(--os-text-xs)" }}>
           {concept.productionStatus}
         </span>
       </div>
@@ -60,7 +60,7 @@ export function MicrolearningPreview({
           <div style={{ color: "var(--os-text)", fontSize: "var(--os-text-xl)", fontWeight: 800 }}>
             {concept.thumbnail.titleHe}
           </div>
-          <div style={{ color: "var(--os-cyan)", fontSize: "var(--os-text-sm)", marginBlockStart: 6 }}>
+          <div style={{ color: "var(--os-cyan-text)", fontSize: "var(--os-text-sm)", marginBlockStart: 6 }}>
             {concept.thumbnail.subtitleHe}
           </div>
           <div style={{ color: "var(--os-muted)", fontSize: "var(--os-text-2xs)", marginBlockStart: 10 }}>
@@ -86,7 +86,7 @@ export function MicrolearningPreview({
                 padding: "6px 4px",
                 fontSize: "var(--os-text-2xs)",
                 color: i === activeIdx ? "var(--os-bg)" : "var(--os-text-2)",
-                background: i === activeIdx ? "var(--os-cyan)" : "var(--os-panel)",
+                background: i === activeIdx ? "var(--os-cyan-text)" : "var(--os-panel)",
                 border: "1px solid var(--os-border)",
                 borderRadius: 6,
                 cursor: "pointer",
@@ -118,7 +118,7 @@ export function MicrolearningPreview({
           </div>
           <div>
             <div style={fieldLabel}>טקסט על המסך</div>
-            <div style={{ ...fieldText, color: "var(--os-cyan)", fontWeight: 600 }}>{active.onScreenText}</div>
+            <div style={{ ...fieldText, color: "var(--os-cyan-text)", fontWeight: 600 }}>{active.onScreenText}</div>
           </div>
           <div>
             <div style={fieldLabel}>פעולת מסך</div>

@@ -48,7 +48,7 @@ const STYLE_TEXT = `
 .atb-panel--forbidden { border-inline-start: 3px solid var(--os-danger, #ec5d68); }
 .atb-panel ul { margin: 8px 0 0; padding-inline-start: 18px; }
 .atb-panel li { margin-block: 5px; line-height: 1.5; }
-.atb-note { margin-top: 12px; color: var(--os-text-secondary, #98a8bd); font-size: 12px; }
+.atb-note { margin-top: 12px; color: var(--os-text-2); font-size: 12px; }
 
 /* presentation (16:9 export frame): absolute boxes from computeMapLayout */
 .atb-root--presentation { position: relative; width: ${PRESENTATION_WIDTH}px;

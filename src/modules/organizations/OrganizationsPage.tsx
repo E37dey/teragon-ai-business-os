@@ -363,7 +363,7 @@ function OrgsRail({
             </span>
             <span
               className="os-num"
-              style={{ color: e.openItems > 0 ? "var(--os-warning)" : "var(--os-muted)" }}
+              style={{ color: e.openItems > 0 ? "var(--warning-text)" : "var(--os-muted)" }}
             >
               {e.openItems}
             </span>
@@ -506,7 +506,7 @@ function OrgDrawer({
               )}
               {[...departments.entries()].map(([dept, list]) => (
                 <div key={dept} style={{ marginBlockEnd: "var(--os-space-4)" }}>
-                  <div style={{ color: "var(--os-cyan)", fontSize: "var(--os-text-xs)" }}>
+                  <div style={{ color: "var(--os-cyan-text)", fontSize: "var(--os-text-xs)" }}>
                     {dept}
                   </div>
                   {list.map((c) => (
@@ -664,7 +664,7 @@ function OrgDrawer({
                   <span className="os-num" style={{ color: "var(--os-muted)", minInlineSize: 70 }}>
                     {fmtDate(a.at)}
                   </span>
-                  <span style={{ color: "var(--os-cyan)" }}>{a.kind}</span>
+                  <span style={{ color: "var(--os-cyan-text)" }}>{a.kind}</span>
                   <span>{a.text}</span>
                 </div>
               ))}

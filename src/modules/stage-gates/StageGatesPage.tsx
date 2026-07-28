@@ -300,7 +300,7 @@ function GateNavigator({
               </b>
             </div>
             <StatusChip status={STATE_CHIP[validation.state]} label={validation.state} />
-            <div style={{ color: "var(--os-muted)", fontSize: "var(--os-text-2xs)" }}>
+            <div style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-2xs)" }}>
               ראיות תקפות{" "}
               <span className="os-num">
                 {validation.criteria.reduce((n, c) => n + c.validCount, 0)}
@@ -364,7 +364,7 @@ function GateDetail({
         <div style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-sm)" }}>
           {def.descriptionHe}
         </div>
-        <div style={{ color: "var(--os-warning)", fontSize: "var(--os-text-xs)" }}>
+        <div style={{ color: "var(--warning-text)", fontSize: "var(--os-text-xs)" }}>
           סיכון: {def.riskHe}
         </div>
 
@@ -570,7 +570,7 @@ function GateDetail({
             ראיות נדרשות: {c.requiredEvidenceHe}
           </div>
           {c.missingHe.map((m) => (
-            <div key={m} style={{ color: "var(--os-warning)", fontSize: "var(--os-text-2xs)" }}>
+            <div key={m} style={{ color: "var(--warning-text)", fontSize: "var(--os-text-2xs)" }}>
               ⚠ {m}
             </div>
           ))}
@@ -604,10 +604,10 @@ function GateDetail({
                   style={{
                     color:
                       e.status === "תקפה"
-                        ? "var(--os-success)"
+                        ? "var(--success-text)"
                         : e.status === "פג תוקף"
-                          ? "var(--os-warning)"
-                          : "var(--os-danger)",
+                          ? "var(--warning-text)"
+                          : "var(--danger-text)",
                     fontSize: "var(--os-text-2xs)",
                   }}
                 >
@@ -889,10 +889,10 @@ function EvidenceViewer({
         style={{
           color:
             evaluated.status === "תקפה"
-              ? "var(--os-success)"
+              ? "var(--success-text)"
               : evaluated.status === "פג תוקף"
-                ? "var(--os-warning)"
-                : "var(--os-danger)",
+                ? "var(--warning-text)"
+                : "var(--danger-text)",
           fontSize: "var(--os-text-xs)",
         }}
       >
@@ -1041,7 +1041,7 @@ function RecordPreview({
 
 function MissingRecord(): ReactElement {
   return (
-    <div style={{ color: "var(--os-danger)", fontSize: "var(--os-text-xs)" }}>
+    <div style={{ color: "var(--danger-text)", fontSize: "var(--os-text-xs)" }}>
       הרשומה לא נמצאה באוסף — הראיה פסולה.
     </div>
   );
@@ -1129,7 +1129,7 @@ function RailRow({
       }}
     >
       <span style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-xs)" }}>{label}</span>
-      <span className="os-num" style={{ color: warn ? "var(--os-warning)" : "var(--os-text)" }}>
+      <span className="os-num" style={{ color: warn ? "var(--warning-text)" : "var(--os-text)" }}>
         {value}
       </span>
     </div>

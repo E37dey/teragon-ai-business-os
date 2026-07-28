@@ -283,7 +283,7 @@ export default function SubmissionPage(): ReactElement {
           <OsButton size="sm" icon="doc" onClick={() => window.print()}>
             הדפסה / שמירה כ-PDF
           </OsButton>
-          <Link to="/submission" style={{ color: "var(--os-cyan)", alignSelf: "center" }}>
+          <Link to="/submission" style={{ color: "var(--os-cyan-text)", alignSelf: "center" }}>
             חזרה לתצוגת המסך
           </Link>
         </div>
@@ -367,7 +367,7 @@ export default function SubmissionPage(): ReactElement {
           <span>
             חוסמים פתוחים: <span className="os-num">{blockerCount}</span>
           </span>
-          {persistNote ? <span style={{ color: "var(--os-cyan)" }}>{persistNote}</span> : null}
+          {persistNote ? <span style={{ color: "var(--os-cyan-text)" }}>{persistNote}</span> : null}
         </div>
       </Panel>
 
@@ -413,14 +413,14 @@ function DeliverablesGrid({
       {evaluations.map((ev) => (
         <Panel key={ev.key} style={{ padding: "var(--os-space-4)", display: "grid", gap: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-            <strong style={{ color: "var(--os-text-1)" }}>
+            <strong style={{ color: "var(--os-text)" }}>
               {ev.order}. {ev.title}
             </strong>
             <StatusChip status={STATE_TONE[ev.state] ?? "ממתין"} label={ev.state} />
           </div>
           {ev.state !== "מלא" ? (
             <div
-              style={{ fontSize: "var(--os-text-xs)", color: "var(--os-amber, #E8B93E)" }}
+              style={{ fontSize: "var(--os-text-xs)", color: "var(--warning-text)" }}
               data-testid="deliverable-pending-approval"
             >
               {WAVE8_PENDING_APPROVAL_HE}
@@ -434,10 +434,10 @@ function DeliverablesGrid({
               {/* W7-G trivial a11y fix: links inside text need underline, not
                   color alone (axe link-in-text-block, serious) */}
               מסך תפעולי:{" "}
-              <Link to={ev.route} style={{ color: "var(--os-cyan)", textDecoration: "underline" }}>
+              <Link to={ev.route} style={{ color: "var(--os-cyan-text)", textDecoration: "underline" }}>
                 {ev.route}
               </Link>{" "}
-              · <Link to="/submission?print=1" style={{ color: "var(--os-cyan)", textDecoration: "underline" }}>הדפסה</Link>
+              · <Link to="/submission?print=1" style={{ color: "var(--os-cyan-text)", textDecoration: "underline" }}>הדפסה</Link>
             </span>
           </div>
           <div style={{ fontSize: "var(--os-text-xs)", color: "var(--os-text-2)" }}>
@@ -448,7 +448,7 @@ function DeliverablesGrid({
             ))}
           </div>
           {ev.stateReasonsHe.length > 0 ? (
-            <ul style={{ margin: 0, paddingInlineStart: 16, fontSize: "var(--os-text-xs)", color: "var(--os-amber, #E8B93E)" }}>
+            <ul style={{ margin: 0, paddingInlineStart: 16, fontSize: "var(--os-text-xs)", color: "var(--warning-text)" }}>
               {ev.stateReasonsHe.map((r) => (
                 <li key={r}>{r}</li>
               ))}
@@ -470,10 +470,10 @@ const CELL_GLYPH: Record<string, string> = {
 };
 
 const CELL_COLOR: Record<string, string> = {
-  pass: "var(--os-green, #3ECF8E)",
-  warning: "var(--os-amber, #E8B93E)",
-  fail: "var(--os-red, #E85C5C)",
-  not_applicable: "var(--os-text-3, #6B7A90)",
+  pass: "var(--success-text)",
+  warning: "var(--warning-text)",
+  fail: "var(--danger-text)",
+  not_applicable: "var(--os-muted)",
 };
 
 function QualityMatrix({
@@ -503,7 +503,7 @@ function QualityMatrix({
         <tbody>
           {keys.map((k) => (
             <tr key={k}>
-              <td style={{ ...cellStyle, textAlign: "right", color: "var(--os-text-1)" }}>{k}</td>
+              <td style={{ ...cellStyle, textAlign: "right", color: "var(--os-text)" }}>{k}</td>
               {QUALITY_CRITERIA.map((c) => {
                 const r = quality.find((q) => q.deliverableKey === k && q.criterion === c);
                 return (
@@ -551,7 +551,7 @@ function MetricsBoard({ sources }: { sources: SubmissionSources }): ReactElement
     <div style={{ display: "grid", gap: "var(--os-space-4)" }}>
       {groups.map((g) => (
         <Panel key={g} style={{ padding: "var(--os-space-4)" }}>
-          <h3 style={{ margin: "0 0 8px", color: "var(--os-text-1)", fontSize: "var(--os-text-md)" }}>
+          <h3 style={{ margin: "0 0 8px", color: "var(--os-text)", fontSize: "var(--os-text-md)" }}>
             {METRIC_GROUP_TITLES[g]}
           </h3>
           <div style={{ overflowX: "auto" }}>
@@ -571,7 +571,7 @@ function MetricsBoard({ sources }: { sources: SubmissionSources }): ReactElement
               <tbody>
                 {board[g].map(({ def, measurement, baselineHe, currentHe }) => (
                   <tr key={def.key} style={{ borderBlockStart: "1px solid var(--os-border, #22304a)" }}>
-                    <td style={{ padding: 4, color: "var(--os-text-1)" }} title={`${def.definitionHe}${def.limitationsHe.length ? ` · מגבלות: ${def.limitationsHe.join(" · ")}` : ""}`}>
+                    <td style={{ padding: 4, color: "var(--os-text)" }} title={`${def.definitionHe}${def.limitationsHe.length ? ` · מגבלות: ${def.limitationsHe.join(" · ")}` : ""}`}>
                       {def.nameHe}
                     </td>
                     <td style={{ padding: 4 }}>{def.type}</td>
@@ -579,7 +579,7 @@ function MetricsBoard({ sources }: { sources: SubmissionSources }): ReactElement
                     <td style={{ padding: 4 }}>{def.periodHe}</td>
                     <td style={{ padding: 4 }}>{baselineHe}</td>
                     <td style={{ padding: 4 }}>{def.targetHe ?? "—"}</td>
-                    <td style={{ padding: 4, color: measurement ? "var(--os-green, #3ECF8E)" : "var(--os-text-3, #6B7A90)" }} title={measurement?.methodHe ?? "טרם נמדד"}>
+                    <td style={{ padding: 4, color: measurement ? "var(--success-text)" : "var(--os-muted)" }} title={measurement?.methodHe ?? "טרם נמדד"}>
                       {currentHe}
                     </td>
                     <td style={{ padding: 4 }}>{def.ownerId}</td>
@@ -612,7 +612,7 @@ function SupportArtefactView({ sources }: { sources: SubmissionSources }): React
           const m = artefact.measured.find((x) => x.tier === t.tier);
           return (
             <Panel key={t.tier} style={{ padding: "var(--os-space-4)", display: "grid", gap: 6 }}>
-              <strong style={{ color: "var(--os-text-1)" }}>{t.titleHe}</strong>
+              <strong style={{ color: "var(--os-text)" }}>{t.titleHe}</strong>
               <span style={{ fontSize: "var(--os-text-xs)", color: "var(--os-text-2)" }}>{t.audienceHe}</span>
               <span style={{ fontSize: "var(--os-text-xs)", color: "var(--os-text-2)" }}>
                 ערוצים: {t.channelsHe.join(" · ")}
@@ -620,7 +620,7 @@ function SupportArtefactView({ sources }: { sources: SubmissionSources }): React
               <span style={{ fontSize: "var(--os-text-sm)" }}>
                 SLA יעד: <strong>{t.targetSlaHe}</strong>
               </span>
-              <span style={{ fontSize: "var(--os-text-sm)", color: m?.medianResolutionHours === null || m === undefined ? "var(--os-text-3, #6B7A90)" : "var(--os-green, #3ECF8E)" }}>
+              <span style={{ fontSize: "var(--os-text-sm)", color: m?.medianResolutionHours === null || m === undefined ? "var(--os-muted)" : "var(--success-text)" }}>
                 SLA מדוד: {m?.measuredHe ?? "טרם נמדד"}
               </span>
               <span style={{ fontSize: "var(--os-text-xs)", color: "var(--os-text-2)" }}>
@@ -632,7 +632,7 @@ function SupportArtefactView({ sources }: { sources: SubmissionSources }): React
         })}
       </div>
       <Panel style={{ padding: "var(--os-space-4)", display: "grid", gap: 6 }}>
-        <strong style={{ color: "var(--os-text-1)" }}>שגרת רענון ותחזוקה</strong>
+        <strong style={{ color: "var(--os-text)" }}>שגרת רענון ותחזוקה</strong>
         {artefact.refreshCadenceHe.map((c) => (
           <span key={c} style={{ fontSize: "var(--os-text-xs)", color: "var(--os-text-2)" }}>
             • {c}
@@ -650,7 +650,7 @@ function SupportArtefactView({ sources }: { sources: SubmissionSources }): React
               key={l.route}
               to={l.route}
               /* W7-G trivial a11y fix: underline — see axe link-in-text-block */
-              style={{ color: "var(--os-cyan)", marginInlineEnd: 12, textDecoration: "underline" }}
+              style={{ color: "var(--os-cyan-text)", marginInlineEnd: 12, textDecoration: "underline" }}
             >
               {l.labelHe}
             </Link>
@@ -666,9 +666,9 @@ function SupportArtefactView({ sources }: { sources: SubmissionSources }): React
 function OnePagerView(): ReactElement {
   return (
     <Panel style={{ padding: "var(--os-space-5)", display: "grid", gap: "var(--os-space-4)" }}>
-      <h3 style={{ margin: 0, color: "var(--os-text-1)" }}>{ONE_PAGER.title}</h3>
+      <h3 style={{ margin: 0, color: "var(--os-text)" }}>{ONE_PAGER.title}</h3>
       <div>
-        <strong style={{ color: "var(--os-text-1)" }}>הבעיה העסקית</strong>
+        <strong style={{ color: "var(--os-text)" }}>הבעיה העסקית</strong>
         <ul style={{ margin: "6px 0", paddingInlineStart: 18, color: "var(--os-text-2)", fontSize: "var(--os-text-sm)" }}>
           {ONE_PAGER.businessProblemHe.map((p) => (
             <li key={p}>{p}</li>
@@ -676,7 +676,7 @@ function OnePagerView(): ReactElement {
         </ul>
       </div>
       <div>
-        <strong style={{ color: "var(--os-text-1)" }}>הפתרון</strong>
+        <strong style={{ color: "var(--os-text)" }}>הפתרון</strong>
         <ul style={{ margin: "6px 0", paddingInlineStart: 18, color: "var(--os-text-2)", fontSize: "var(--os-text-sm)" }}>
           {ONE_PAGER.solutionHe.map((p) => (
             <li key={p}>{p}</li>
@@ -684,17 +684,17 @@ function OnePagerView(): ReactElement {
         </ul>
       </div>
       <div>
-        <strong style={{ color: "var(--os-text-1)" }}>ערך — כל טענה מסומנת-סוג</strong>
+        <strong style={{ color: "var(--os-text)" }}>ערך — כל טענה מסומנת-סוג</strong>
         <ul style={{ margin: "6px 0", paddingInlineStart: 18, color: "var(--os-text-2)", fontSize: "var(--os-text-sm)" }}>
           {ONE_PAGER.valueClaims.map((c) => (
             <li key={c.claimHe}>
               <StatusChip status={c.kindHe === "עיקרון" ? "הושלם" : "ממתין"} label={c.kindHe} /> {c.claimHe}{" "}
-              <span style={{ color: "var(--os-text-3, #6B7A90)" }}>({c.basisHe})</span>
+              <span style={{ color: "var(--os-muted)" }}>({c.basisHe})</span>
             </li>
           ))}
         </ul>
       </div>
-      <p style={{ margin: 0, fontSize: "var(--os-text-xs)", color: "var(--os-text-3, #6B7A90)" }}>
+      <p style={{ margin: 0, fontSize: "var(--os-text-xs)", color: "var(--os-muted)" }}>
         {ONE_PAGER.honestyNoteHe}
       </p>
     </Panel>
@@ -706,7 +706,7 @@ function OnePagerView(): ReactElement {
 function DocsAndBuildPanel(): ReactElement {
   return (
     <Panel style={{ padding: "var(--os-space-4)", display: "grid", gap: 4 }}>
-      <strong style={{ color: "var(--os-text-1)", fontSize: "var(--os-text-sm)" }}>
+      <strong style={{ color: "var(--os-text)", fontSize: "var(--os-text-sm)" }}>
         צילומי מסך, דוחות QA ומצב Build
       </strong>
       <span style={{ fontSize: "var(--os-text-xs)", color: "var(--os-text-2)" }}>
@@ -734,13 +734,13 @@ function SubmissionRail({
   const warnings = findings.filter((f) => f.severity === "אזהרה");
   return (
     <div style={{ display: "grid", gap: 8 }}>
-      <strong style={{ color: "var(--os-text-1)", fontSize: "var(--os-text-sm)" }}>מבקר ההגשה</strong>
+      <strong style={{ color: "var(--os-text)", fontSize: "var(--os-text-sm)" }}>מבקר ההגשה</strong>
       <span style={{ fontSize: "var(--os-text-xs)", color: "var(--os-text-2)" }}>
         <span className="os-num">{blockers.length}</span> חוסמים ·{" "}
         <span className="os-num">{warnings.length}</span> אזהרות — לחיצה פותחת את היעד
       </span>
       {findings.length === 0 ? (
-        <span style={{ fontSize: "var(--os-text-xs)", color: "var(--os-green, #3ECF8E)" }}>
+        <span style={{ fontSize: "var(--os-text-xs)", color: "var(--success-text)" }}>
           אין ממצאים פתוחים
         </span>
       ) : (
@@ -761,7 +761,7 @@ function SubmissionRail({
               gap: 2,
             }}
           >
-            <span style={{ color: f.severity === "חוסם" ? "var(--os-red, #E85C5C)" : "var(--os-amber, #E8B93E)", fontSize: "var(--os-text-xs)", fontWeight: 600 }}>
+            <span style={{ color: f.severity === "חוסם" ? "var(--danger-text)" : "var(--warning-text)", fontSize: "var(--os-text-xs)", fontWeight: 600 }}>
               {f.severity} · {f.titleHe}
             </span>
             <span style={{ fontSize: "var(--os-text-xs)" }}>{f.detailHe}</span>

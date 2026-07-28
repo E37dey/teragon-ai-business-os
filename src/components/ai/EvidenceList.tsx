@@ -52,7 +52,7 @@ export function EvidenceList({ evidence, onOpen }: EvidenceListProps): ReactElem
                   background: "none",
                   border: "none",
                   padding: 0,
-                  color: "var(--os-cyan)",
+                  color: "var(--os-cyan-text)",
                   cursor: "pointer",
                   font: "inherit",
                 }}
@@ -66,9 +66,9 @@ export function EvidenceList({ evidence, onOpen }: EvidenceListProps): ReactElem
               {item.sourceId}
             </span>
             {item.verified ? (
-              <span style={{ color: "var(--os-success)" }}>מאומת</span>
+              <span style={{ color: "var(--success-text)" }}>מאומת</span>
             ) : (
-              <span style={{ color: "var(--os-warning)" }}>⚠ לא אומת</span>
+              <span style={{ color: "var(--warning-text)" }}>⚠ לא אומת</span>
             )}
           </div>
           <div style={{ color: "var(--os-text-2)" }}>{item.relevantExcerpt}</div>

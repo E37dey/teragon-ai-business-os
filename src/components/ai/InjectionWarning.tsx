@@ -20,7 +20,7 @@ export function InjectionWarning({ findings }: InjectionWarningProps): ReactElem
         display: "grid",
         gap: 4,
         fontSize: "var(--os-text-sm, 13px)",
-        color: "var(--os-danger)",
+        color: "var(--danger-text)",
         border: "1px solid var(--os-danger-border, var(--os-border))",
         background: "var(--os-danger-soft, transparent)",
         borderRadius: "var(--os-radius-sm, 6px)",

@@ -276,7 +276,7 @@ function EscalationArrow({ label }: { label: string }): ReactElement {
       }}
       aria-hidden="true"
     >
-      <span style={{ letterSpacing: 2, color: "var(--os-cyan)" }}>◄╌╌╌</span>
+      <span style={{ letterSpacing: 2, color: "var(--os-cyan-text)" }}>◄╌╌╌</span>
       <span>{label}</span>
     </div>
   );
@@ -314,7 +314,7 @@ function SupportRail({
         {recurring.map((r) => (
           <div key={r.category} style={railRow}>
             <span>{r.category}</span>
-            <span className="os-num" style={{ color: "var(--os-warning)" }}>
+            <span className="os-num" style={{ color: "var(--warning-text)" }}>
               {r.count} פניות
             </span>
           </div>
@@ -395,10 +395,10 @@ function SupportQueue({
             style={{
               color:
                 s.level === "חריגה"
-                  ? "var(--os-danger)"
+                  ? "var(--danger-text)"
                   : s.level === "בסיכון"
-                    ? "var(--os-warning)"
-                    : "var(--os-success)",
+                    ? "var(--warning-text)"
+                    : "var(--success-text)",
             }}
           >
             {fmtElapsed(s.elapsedHours)} / {s.targetHours} שע'
@@ -484,10 +484,10 @@ function RequestDrawer({
             style={{
               color:
                 sla.level === "חריגה"
-                  ? "var(--os-danger)"
+                  ? "var(--danger-text)"
                   : sla.level === "בסיכון"
-                    ? "var(--os-warning)"
-                    : "var(--os-success)",
+                    ? "var(--warning-text)"
+                    : "var(--success-text)",
               fontSize: "var(--os-text-xs)",
             }}
           >

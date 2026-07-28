@@ -98,7 +98,7 @@ export default function QuickStartPage({ presentation = false }: QuickStartPageP
         <span style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-sm)" }}>
           🎬 {MICROLEARNING_CHECK_AI.label}: «{MICROLEARNING_CHECK_AI.title}» (
           <span className="os-num">{MICROLEARNING_CHECK_AI.totalSec}</span> שניות) —{" "}
-          <Link to="/training-materials" style={{ color: "var(--os-cyan)" }}>
+          <Link to="/training-materials" style={{ color: "var(--os-cyan-text)" }}>
             לצפייה בסטוריבורד המלא במרכז חומרי ההדרכה
           </Link>
           . {MICROLEARNING_CHECK_AI.productionStatus}.
@@ -153,7 +153,7 @@ function ActionCard({ action, compact }: { action: QuickStartAction; compact: bo
             placeItems: "center",
             borderRadius: "var(--os-radius-full)",
             background: "var(--os-cyan-soft)",
-            color: "var(--os-cyan)",
+            color: "var(--os-cyan-text)",
             fontWeight: 800,
           }}
         >
@@ -265,13 +265,13 @@ function RulesPanel(): ReactElement {
     <div style={{ display: "grid", gap: "var(--os-space-4)" }}>
       <SectionTitle icon="shield" title="כללי שימוש נכון" />
       <Panel variant="raised" style={{ padding: "var(--os-space-5)", display: "grid", gap: "var(--os-space-5)" }}>
-        <RulesColumn title="מותר" color="var(--os-success)" items={CORRECT_USE_RULES.allowed} />
+        <RulesColumn title="מותר" color="var(--success-text)" items={CORRECT_USE_RULES.allowed} />
         <RulesColumn
           title="חובה לבדוק"
-          color="var(--os-warning)"
+          color="var(--warning-text)"
           items={CORRECT_USE_RULES.mustVerify}
         />
-        <RulesColumn title="אסור" color="var(--os-danger)" items={CORRECT_USE_RULES.forbidden} />
+        <RulesColumn title="אסור" color="var(--danger-text)" items={CORRECT_USE_RULES.forbidden} />
         <div style={{ color: "var(--os-muted)", fontSize: "var(--os-text-2xs)" }}>
           הנוהל המלא: «נוהל שימוש נכון» במרכז חומרי ההדרכה. הפרת סעיפי ה"אסור" מטופלת
           כאירוע אבטחה.
@@ -301,7 +301,7 @@ function PresentationView(): ReactElement {
     >
       {slide === 0 ? (
         <>
-          <div style={{ color: "var(--os-cyan)", fontSize: "var(--os-text-sm)", fontWeight: 600 }}>
+          <div style={{ color: "var(--os-cyan-text)", fontSize: "var(--os-text-sm)", fontWeight: 600 }}>
             TERAGON AI BUSINESS OS
           </div>
           <div style={{ color: "var(--os-text)", fontSize: "var(--os-text-2xl)", fontWeight: 800 }}>
@@ -313,7 +313,7 @@ function PresentationView(): ReactElement {
         </>
       ) : action ? (
         <>
-          <div style={{ color: "var(--os-cyan)", fontSize: "var(--os-text-lg)", fontWeight: 700 }}>
+          <div style={{ color: "var(--os-cyan-text)", fontSize: "var(--os-text-lg)", fontWeight: 700 }}>
             פעולה <span className="os-num">{action.order}</span> / 3
           </div>
           <div style={{ color: "var(--os-text)", fontSize: "var(--os-text-2xl)", fontWeight: 800 }}>
@@ -322,7 +322,7 @@ function PresentationView(): ReactElement {
           <div style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-lg)", maxInlineSize: 640, marginInline: "auto" }}>
             {action.expectedResult}
           </div>
-          <div style={{ color: "var(--os-warning)", fontSize: "var(--os-text-md)" }}>
+          <div style={{ color: "var(--warning-text)", fontSize: "var(--os-text-md)" }}>
             טעות נפוצה: {action.commonMistake}
           </div>
         </>
@@ -361,11 +361,11 @@ function QuickStartRail(): ReactElement {
 
   const verdictColor = (v: PlannedActionAnswer["verdict"]): string =>
     v === "מותר"
-      ? "var(--os-success)"
+      ? "var(--success-text)"
       : v === "חובה לבדוק"
-        ? "var(--os-warning)"
+        ? "var(--warning-text)"
         : v === "אסור"
-          ? "var(--os-danger)"
+          ? "var(--danger-text)"
           : "var(--os-muted)";
 
   return (

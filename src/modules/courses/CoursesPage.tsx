@@ -513,7 +513,7 @@ function SessionsView({
       header: "נוכחות",
       render: (s) =>
         s.notes.startsWith("נוכחות") ? (
-          <span style={{ color: "var(--os-success)", fontSize: "var(--os-text-xs)" }}>
+          <span style={{ color: "var(--success-text)", fontSize: "var(--os-text-xs)" }}>
             {s.notes}
           </span>
         ) : (

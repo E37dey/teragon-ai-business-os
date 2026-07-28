@@ -167,7 +167,7 @@ export function MainWorkflow({
             className="courses-workflow__block"
             style={{ padding: "var(--os-space-4)" }}
           >
-            <div style={{ color: "var(--os-danger)", marginBlockEnd: 4 }}>בקשת עזרה</div>
+            <div style={{ color: "var(--danger-text)", marginBlockEnd: 4 }}>בקשת עזרה</div>
             <div className="courses-workflow__text">{activeStage.help}</div>
           </Panel>
         )}
@@ -179,7 +179,7 @@ export function MainWorkflow({
               </div>
             ))}
             {activeStage.links.map((l) => (
-              <div key={l.url} style={{ color: "var(--os-cyan)" }}>
+              <div key={l.url} style={{ color: "var(--os-cyan-text)" }}>
                 🔗 {l.label}
               </div>
             ))}
@@ -191,7 +191,7 @@ export function MainWorkflow({
             {stageMeta.checklist.map((item) => {
               const done = activeStage.checklistDone.includes(item);
               return (
-                <div key={item} style={{ color: done ? "var(--os-success)" : "var(--os-text-2)" }}>
+                <div key={item} style={{ color: done ? "var(--success-text)" : "var(--os-text-2)" }}>
                   {done ? "✓" : "○"} {item}
                 </div>
               );
@@ -209,7 +209,7 @@ export function MainWorkflow({
                 variant="raised"
                 style={{ padding: "var(--os-space-3)", fontSize: "var(--os-text-xs)" }}
               >
-                <span style={{ color: "var(--os-cyan)" }}>{n.author}</span>
+                <span style={{ color: "var(--os-cyan-text)" }}>{n.author}</span>
                 <span style={{ color: "var(--os-muted)" }}>
                   {" · "}
                   <span className="os-num">{formatDateHe(n.date)}</span>

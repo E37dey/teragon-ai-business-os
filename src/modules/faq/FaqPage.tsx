@@ -251,7 +251,7 @@ function ObjectionDetail({
         {objection.supportingEvidence.map((ev) => (
           <div key={ev.label} style={{ fontSize: "var(--os-text-sm)" }}>
             {ev.route ? (
-              <Link to={ev.route} style={{ color: "var(--os-cyan)", fontWeight: 600 }}>
+              <Link to={ev.route} style={{ color: "var(--os-cyan-text)", fontWeight: 600 }}>
                 ← {ev.label} <span dir="ltr">({ev.route})</span>
               </Link>
             ) : (
@@ -264,7 +264,7 @@ function ObjectionDetail({
           <div style={fieldLabel}>חומר הדרכה קשור</div>
           <div style={fieldText}>
             {objection.relatedMaterialId ? (
-              <Link to="/training-materials" style={{ color: "var(--os-cyan)" }}>
+              <Link to="/training-materials" style={{ color: "var(--os-cyan-text)" }}>
                 {objection.relatedMaterialId} — במרכז חומרי ההדרכה
               </Link>
             ) : (
@@ -274,7 +274,7 @@ function ObjectionDetail({
         </div>
         <div>
           <div style={fieldLabel}>שאלת המשך מומלצת</div>
-          <div style={{ ...fieldText, color: "var(--os-cyan)" }}>{objection.followUpQuestion}</div>
+          <div style={{ ...fieldText, color: "var(--os-cyan-text)" }}>{objection.followUpQuestion}</div>
         </div>
       </div>
     </div>
@@ -373,25 +373,25 @@ function SimulatorRail({
         <div style={{ display: "grid", gap: "var(--os-space-3)" }}>
           {result.evaluation.warnings.length > 0 ? (
             <div>
-              <div style={{ color: "var(--os-danger)", fontWeight: 700, fontSize: "var(--os-text-xs)" }}>
+              <div style={{ color: "var(--danger-text)", fontWeight: 700, fontSize: "var(--os-text-xs)" }}>
                 אזהרות ניסוח ({result.evaluation.warnings.length})
               </div>
               {result.evaluation.warnings.map((w) => (
                 <div key={w.rule} style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-2xs)", marginBlockStart: 4, lineHeight: 1.6 }}>
-                  <b style={{ color: "var(--os-warning)" }}>{w.rule}</b> — «{w.matchedText}»:{" "}
+                  <b style={{ color: "var(--warning-text)" }}>{w.rule}</b> — «{w.matchedText}»:{" "}
                   {w.explanationHe}
                 </div>
               ))}
             </div>
           ) : (
-            <div style={{ color: "var(--os-success)", fontSize: "var(--os-text-xs)" }}>
+            <div style={{ color: "var(--success-text)", fontSize: "var(--os-text-xs)" }}>
               לא זוהו דפוסי ניסוח בעייתיים על ידי הכללים.
             </div>
           )}
 
           {result.evaluation.strengths.length > 0 && (
             <div>
-              <div style={{ color: "var(--os-success)", fontWeight: 700, fontSize: "var(--os-text-xs)" }}>
+              <div style={{ color: "var(--success-text)", fontWeight: 700, fontSize: "var(--os-text-xs)" }}>
                 חוזקות שזוהו
               </div>
               {result.evaluation.strengths.map((s) => (
@@ -404,7 +404,7 @@ function SimulatorRail({
 
           {result.evaluation.suggestions.length > 0 && (
             <div>
-              <div style={{ color: "var(--os-cyan)", fontWeight: 700, fontSize: "var(--os-text-xs)" }}>
+              <div style={{ color: "var(--os-cyan-text)", fontWeight: 700, fontSize: "var(--os-text-xs)" }}>
                 הצעות לשיפור
               </div>
               {result.evaluation.suggestions.map((s) => (

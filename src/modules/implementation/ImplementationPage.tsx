@@ -152,7 +152,7 @@ function GanttTimeline({
               y={y + 15}
               textAnchor="end"
               fontSize={12}
-              fill="var(--os-text-secondary, #98A8BD)"
+              fill="var(--os-text-2)"
               direction="rtl"
             >
               {s.order}. {s.name}
@@ -290,7 +290,7 @@ function StageDrawer({
               {risks.map((r) => (
                 <Panel key={r.id} style={{ marginBlock: 8, padding: 12 }}>
                   <div style={{ fontWeight: 600 }}>{r.title}</div>
-                  <div style={{ fontSize: 12, color: "var(--os-text-secondary)", marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: "var(--os-text-2)", marginTop: 4 }}>
                     הסתברות {r.probability} · השפעה {r.impact} · {r.status}
                   </div>
                   <div style={{ fontSize: 12, marginTop: 6 }}>מיתון: {r.mitigation}</div>
@@ -476,7 +476,7 @@ export default function ImplementationPage(): ReactElement {
               label={currentStage.status}
             />
           )}
-          <span style={{ color: "var(--os-text-secondary)", fontSize: 13 }}>
+          <span style={{ color: "var(--os-text-2)", fontSize: 13 }}>
             {currentStage?.nextAction}
           </span>
         </div>
@@ -511,7 +511,7 @@ export default function ImplementationPage(): ReactElement {
                   </strong>
                   <StatusChip status={STAGE_STATUS_CHIP[stage.status]} label={stage.status} />
                 </div>
-                <div style={{ fontSize: 12, color: "var(--os-text-secondary)", marginTop: 8 }}>
+                <div style={{ fontSize: 12, color: "var(--os-text-2)", marginTop: 8 }}>
                   {stage.objective}
                 </div>
                 <div style={{ fontSize: 12, marginTop: 10, display: "grid", gap: 4 }}>
@@ -553,7 +553,7 @@ export default function ImplementationPage(): ReactElement {
                 </strong>
                 <StatusChip status={STAGE_STATUS_CHIP[w.status]} label={w.status} />
               </div>
-              <div style={{ fontSize: 12, color: "var(--os-text-secondary)", marginTop: 6 }}>
+              <div style={{ fontSize: 12, color: "var(--os-text-2)", marginTop: 6 }}>
                 {w.audienceHe}
               </div>
               <div style={{ fontSize: 12, marginTop: 6 }}>

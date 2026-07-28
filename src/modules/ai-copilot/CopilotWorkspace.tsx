@@ -459,7 +459,7 @@ export default function CopilotWorkspace(): ReactElement {
                         display: "grid",
                         gap: 6,
                         fontSize: "var(--os-text-sm, 13px)",
-                        color: "var(--os-danger)",
+                        color: "var(--danger-text)",
                         border: "1px solid var(--os-danger-border, var(--os-border))",
                         borderRadius: "var(--os-radius-md, 8px)",
                         paddingBlock: "var(--os-space-2)",
@@ -501,7 +501,7 @@ export default function CopilotWorkspace(): ReactElement {
                                 <span key={a.id + String(i)}>
                                   {i > 0 && " · "}
                                   {a.route ? (
-                                    <Link to={a.route} style={{ color: "var(--os-cyan)" }}>
+                                    <Link to={a.route} style={{ color: "var(--os-cyan-text)" }}>
                                       {a.labelHe} ({a.id})
                                     </Link>
                                   ) : (

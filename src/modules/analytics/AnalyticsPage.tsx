@@ -129,8 +129,8 @@ const kpiRowStyle: CSSProperties = {
 };
 
 const selectStyle: CSSProperties = {
-  background: "var(--os-bg-raised)",
-  color: "var(--os-text-1)",
+  background: "var(--os-raised)",
+  color: "var(--os-text)",
   border: "1px solid var(--os-border)",
   borderRadius: "6px",
   padding: "0.35rem 0.5rem",
@@ -612,11 +612,11 @@ export default function AnalyticsPage(): ReactElement {
             <p style={{ color: "var(--os-text-2)", fontSize: "0.85rem", margin: 0 }}>
               {drill.contextHe}
             </p>
-            <p className="os-num" style={{ color: "var(--os-text-3)", fontSize: "0.78rem", margin: 0 }} dir="ltr">
+            <p className="os-num" style={{ color: "var(--os-muted)", fontSize: "0.78rem", margin: 0 }} dir="ltr">
               {drill.period.startISO.slice(0, 10)} → {drill.period.endISO.slice(0, 10)}
             </p>
             {drill.def.limitationsHe.length > 0 && (
-              <ul style={{ margin: 0, paddingInlineStart: "1.1rem", color: "var(--os-text-3)", fontSize: "0.78rem" }}>
+              <ul style={{ margin: 0, paddingInlineStart: "1.1rem", color: "var(--os-muted)", fontSize: "0.78rem" }}>
                 {drill.def.limitationsHe.map((l) => (
                   <li key={l}>{l}</li>
                 ))}
@@ -628,7 +628,7 @@ export default function AnalyticsPage(): ReactElement {
                   key: "titleHe",
                   header: "רשומה",
                   render: (r) => (
-                    <Link to={r.route} style={{ color: "var(--os-accent-cyan, #20C4E8)" }}>
+                    <Link to={r.route} style={{ color: "var(--os-cyan-text)" }}>
                       {r.titleHe}
                     </Link>
                   ),
@@ -694,7 +694,7 @@ export default function AnalyticsPage(): ReactElement {
               emptyText="אין שורות בדוח"
             />
             {openRun.limitations.length > 0 && (
-              <ul style={{ margin: 0, paddingInlineStart: "1.1rem", color: "var(--os-text-3)", fontSize: "0.78rem" }}>
+              <ul style={{ margin: 0, paddingInlineStart: "1.1rem", color: "var(--os-muted)", fontSize: "0.78rem" }}>
                 {openRun.limitations.map((l) => (
                   <li key={l}>מגבלה: {l}</li>
                 ))}
@@ -893,7 +893,7 @@ function MetricCard({
   return (
     <Panel variant="raised" style={{ padding: "var(--os-space-4)", display: "grid", gap: "var(--os-space-3)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--os-space-3)", alignItems: "baseline" }}>
-        <span style={{ fontSize: "0.88rem", color: "var(--os-text-1)", fontWeight: 600 }}>{def.titleHe}</span>
+        <span style={{ fontSize: "0.88rem", color: "var(--os-text)", fontWeight: 600 }}>{def.titleHe}</span>
         {kindChip(def.kind)}
       </div>
       <button
@@ -914,7 +914,7 @@ function MetricCard({
           cursor: "pointer",
           fontSize: "1.35rem",
           fontWeight: 700,
-          color: latest === null ? "var(--os-text-3)" : "var(--os-text-1)",
+          color: latest === null ? "var(--os-muted)" : "var(--os-text)",
         }}
         aria-label={`${def.titleHe} — פתיחת רשומות המקור`}
       >
@@ -925,7 +925,7 @@ function MetricCard({
         )}
       </button>
       {latest === null && (
-        <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--os-text-3)" }}>{def.sourceHe}</p>
+        <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--os-muted)" }}>{def.sourceHe}</p>
       )}
       {comparison !== null && (
         <div>{comparisonChip(comparison, def.betterWhen)}</div>
@@ -979,7 +979,7 @@ function MetricCard({
         />
       )}
       {isSeries && (
-        <p className="os-num" style={{ margin: 0, fontSize: "0.72rem", color: "var(--os-text-3)" }} dir="rtl">
+        <p className="os-num" style={{ margin: 0, fontSize: "0.72rem", color: "var(--os-muted)" }} dir="rtl">
           {measuredCount} נקודות מדודות מתוך {series.points.length}
         </p>
       )}
@@ -1175,17 +1175,17 @@ function MetricsMoreDisclosure({
               paddingBlockStart: "var(--os-space-3)",
             }}
           >
-            <span style={{ fontSize: "0.9rem", color: "var(--os-text-1)", fontWeight: 600 }}>
+            <span style={{ fontSize: "0.9rem", color: "var(--os-text)", fontWeight: 600 }}>
               {d.titleHe} · {d.unit}
             </span>
             <span style={{ fontSize: "var(--os-text-sm, 13px)", color: "var(--os-text-2)" }}>
               שיטת חישוב: {d.calculationMethodHe}
             </span>
-            <span style={{ fontSize: "var(--os-text-sm, 13px)", color: "var(--os-text-3)" }}>
+            <span style={{ fontSize: "var(--os-text-sm, 13px)", color: "var(--os-muted)" }}>
               מקור: {d.sourceHe}
             </span>
             {d.limitationsHe.length > 0 && (
-              <span style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-text-3)" }}>
+              <span style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-muted)" }}>
                 מגבלות: {d.limitationsHe.join(" · ")}
               </span>
             )}
@@ -1231,9 +1231,9 @@ function ReportsSection({
       >
         {defs.map((d) => (
           <Panel key={d.id} variant="raised" style={{ padding: "var(--os-space-4)", display: "grid", gap: "var(--os-space-3)" }}>
-            <span style={{ fontWeight: 600, color: "var(--os-text-1)" }}>{d.titleHe}</span>
+            <span style={{ fontWeight: 600, color: "var(--os-text)" }}>{d.titleHe}</span>
             <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--os-text-2)" }}>{d.descriptionHe}</p>
-            <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--os-text-3)" }}>
+            <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--os-muted)" }}>
               תדירות: {d.cadenceHe} · בעלים: {userName(d.ownerId)} ·{" "}
               <span className="os-num">{d.metricKeys.length}</span> מדדים
             </p>
@@ -1269,7 +1269,7 @@ function ReportsSection({
             key: "exportState",
             header: "ייצוא",
             render: (r: ReportRun) => (
-              <span style={{ fontSize: "0.75rem", color: "var(--os-text-3)" }}>
+              <span style={{ fontSize: "0.75rem", color: "var(--os-muted)" }}>
                 {r.exportState.csvExportedAt !== null ? "CSV ✓" : ""}
                 {r.exportState.printedAt !== null ? " הודפס ✓" : ""}
                 {r.exportState.csvExportedAt === null && r.exportState.printedAt === null ? "—" : ""}

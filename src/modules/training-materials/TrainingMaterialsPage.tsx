@@ -489,7 +489,7 @@ function MaterialDrawer({
             </OsButton>
           )}
           {material.contentRoute && (
-            <Link to={material.contentRoute} style={{ alignSelf: "center", color: "var(--os-cyan)", fontSize: "var(--os-text-sm)" }}>
+            <Link to={material.contentRoute} style={{ alignSelf: "center", color: "var(--os-cyan-text)", fontSize: "var(--os-text-sm)" }}>
               ← מעבר לעמוד החומר <span dir="ltr">({material.contentRoute})</span>
             </Link>
           )}
@@ -534,7 +534,7 @@ function MaterialsRail({ findings }: { findings: readonly MaterialFinding[] }): 
       )}
       {[...byKind.entries()].map(([kind, list]) => (
         <div key={kind}>
-          <div style={{ color: "var(--os-warning)", fontWeight: 600, marginBlockEnd: 4 }}>
+          <div style={{ color: "var(--warning-text)", fontWeight: 600, marginBlockEnd: 4 }}>
             {kind} ({list.length})
           </div>
           {list.slice(0, 4).map((f) => (

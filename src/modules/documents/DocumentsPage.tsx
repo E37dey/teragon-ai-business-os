@@ -313,7 +313,7 @@ export default function DocumentsPage(): ReactElement {
                 expSoon.map((q) => (
                   <div key={q.id} style={{ display: "flex", justifyContent: "space-between" }}>
                     <span>{q.customerName}</span>
-                    <span className="os-num" style={{ color: "var(--os-warning)" }}>
+                    <span className="os-num" style={{ color: "var(--warning-text)" }}>
                       {dateHe(q.validUntil)}
                     </span>
                   </div>
@@ -343,13 +343,13 @@ export default function DocumentsPage(): ReactElement {
             <div style={{ display: "grid", gap: 6, fontSize: "var(--os-text-sm, 12px)" }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span>פתוח</span>
-                <span className="os-num" style={{ color: "var(--os-cyan)" }}>
+                <span className="os-num" style={{ color: "var(--os-cyan-text)" }}>
                   {ils(pipeline.openValue)}
                 </span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span>מאושר</span>
-                <span className="os-num" style={{ color: "var(--os-success)" }}>
+                <span className="os-num" style={{ color: "var(--success-text)" }}>
                   {ils(pipeline.approvedValue)}
                 </span>
               </div>
@@ -469,7 +469,7 @@ export default function DocumentsPage(): ReactElement {
                 render: (q) => (
                   <span
                     className="os-num"
-                    style={isExpired(q, today) ? { color: "var(--os-danger)" } : undefined}
+                    style={isExpired(q, today) ? { color: "var(--danger-text)" } : undefined}
                   >
                     {dateHe(q.validUntil)}
                   </span>
@@ -601,7 +601,7 @@ export default function DocumentsPage(): ReactElement {
                       target="_blank"
                       rel="noreferrer"
                       className="os-ltr"
-                      style={{ color: "var(--os-cyan)" }}
+                      style={{ color: "var(--os-cyan-text)" }}
                     >
                       פתיחה
                     </a>
@@ -884,7 +884,7 @@ export default function DocumentsPage(): ReactElement {
                   display: "flex",
                   justifyContent: "space-between",
                   fontWeight: 700,
-                  color: "var(--os-cyan)",
+                  color: "var(--os-cyan-text)",
                 }}
               >
                 <span>סה"כ לתשלום</span>

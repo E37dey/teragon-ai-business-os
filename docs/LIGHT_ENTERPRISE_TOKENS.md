@@ -15,7 +15,7 @@ Canonical light-theme color values (`src/styles/tokens.css`, `:root` / `[data-th
 | Border subtle/default/strong | `--border-*` | `rgba(39,57,73, .08/.14/.22)` |
 | Text primary | `--text-primary` | `#18232D` |
 | Text secondary | `--text-secondary` | `#4F5F6E` |
-| Text muted | `--text-muted` | `#5B6773` * (spec `#74818D` failed AA on light) |
+| Text muted | `--text-muted` | `#545F6B` * (spec `#74818D`; darkened for AA incl. tinted/selected) |
 | Text disabled | `--text-disabled` | `#8B96A1` * |
 | Accent primary | `--accent-primary` | `#3F7E8D` |
 | Accent hover | `--accent-primary-hover` | `#356E7B` |

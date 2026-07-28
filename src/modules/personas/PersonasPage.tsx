@@ -57,15 +57,15 @@ const PERSONA_VISUALS: Record<string, PersonaVisual> = {
   "per-7": { accent: "blue", icon: "alert", signature: "lace" },
 };
 const ACCENT_VAR: Record<OsAccent, string> = {
-  blue: "var(--os-blue)",
-  cyan: "var(--os-cyan)",
+  blue: "var(--os-cyan-text)",
+  cyan: "var(--os-cyan-text)",
   // W7-G trivial a11y fix: --os-violet fails WCAG AA as TEXT on panels (axe
   // color-contrast, serious, per-3 lane) — the palette ships a readable text
   // variant for exactly this case (docs/WAVE_7_VISUAL_QA.md §axe)
   violet: "var(--os-violet-text)",
-  success: "var(--os-success)",
-  warning: "var(--os-warning)",
-  danger: "var(--os-danger)",
+  success: "var(--success-text)",
+  warning: "var(--warning-text)",
+  danger: "var(--danger-text)",
 };
 
 const kpiRowStyle: CSSProperties = {
@@ -638,7 +638,7 @@ function ValidationStatus({
         <span className="os-chip os-chip--muted">אימוץ: {NOT_MEASURED}</span>
       </div>
       {problems.length > 0 && (
-        <ul style={{ margin: 0, paddingInlineStart: "1.2em", color: "var(--os-danger)" }}>
+        <ul style={{ margin: 0, paddingInlineStart: "1.2em", color: "var(--danger-text)" }}>
           {problems.map((p) => (
             <li key={p} style={{ fontSize: "var(--os-text-sm)" }}>
               {p}
@@ -749,7 +749,7 @@ function PersonasRail({
         <div>
           <div style={railTitle}>בעיות גשר seed</div>
           {bridgeProblems.map((p) => (
-            <div key={p} style={{ color: "var(--os-danger)", fontSize: "var(--os-text-xs)" }}>
+            <div key={p} style={{ color: "var(--danger-text)", fontSize: "var(--os-text-xs)" }}>
               {p}
             </div>
           ))}
@@ -807,7 +807,7 @@ function RailWarning({ warning }: { warning: PersonaAuditWarning }): ReactElemen
     >
       <span
         style={{
-          color: warning.severity === "אזהרה" ? "var(--os-warning)" : "var(--os-muted)",
+          color: warning.severity === "אזהרה" ? "var(--warning-text)" : "var(--os-muted)",
           fontSize: "var(--os-text-2xs)",
           fontWeight: 600,
         }}

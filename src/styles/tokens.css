@@ -42,7 +42,7 @@
 
   --text-primary: #18232d;
   --text-secondary: #4f5f6e;
-  --text-muted: #5b6773; /* darkened from spec #74818d to hold WCAG AA on light surfaces */
+  --text-muted: #545f6b; /* darkened from spec #74818d to hold WCAG AA on light surfaces incl. tinted/selected */
   --text-disabled: #8b96a1;
 
   --accent-primary: #3f7e8d;

@@ -121,7 +121,7 @@ export function ProposalReviewPanel({
         <div
           data-testid="single-case-marker"
           style={{
-            color: "var(--os-warning)",
+            color: "var(--warning-text)",
             fontSize: "var(--os-text-sm, 13px)",
             fontWeight: 600,
           }}

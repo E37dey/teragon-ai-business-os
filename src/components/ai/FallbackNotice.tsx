@@ -19,7 +19,7 @@ export function FallbackNotice({ fallback }: FallbackNoticeProps): ReactElement 
         alignItems: "center",
         gap: 8,
         fontSize: "var(--os-text-sm, 13px)",
-        color: "var(--os-warning)",
+        color: "var(--warning-text)",
         border: "1px solid var(--os-warning-border, var(--os-border))",
         background: "var(--os-warning-soft, transparent)",
         borderRadius: "var(--os-radius-sm, 6px)",

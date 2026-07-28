@@ -90,7 +90,7 @@ function RoadmapSummary(): ReactElement {
       >
         {stages.map((s) => (
           <Panel key={s.id} variant="raised" style={{ padding: "var(--os-space-4)", display: "grid", gap: 6 }}>
-            <span className="os-num" style={{ color: "var(--os-cyan)", fontWeight: 800 }}>
+            <span className="os-num" style={{ color: "var(--os-cyan-text)", fontWeight: 800 }}>
               {s.order}
             </span>
             <b style={{ color: "var(--os-text)", fontSize: "var(--os-text-sm)" }}>{s.name}</b>
@@ -102,7 +102,7 @@ function RoadmapSummary(): ReactElement {
           </Panel>
         ))}
       </div>
-      <div style={{ color: "var(--os-warning)", fontSize: "var(--os-text-xs)" }}>
+      <div style={{ color: "var(--warning-text)", fontSize: "var(--os-text-xs)" }}>
         נקודת ההחלטה הקריטית: סוף שבוע 7 — שער G4 נשאר חסום עד תוצאת פיילוט מדודה.
       </div>
     </div>
@@ -146,7 +146,7 @@ function MetricsSummary(): ReactElement {
           const levelDefs = defs.filter((d) => d.level === level);
           return (
             <Panel key={level} variant="raised" style={{ padding: "var(--os-space-4)", display: "grid", gap: 8 }}>
-              <b style={{ color: "var(--os-cyan)", fontSize: "var(--os-text-sm)" }}>
+              <b style={{ color: "var(--os-cyan-text)", fontSize: "var(--os-text-sm)" }}>
                 {METRIC_LEVEL_LABELS[level]}
               </b>
               {levelDefs.length === 0 ? (
@@ -167,7 +167,7 @@ function MetricsSummary(): ReactElement {
                     <span style={{ color: "var(--os-text-2)" }}>{d.name}</span>
                     <span
                       style={{
-                        color: measuredKeys.has(d.key) ? "var(--os-success)" : "var(--os-muted)",
+                        color: measuredKeys.has(d.key) ? "var(--success-text)" : "var(--os-muted)",
                         whiteSpace: "nowrap",
                       }}
                     >
@@ -190,13 +190,13 @@ function MetricsSummary(): ReactElement {
             gap: 6,
           }}
         >
-          <b style={{ color: "var(--os-danger)", fontSize: "var(--os-text-sm)" }}>
+          <b style={{ color: "var(--danger-text)", fontSize: "var(--os-text-sm)" }}>
             הסיכון המרכזי: {mainRisk.title}
           </b>
           <span style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-xs)" }}>
             {mainRisk.description}
           </span>
-          <span style={{ color: "var(--os-success)", fontSize: "var(--os-text-xs)" }}>
+          <span style={{ color: "var(--success-text)", fontSize: "var(--os-text-xs)" }}>
             מיתון: {mainRisk.mitigation}
           </span>
         </Panel>
@@ -225,7 +225,7 @@ function QuickStartMicrolearning(): ReactElement {
       >
         {QUICK_START_ACTIONS.map((a) => (
           <Panel key={a.order} variant="raised" style={{ padding: "var(--os-space-4)", display: "grid", gap: 6 }}>
-            <span className="os-num" style={{ color: "var(--os-cyan)", fontWeight: 800 }}>
+            <span className="os-num" style={{ color: "var(--os-cyan-text)", fontWeight: 800 }}>
               {a.order}
             </span>
             <b style={{ color: "var(--os-text)", fontSize: "var(--os-text-sm)" }}>{a.title}</b>
@@ -238,7 +238,7 @@ function QuickStartMicrolearning(): ReactElement {
           </Panel>
         ))}
       </div>
-      <div style={{ color: "var(--os-cyan)", fontSize: "var(--os-text-sm)", fontWeight: 700 }}>
+      <div style={{ color: "var(--os-cyan-text)", fontSize: "var(--os-text-sm)", fontWeight: 700 }}>
         ⭐ הכלל: ה-AI מציע — האדם תמיד מאשר לפני ששולחים (HITL)
       </div>
       <details>
