@@ -103,8 +103,18 @@ for (const [label, chunk] of HALVES) {
     await gotoShellReady(page, "/");
 
     for (const row of chunk) {
+      // Visual-Calm collapses non-active nav groups by default, so a target
+      // link can live inside a collapsed <details>/group and not be visible.
+      // Expand every collapsed group first so every in-shell link is reachable
+      // (the SPA route transition is what's under test, not the disclosure).
+      for (let i = 0; i < 8; i++) {
+        const collapsed = page.locator('.os-nav__group-head[aria-expanded="false"]').first();
+        if ((await collapsed.count()) === 0) break;
+        await collapsed.click();
+      }
       const link = page.locator(`nav.os-nav a[href='${row.path}']`).first();
       await expect(link, `nav link missing for ${row.path}`).toBeVisible({ timeout: 30_000 });
+      await link.scrollIntoViewIfNeeded();
       await link.click();
       await expect(page).toHaveURL(new RegExp(`${row.path.replace(/\//g, "\\/")}$`), {
         timeout: 60_000,

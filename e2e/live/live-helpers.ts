@@ -221,10 +221,20 @@ export async function awaitRouteRendered(page: Page, row: RouteRow): Promise<voi
   if (row.inShell) {
     await expect(page.locator("nav.os-nav").first()).toBeVisible({ timeout: 60_000 });
     await assertNotStuckLoading(page);
-    // (b) router really resolved a route — the active nav item is marked
-    await expect(page.locator('nav.os-nav a[aria-current="page"]').first()).toBeVisible({
-      timeout: 60_000,
-    });
+    // (b) router really resolved a route — the active nav item is marked with
+    // aria-current="page". This proof only applies to routes that HAVE a nav
+    // link. /customers and /customers/:id are OFF-NAV by design (see
+    // live-routes.spec.ts and src/app/nav/navGroups.ts): no nav link exists for
+    // them, so no item can ever carry aria-current. For those, the router-
+    // resolved proof is instead the strong content assertion (c) below plus the
+    // caller's own toHaveURL check — asserting aria-current here would be a
+    // false contract. So we gate (b) on a nav link for this route existing.
+    const hasNavLink = (await page.locator(`nav.os-nav a[href='${row.path}']`).count()) > 0;
+    if (hasNavLink) {
+      await expect(page.locator('nav.os-nav a[aria-current="page"]').first()).toBeVisible({
+        timeout: 60_000,
+      });
+    }
     // (c) the route's own content region rendered
     const main = page.locator("main").first();
     await expect(main).toBeVisible({ timeout: 60_000 });
