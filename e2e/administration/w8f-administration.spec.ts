@@ -11,6 +11,7 @@ test("role assignment via the canonical modal updates the user row", async ({ pa
   const errors = collectConsoleErrors(page);
   await gotoAdministration(page);
 
+  await page.getByTestId("user-actions-u-maya").locator("summary").click();
   await page.getByTestId("assign-role-u-maya").click();
   const modal = page.getByTestId("assign-role-modal");
   await expect(modal).toBeVisible();
@@ -28,6 +29,7 @@ test("self-approval is refused VISIBLY — approver list excludes the requester 
   const errors = collectConsoleErrors(page);
   await gotoAdministration(page);
 
+  await page.getByTestId("user-actions-u-maya").locator("summary").click();
   await page.getByTestId("request-change-u-maya").click();
   const modal = page.getByTestId("request-change-modal");
   await expect(modal).toBeVisible();
@@ -51,6 +53,7 @@ test("invalid combination is refused CONSTRUCTIVELY at request time (R3: מכי�
   await gotoAdministration(page);
 
   // u-maya is מכירות — restricted technical memory is forbidden even for read
+  await page.getByTestId("user-actions-u-maya").locator("summary").click();
   await page.getByTestId("request-change-u-maya").click();
   const modal = page.getByTestId("request-change-modal");
   await modal.locator("#adm-req-domain").selectOption("memory-restricted");
@@ -107,6 +110,7 @@ test("permission request → approve → executed + VERIFIED by read-back", asyn
 
   // create a REAL request through the UI (valid combination: crm read → write
   // is not needed — keep the current level's domain at a harmless level)
+  await page.getByTestId("user-actions-u-maya").locator("summary").click();
   await page.getByTestId("request-change-u-maya").click();
   const modal = page.getByTestId("request-change-modal");
   await modal.locator("#adm-req-domain").selectOption("crm");

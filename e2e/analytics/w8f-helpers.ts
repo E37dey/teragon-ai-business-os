@@ -24,7 +24,9 @@ export function nonNetworkErrors(errors: string[]): string[] {
 export async function gotoAnalytics(page: Page): Promise<void> {
   await page.goto("/analytics");
   await expect(page.getByText("דוחות וניתוחים").first()).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText("מבקר המדדים").first()).toBeVisible({ timeout: 30_000 });
+  // wait on a stable primary KPI (the rail title renders non-exactly and a
+  // like-named metric was moved into a collapsed disclosure by Visual Calm).
+  await expect(page.getByText("לידים חדשים").first()).toBeVisible({ timeout: 30_000 });
 }
 
 export async function gotoGovernance(page: Page): Promise<void> {

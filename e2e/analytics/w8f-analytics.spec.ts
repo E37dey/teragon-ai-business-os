@@ -15,22 +15,22 @@ const SECRET_PATTERNS = [
   /password\s*[:=]/i,
 ];
 
-test("filters narrow the visible metric groups — and reset restores them", async ({ page }) => {
+test("segmented group navigation shows one group at a time (VC-F)", async ({ page }) => {
   const errors = collectConsoleErrors(page);
   await gotoAnalytics(page);
 
-  // all 6 group SECTION HEADINGS visible unfiltered (the <option>s of the same
-  // text stay in the DOM — scope to the h3 headings, not the select options)
-  await expect(page.getByRole("heading", { name: "ב · מכירות ולקוחות" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "ה · AI וממשל" })).toBeVisible();
-
-  // narrow to group ב
-  await page.getByLabel("קבוצת מדדים").selectOption({ label: "ב · מכירות ולקוחות" });
+  // default group ו is shown; the others are NOT rendered simultaneously
+  await expect(page.getByRole("heading", { name: "ו · תוצאות עסקיות" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "ה · AI וממשל" })).toHaveCount(0);
+
+  // pick group ב via the segmented GroupNav → its heading shows, ו hides
+  await page.getByRole("tab", { name: "ב · מכירות ולקוחות" }).click();
+  await expect(page.getByRole("heading", { name: "ב · מכירות ולקוחות" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "ו · תוצאות עסקיות" })).toHaveCount(0);
   await expect(page.getByText("לידים חדשים").first()).toBeVisible();
 
-  // reset restores everything
-  await page.getByRole("button", { name: "איפוס" }).click();
+  // switch to group ה
+  await page.getByRole("tab", { name: "ה · AI וממשל" }).click();
   await expect(page.getByRole("heading", { name: "ה · AI וממשל" })).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -40,8 +40,10 @@ test("insufficient-data state is VISIBLE — 'טרם נמדד' chips, never a fa
   await gotoAnalytics(page);
   // pilot-target/structural metrics honestly report טרם נמדד
   await expect(page.getByText("טרם נמדד").first()).toBeVisible();
-  // the KPI row separates honest counts
-  await expect(page.getByText("ללא מדידה כעת").first()).toBeVisible();
+  // the honest "ללא מדידה כעת" count moved into the "מדדים נוספים" disclosure (VC-F)
+  const more = page.locator(".os-more-metrics");
+  await more.locator("summary").click();
+  await expect(more.getByText("ללא מדידה כעת")).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -49,6 +51,8 @@ test("chart drilldown opens the REAL source records with in-app routes", async (
   const errors = collectConsoleErrors(page);
   await gotoAnalytics(page);
 
+  // leads_new's drilldown card lives in group ב — select it via the group nav
+  await page.getByRole("tab", { name: "ב · מכירות ולקוחות" }).click();
   await page.getByRole("button", { name: "לידים חדשים — פתיחת רשומות המקור" }).click();
   await expect(page.getByText("רשומות המקור — לידים חדשים")).toBeVisible();
   // the drawer lists real lead records that link to /crm
@@ -112,8 +116,8 @@ test("saved view persists across a full reload (IndexedDB)", async ({ page }) =>
   const errors = collectConsoleErrors(page);
   await gotoAnalytics(page);
 
-  // set a distinctive filter and save it
-  await page.getByLabel("קבוצת מדדים").selectOption({ label: "ב · מכירות ולקוחות" });
+  // set a distinctive filter (group ב via the segmented nav) and save it
+  await page.getByRole("tab", { name: "ב · מכירות ולקוחות" }).click();
   await page.getByRole("button", { name: "שמירת תצוגה" }).click();
   await page.getByPlaceholder("לדוגמה: מכירות — רבעון").fill("W8F-בדיקת-התמדה");
   await page.getByRole("button", { name: "שמירה", exact: true }).click();

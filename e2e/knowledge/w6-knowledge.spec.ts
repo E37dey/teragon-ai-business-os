@@ -169,7 +169,9 @@ test("contradiction: two approved articles with conflicting claims → scan flag
   await approveOpenArticle(page);
   await page.keyboard.press("Escape");
 
-  // deterministic contradiction scan (not a model)
+  // deterministic contradiction scan (not a model). VC moved the panel into the
+  // "סתירות בידע" queue tab — open it first.
+  await page.getByRole("tab", { name: "סתירות בידע" }).click();
   await page.getByRole("button", { name: "סריקת סתירות" }).click();
   await expect(page.getByText(/נמצאו \d+ סתירות חדשות/).first()).toBeVisible({ timeout: 20_000 });
 

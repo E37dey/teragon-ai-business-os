@@ -29,16 +29,21 @@ test("/learning loads: derived metrics, loop stepper, honest «טרם נמדד»
   const errors = collectConsoleErrors(page);
   await gotoLearning(page);
 
+  // four PRIMARY derived metrics (Visual Calm: ≤4 KPIs)
   const metrics = page.getByTestId("learning-metrics");
   for (const title of [
-    "המלצות שאושרו",
-    "המלצות שנדחו",
-    "תוצאות שנמדדו",
     "תובנות ממתינות לבדיקה",
+    "במעקב (טרם נמדדו)",
     "כללים פעילים",
     "ביטולים (rollback)",
   ]) {
     await expect(metrics.getByText(title, { exact: true })).toBeVisible();
+  }
+  // analytical totals moved to the "מדדים נוספים" disclosure — still accessible
+  const more = page.locator(".os-more-metrics");
+  await more.locator("summary").click();
+  for (const title of ["המלצות שאושרו", "המלצות שנדחו", "תוצאות שנמדדו"]) {
+    await expect(more.getByText(title, { exact: true })).toBeVisible();
   }
   // honesty: unmeasured is never a number
   await expect(page.getByText("טרם נמדד").first()).toBeVisible();

@@ -48,7 +48,7 @@ test("resilience: back/forward preserves route identity across a walk", async ({
     await expect(page.locator("nav.os-nav").first()).toBeVisible();
     await assertNotStuckLoading(page);
   }
-  await expect(page).toHaveURL(/localhost:5373\/$/);
+  await expect(page).toHaveURL(/\/$/);
   // and forward once
   await page.goForward();
   await expect(page).toHaveURL(/\/crm$/);
@@ -120,6 +120,13 @@ const WARM_LINKS = [
 ];
 
 async function clickNav(page: import("@playwright/test").Page, label: string, url: RegExp) {
+  // VC-B collapses non-active nav groups by default — expand them so every
+  // link is reachable (the SPA-navigation resilience is what's under test).
+  for (let i = 0; i < 8; i++) {
+    const collapsed = page.locator('.os-nav__group-head[aria-expanded="false"]').first();
+    if ((await collapsed.count()) === 0) break;
+    await collapsed.click();
+  }
   const navLink = page.getByRole("link", { name: label }).first();
   await navLink.scrollIntoViewIfNeeded();
   await navLink.click();
@@ -137,7 +144,7 @@ test("resilience: offline warm-walk — cached SPA still navigates, no crash", a
   // goto reload would drop the in-memory module cache. (This SPA has no service
   // worker, so only already-loaded chunks are reachable offline — by design.)
   for (const link of WARM_LINKS) await clickNav(page, link.label, link.url);
-  await clickNav(page, "מרכז השליטה", /localhost:5373\/$/);
+  await clickNav(page, "מרכז השליטה", /\/$/);
 
   await page.context().setOffline(true);
   try {

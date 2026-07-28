@@ -61,6 +61,7 @@ test("axe: /settings — ZERO serious/critical", async ({ page }) => {
 
 test("axe: analytics drilldown drawer open — ZERO serious/critical", async ({ page }) => {
   await gotoAnalytics(page);
+  await page.getByRole("tab", { name: "ב · מכירות ולקוחות" }).click();
   await page.getByRole("button", { name: "לידים חדשים — פתיחת רשומות המקור" }).click();
   await expect(page.getByText("רשומות המקור — לידים חדשים")).toBeVisible();
   expect(await seriousViolations(page)).toEqual([]);

@@ -27,7 +27,9 @@ test("GP-1: new lead → CRM table + command-center queue + global search", asyn
   await page.getByRole("button", { name: "שמירה" }).click();
   await expect(page.locator(".os-toast").first()).toContainText("נוצר");
 
-  // module 1: appears in the CRM table
+  // module 1: appears in the CRM table (filter to it — pagination may otherwise
+  // place a newly-created lead on a later page)
+  await page.getByLabel("חיפוש חופשי בלידים").fill(name);
   await expect(page.getByTestId("leads-table")).toContainText(name);
 
   // module 2: appears on the command center follow-up queue (query invalidation)

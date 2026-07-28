@@ -108,11 +108,11 @@
 }
 
 .os-kpi__delta--up {
-  color: var(--os-success);
+  color: var(--success-text);
   background: var(--os-success-soft);
 }
 .os-kpi__delta--down {
-  color: var(--os-danger);
+  color: var(--danger-text);
   background: var(--os-danger-soft);
 }
 .os-kpi__delta--flat {
@@ -212,7 +212,7 @@
 
 .os-section-title__icon {
   display: inline-flex;
-  color: var(--os-cyan);
+  color: var(--os-cyan-text);
   flex: none;
 }
 
@@ -553,12 +553,12 @@
 
 .os-stepper__step--done .os-stepper__circle {
   border-color: var(--os-cyan-border);
-  color: var(--os-cyan);
+  color: var(--os-cyan-text);
 }
 
 .os-stepper__step--active .os-stepper__circle {
   border-color: var(--os-cyan);
-  color: var(--os-cyan);
+  color: var(--os-cyan-text);
   background: var(--os-cyan-soft);
   box-shadow: var(--os-glow-cyan);
 }
@@ -571,7 +571,7 @@
 }
 
 .os-stepper__step--active .os-stepper__label {
-  color: var(--os-cyan);
+  color: var(--os-cyan-text);
   font-weight: var(--os-weight-semibold);
 }
 
@@ -583,7 +583,7 @@
 }
 
 .os-stepper__step--active .os-stepper__count {
-  color: var(--os-cyan);
+  color: var(--os-cyan-text);
 }
 
 /* ═══════════════ AgentCard ═══════════════ */
@@ -751,11 +751,11 @@
 
 .os-tier--blue .os-tier__title,
 .os-tier--blue .os-tier__icon {
-  color: var(--os-blue);
+  color: var(--os-cyan-text);
 }
 .os-tier--cyan .os-tier__title,
 .os-tier--cyan .os-tier__icon {
-  color: var(--os-cyan);
+  color: var(--os-cyan-text);
 }
 .os-tier--violet .os-tier__title,
 .os-tier--violet .os-tier__icon {
@@ -811,10 +811,10 @@
 }
 
 .os-tier--blue .os-tier__foot {
-  color: var(--os-blue);
+  color: var(--os-cyan-text);
 }
 .os-tier--cyan .os-tier__foot {
-  color: var(--os-cyan);
+  color: var(--os-cyan-text);
 }
 .os-tier--violet .os-tier__foot {
   color: var(--os-violet-text);
@@ -1344,25 +1344,25 @@
   border-color: var(--os-success-border);
 }
 .os-toast--success .os-toast__icon {
-  color: var(--os-success);
+  color: var(--success-text);
 }
 .os-toast--danger {
   border-color: var(--os-danger-border);
 }
 .os-toast--danger .os-toast__icon {
-  color: var(--os-danger);
+  color: var(--danger-text);
 }
 .os-toast--warning {
   border-color: var(--os-warning-border);
 }
 .os-toast--warning .os-toast__icon {
-  color: var(--os-warning);
+  color: var(--warning-text);
 }
 .os-toast--info {
   border-color: var(--os-cyan-border);
 }
 .os-toast--info .os-toast__icon {
-  color: var(--os-cyan);
+  color: var(--os-cyan-text);
 }
 
 .os-toast__close {
@@ -1455,6 +1455,12 @@
 .os-nav__link:hover {
   color: var(--os-nav-text-strong);
   background: var(--os-nav-surface);
+}
+
+/* visible focus indicator (outline is not overridden by the active box-shadow:none) */
+.os-nav__link:focus-visible {
+  outline: 2px solid var(--os-nav-selected-text);
+  outline-offset: -2px;
 }
 
 .os-nav__link--active {
@@ -1676,7 +1682,7 @@
   border-radius: var(--os-radius-full);
   border: 1px solid var(--os-border-strong);
   background: var(--os-highlight);
-  color: var(--os-cyan);
+  color: var(--os-cyan-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1970,7 +1976,7 @@
 
 .os-palette__mode-icon {
   display: inline-flex;
-  color: var(--os-cyan);
+  color: var(--os-cyan-text);
   flex: none;
 }
 
@@ -2030,7 +2036,7 @@
 }
 
 .os-palette__item--active {
-  color: var(--os-cyan);
+  color: var(--os-cyan-text);
   background: var(--os-highlight);
   border-color: var(--os-cyan-border);
   box-shadow: var(--os-glow-cyan);
@@ -2047,7 +2053,7 @@
 }
 
 .os-palette__item--active .os-palette__item-title {
-  color: var(--os-cyan);
+  color: var(--os-cyan-text);
 }
 
 .os-palette__item--hit {
@@ -2133,7 +2139,7 @@
 }
 
 .os-ntf-filter--active {
-  color: var(--os-cyan);
+  color: var(--os-cyan-text);
   border-color: var(--os-cyan-border);
   background: var(--os-cyan-soft);
 }
@@ -2261,7 +2267,7 @@
 }
 
 .os-ntf__read-toggle:hover {
-  color: var(--os-cyan);
+  color: var(--os-cyan-text);
   background: var(--os-highlight);
 }
 
@@ -2353,7 +2359,7 @@
 
 .os-qc-error {
   font-size: var(--os-text-2xs);
-  color: var(--os-danger);
+  color: var(--danger-text);
 }
 
 .os-qc-actions {
@@ -2389,7 +2395,7 @@
 .os-shortcuts__kbd {
   font-family: var(--os-font-mono);
   font-size: var(--os-text-2xs);
-  color: var(--os-cyan);
+  color: var(--os-cyan-text);
   background: var(--os-highlight);
   border: var(--os-border-thin);
   border-radius: var(--os-radius-xs);

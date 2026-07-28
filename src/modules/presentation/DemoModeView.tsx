@@ -113,7 +113,7 @@ export function DemoModeView(): ReactElement {
         <Panel
           style={{
             padding: "var(--os-space-3) var(--os-space-4)",
-            color: "var(--os-warning)",
+            color: "var(--warning-text)",
             fontSize: "var(--os-text-xs)",
           }}
         >
@@ -139,7 +139,7 @@ export function DemoModeView(): ReactElement {
             boxShadow: "0 4px 24px rgba(32,196,232,0.25)",
           }}
         >
-          <span style={{ color: "var(--os-cyan)", fontWeight: 700, fontSize: "var(--os-text-sm)" }}>
+          <span style={{ color: "var(--os-cyan-text)", fontWeight: 700, fontSize: "var(--os-text-sm)" }}>
             הצעד הבא ({next.order}/11): {next.titleHe}
           </span>
           <OsButton size="sm" icon="chevron-back" onClick={() => void goToStep(next, true)}>
@@ -151,7 +151,7 @@ export function DemoModeView(): ReactElement {
         </div>
       )}
       {!next && steps.length > 0 && (
-        <Panel style={{ padding: "var(--os-space-4)", color: "var(--os-success)" }}>
+        <Panel style={{ padding: "var(--os-space-4)", color: "var(--success-text)" }}>
           ✓ כל 11 צעדי ההדגמה הושלמו.
         </Panel>
       )}
@@ -178,7 +178,7 @@ export function DemoModeView(): ReactElement {
                 placeItems: "center",
                 borderRadius: "var(--os-radius-full)",
                 background: step.status === "בוצע" ? "rgba(33,201,129,0.15)" : "var(--os-cyan-soft)",
-                color: step.status === "בוצע" ? "var(--os-success)" : "var(--os-cyan)",
+                color: step.status === "בוצע" ? "var(--success-text)" : "var(--os-cyan-text)",
                 fontWeight: 800,
               }}
             >
@@ -208,7 +208,7 @@ export function DemoModeView(): ReactElement {
           איפוס נתוני הדגמה דטרמיניסטיים…
         </OsButton>
         {resetSummary && (
-          <span style={{ color: "var(--os-success)", fontSize: "var(--os-text-xs)", alignSelf: "center" }}>
+          <span style={{ color: "var(--success-text)", fontSize: "var(--os-text-xs)", alignSelf: "center" }}>
             {resetSummary}
           </span>
         )}

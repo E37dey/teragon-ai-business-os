@@ -34,6 +34,7 @@ const SURFACES: { slug: string; prepare: Prepare }[] = [
     slug: "03-analytics-drilldown",
     prepare: async (page) => {
       await gotoAnalytics(page);
+      await page.getByRole("tab", { name: "ב · מכירות ולקוחות" }).click();
       await page.getByRole("button", { name: "לידים חדשים — פתיחת רשומות המקור" }).click();
       await expect(page.getByText("רשומות המקור — לידים חדשים")).toBeVisible();
     },
@@ -112,6 +113,7 @@ const SURFACES: { slug: string; prepare: Prepare }[] = [
     slug: "12-administration-user-drawer",
     prepare: async (page) => {
       await gotoAdministration(page);
+      await page.getByTestId("user-actions-u-maya").locator("summary").click();
       await page.getByTestId("assign-role-u-maya").click();
       await expect(page.getByTestId("assign-role-modal")).toBeVisible();
     },
@@ -120,6 +122,7 @@ const SURFACES: { slug: string; prepare: Prepare }[] = [
     slug: "13-administration-permission-request",
     prepare: async (page) => {
       await gotoAdministration(page);
+      await page.getByTestId("user-actions-u-maya").locator("summary").click();
       await page.getByTestId("request-change-u-maya").click();
       await expect(page.getByTestId("request-change-modal")).toBeVisible();
     },
