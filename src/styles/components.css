@@ -27,6 +27,14 @@
   box-shadow: var(--os-shadow-raised);
 }
 
+/* Command Center focal panel — the SINGLE dominant area (מרכז ההחלטות).
+   A restrained steel-blue accent frame + inline-start bar marks it as primary.
+   Deliberately NO glow/neon (Quiet Enterprise); every other card stays quieter. */
+.os-focal-panel.os-panel {
+  border: 1px solid var(--os-accent-primary);
+  border-inline-start: 4px solid var(--os-accent-primary);
+}
+
 .os-panel--highlight {
   background: var(--os-highlight);
   border-color: var(--os-border-strong);
@@ -1753,6 +1761,70 @@
 .os-header__iconbtn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* Text theme selector — segmented radiogroup (בהיר / כהה / לפי המערכת). */
+.os-theme-select {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 2px;
+  border: var(--os-border-thin);
+  border-radius: var(--os-radius-full);
+  background: var(--os-surface-2);
+}
+
+.os-theme-select__opt {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  border-radius: var(--os-radius-full);
+  background: transparent;
+  color: var(--os-text-2);
+  font-size: var(--os-text-xs, 12px);
+  line-height: 1;
+  padding-block: 5px;
+  padding-inline: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color var(--os-transition-fast),
+    background-color var(--os-transition-fast),
+    box-shadow var(--os-transition-fast);
+}
+
+.os-theme-select__opt:hover:not(.is-selected) {
+  color: var(--os-text);
+  background: var(--os-surface-hover);
+}
+
+.os-theme-select__opt.is-selected {
+  /* steel-blue selected state — tinted fill + accent bar + AA accent text */
+  background: var(--os-accent-primary-soft);
+  color: var(--os-accent-primary-text);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--os-accent-primary);
+}
+
+.os-theme-select__opt:focus-visible {
+  outline: 2px solid var(--os-accent-primary);
+  outline-offset: 1px;
+}
+
+.os-theme-select__glyph {
+  font-size: 12px;
+}
+
+/* Below a narrow header, drop the glyphs but keep the words (text, not icon). */
+@media (max-width: 900px) {
+  .os-theme-select__glyph {
+    display: none;
+  }
+  .os-theme-select__opt {
+    padding-inline: 8px;
+  }
 }
 
 .os-header__count {

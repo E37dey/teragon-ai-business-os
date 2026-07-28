@@ -73,7 +73,7 @@ export function ManagementBand(): ReactElement {
     (q) => q.isLoading,
   );
 
-  const items = deriveManagementBand({
+  const allItems = deriveManagementBand({
     risks: risksQ.data ?? [],
     incidents: incidentsQ.data ?? [],
     accessReviews: reviewsQ.data ?? [],
@@ -83,11 +83,15 @@ export function ManagementBand(): ReactElement {
     nowISO: new Date().toISOString(),
   });
 
+  // VC density round-2: show ONLY items that require action (attention), capped
+  // at three. A healthy state renders a single neutral line — no wall of cards.
+  const items = allItems.filter((i) => i.attention).slice(0, 3);
+
   return (
     <Panel variant="panel" style={{ padding: "var(--os-space-5)" }} data-testid="management-band">
       <SectionTitle
         title="רצועת הניהול"
-        subtitle="סיכונים · תקריות · סקירות גישה · בריאות · מדידה · מדיניות · אישורי הגשה — כל מספר נגזר מרשומות אמת ומקושר למסך שלו"
+        subtitle="הפריטים הדורשים פעולה — נגזרים מרשומות אמת ומקושרים למסך שלהם"
         icon="shield"
       />
       {isLoading ? (
@@ -101,11 +105,21 @@ export function ManagementBand(): ReactElement {
         >
           טוען את נתוני הניהול מהמאגר המקומי…
         </div>
+      ) : items.length === 0 ? (
+        <div
+          style={{
+            marginBlockStart: "var(--os-space-3)",
+            fontSize: "var(--os-text-sm, 13px)",
+            color: "var(--os-text-2)",
+          }}
+        >
+          אין פריטי ניהול הדורשים פעולה כעת — כל הבקרות במצב תקין או ממתינות למדידה.
+        </div>
       ) : (
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
             gap: "var(--os-space-3)",
             marginBlockStart: "var(--os-space-3)",
           }}

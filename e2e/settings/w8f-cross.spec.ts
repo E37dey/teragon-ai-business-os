@@ -37,7 +37,7 @@ async function settledBlockers(page: Page): Promise<number> {
   return stable;
 }
 
-test("management band: 7 derived items, honest counts, click-through navigates", async ({
+test("management band: only actionable items (max 3), honest counts, click-through navigates", async ({
   page,
 }) => {
   const errors = collectConsoleErrors(page);
@@ -46,26 +46,17 @@ test("management band: 7 derived items, honest counts, click-through navigates",
   await band.scrollIntoViewIfNeeded();
   await expect(band.getByText("רצועת הניהול")).toBeVisible({ timeout: 30_000 });
 
-  // the 7 derived items are all present
-  for (const key of [
-    "operational-risks",
-    "critical-incidents",
-    "pending-access-reviews",
-    "health-attention",
-    "missing-baselines",
-    "expiring-policies",
-    "submission-approvals",
-  ]) {
-    await expect(page.getByTestId(`management-band-${key}`)).toBeVisible({ timeout: 30_000 });
-  }
+  // VC density round-2: the band renders ONLY items that require action, capped
+  // at three (all seven are still DERIVED; passive/healthy ones are not shown).
+  const cards = band.locator("[data-testid^='management-band-']");
+  const count = await cards.count();
+  expect(count).toBeGreaterThan(0);
+  expect(count).toBeLessThanOrEqual(3);
 
-  // health item is honestly unmeasured before any snapshot — "טרם נבדק", not 0
-  await expect(page.getByTestId("management-band-health-attention")).toContainText("טרם נבדק");
-
-  // click-through: the risks card navigates to /governance
-  await page.getByTestId("management-band-operational-risks").click();
-  await expect(page).toHaveURL(/\/governance$/, { timeout: 15_000 });
-  await expect(page.getByText("ממשל ובקרת AI").first()).toBeVisible({ timeout: 30_000 });
+  // click-through: the first actionable card navigates to its owning screen
+  // (never back to the command center itself).
+  await cards.first().click();
+  await expect(page).not.toHaveURL(/\/$/, { timeout: 15_000 });
   expect(errors).toEqual([]);
 });
 

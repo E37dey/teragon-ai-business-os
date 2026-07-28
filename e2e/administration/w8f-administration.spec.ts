@@ -202,11 +202,12 @@ test("emergency disable agent → /agents + command center reflect the disabled 
   await page.goto("/agents");
   await expect(page.getByText("מושבת").first()).toBeVisible({ timeout: 30_000 });
 
-  // command center's agent panel reflects it as well
+  // command center's agent band reflects it too. Under VC density round-2 the
+  // per-agent cards live in the "agent-network-detail" disclosure (the band
+  // itself shows only a status summary), so open it to see the disabled agent.
   await page.goto("/");
-  await expect(page.getByText("סוכני המערכת (מצב הדגמה מקומי)")).toBeVisible({
-    timeout: 30_000,
-  });
+  await expect(page.getByTestId("agent-network-live")).toBeVisible({ timeout: 30_000 });
+  await page.getByTestId("agent-network-detail").locator("summary").click();
   await expect(page.getByText("מושבת").first()).toBeVisible({ timeout: 15_000 });
   expect(agentId).not.toBe("");
   expect(errors).toEqual([]);

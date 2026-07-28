@@ -4,7 +4,7 @@
 // (AgentNetworkLive), the decision center opens evidence/related records/
 // audit trails and drives the canonical ApprovalPanel for engine approvals.
 import { useState } from "react";
-import type { CSSProperties, ReactElement, ReactNode } from "react";
+import type { CSSProperties, ReactElement } from "react";
 import { Link } from "react-router-dom";
 import {
   ConfidenceBar,
@@ -12,16 +12,13 @@ import {
   KpiCard,
   Modal,
   OsButton,
-  OsIcon,
   Panel,
   SectionTitle,
   Sparkline,
-  StatusChip,
   useToast,
   type OsAccent,
-  type OsStatus,
 } from "@/design-system";
-import { PageRail } from "@/app/rail";
+import { HideShellRail } from "@/app/rail";
 import { useCollection, useInvalidateCollections } from "@/app/data/hooks";
 import { getRepository } from "@/repositories";
 import { CEO_USER_ID, SEED_ANCHOR } from "@/repositories/seed";
@@ -73,10 +70,6 @@ const stack = (gap = "var(--os-space-4)"): CSSProperties => ({
   display: "grid",
   gap,
 });
-
-function agentStatusChip(status: Agent["status"]): OsStatus {
-  return status;
-}
 
 function DemoBadge(): ReactElement {
   return (
@@ -233,24 +226,6 @@ function MiniBarRow({
           }}
         />
       </div>
-    </div>
-  );
-}
-
-function SidePanel({ title, children }: { title: string; children: ReactNode }): ReactElement {
-  return (
-    <div style={stack("var(--os-space-3)")}>
-      <div
-        style={{
-          fontSize: "var(--os-text-2xs, 11px)",
-          fontWeight: 600,
-          color: "var(--os-text-2)",
-          letterSpacing: "0.04em",
-        }}
-      >
-        {title}
-      </div>
-      {children}
     </div>
   );
 }
@@ -422,56 +397,12 @@ function CommandCenterInner(): ReactElement {
 
   return (
     <div style={stack("var(--os-space-5)")} data-testid="command-center">
-      <PageRail>
-        <div style={stack("var(--os-space-4)")}>
-          <SidePanel title="סוכני המערכת (מצב הדגמה מקומי)">
-            <div style={stack("var(--os-space-2)")}>
-              {agents.slice(0, 6).map((a) => (
-                <div
-                  key={a.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: "var(--os-space-2)",
-                    border: "1px solid var(--os-border)",
-                    borderRadius: "var(--os-radius-sm, 6px)",
-                    paddingBlock: "var(--os-space-2)",
-                    paddingInline: "var(--os-space-3)",
-                    fontSize: "var(--os-text-sm, 13px)",
-                  }}
-                >
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                    <OsIcon name="bot" size={13} />
-                    {a.name}
-                  </span>
-                  <StatusChip status={agentStatusChip(a.status)} />
-                </div>
-              ))}
-            </div>
-          </SidePanel>
-          <SidePanel title="זיכרון · ידע · למידה">
-            <MemoryBand />
-          </SidePanel>
-          <SidePanel title="בריאות המערכת">
-            <div
-              style={{
-                fontSize: "var(--os-text-2xs, 11px)",
-                color: "var(--os-text-2)",
-                display: "grid",
-                gap: 4,
-              }}
-            >
-              <div>אחסון: IndexedDB מקומי (דפדפן) — פעיל</div>
-              <div>
-                נתוני הדגמה נזרעו לעוגן <span className="os-num">{dateHe(SEED_ANCHOR)}</span>
-              </div>
-              <div>ספק AI מרוחק: לא מחובר — כל הלוגיקה דטרמיניסטית מקומית</div>
-              <ProviderStateBadge provider="local-rules" />
-            </div>
-          </SidePanel>
-        </div>
-      </PageRail>
+      {/* VC density round-2: the Command Center no longer publishes a heavy
+          left rail. The per-agent status list (repeated the centre band) was
+          removed; the memory/knowledge and local-health context moved into the
+          "פירוט נוסף" disclosure below. The shell rail is hidden here so the
+          first viewport is not competing with a secondary column. */}
+      <HideShellRail />
 
       {/* header */}
       <div
@@ -566,9 +497,17 @@ function CommandCenterInner(): ReactElement {
       {/* W8-E — management band (Phase 8.13): derived attention items, click-through */}
       <ManagementBand />
 
-      {/* decision center + funnel */}
-      <div style={gridStyle("minmax(0, 2fr) minmax(0, 1fr)")}>
-        <Panel variant="panel" style={{ padding: "var(--os-space-5)" }}>
+      {/* PRIMARY FOCAL AREA — מרכז ההחלטות. Full-width, raised, accent frame:
+          nothing else on the initial viewport competes with it for size, border
+          strength or colour. The sales funnel and all trend/timeline panels move
+          into the "פירוט נוסף" disclosure below. */}
+      <div style={stack()}>
+        <Panel
+          variant="raised"
+          className="os-focal-panel"
+          style={{ padding: "var(--os-space-6)" }}
+          data-testid="decision-focal"
+        >
           <SectionTitle
             title="מרכז ההחלטות של ה-AI"
             subtitle="כל המלצה מוצגת עם המעטפת המלאה: סיבה, ראיות, ביטחון והפעולה הבאה — ההחלטה תמיד אנושית"
@@ -648,24 +587,10 @@ function CommandCenterInner(): ReactElement {
             )}
           </div>
         </Panel>
-
-        <Panel variant="panel" style={{ padding: "var(--os-space-5)" }}>
-          <SectionTitle title="משפך המכירות" subtitle="מצטבר, נגזר מהלידים בפועל" icon="target" />
-          <div style={{ ...stack("var(--os-space-2)"), marginBlockStart: "var(--os-space-3)" }}>
-            {funnel.map((s) => (
-              <MiniBarRow
-                key={s.stage}
-                label={s.stage}
-                value={s.count}
-                max={maxFunnel}
-                accent="cyan"
-              />
-            ))}
-          </div>
-        </Panel>
       </div>
 
-      {/* agent network — LIVE engine data (W5-D Phase 5.13) */}
+      {/* ONE agent-status summary — LIVE engine data (W5-D Phase 5.13). Kept
+          visible per the operator contract, but subordinate to the focal panel. */}
       <AgentNetworkLive
         agents={agents}
         agentTasks={agentTasks}
@@ -677,201 +602,260 @@ function CommandCenterInner(): ReactElement {
         ownerName={userName(CEO_USER_ID)}
       />
 
-      {/* course / service / revenue */}
-      <div style={gridStyle("repeat(auto-fit, minmax(260px, 1fr))")}>
-        <Panel variant="panel" style={{ padding: "var(--os-space-5)" }}>
-          <SectionTitle title="מצב הקורסים" icon="graduation" />
-          <div style={{ ...stack("var(--os-space-2)"), marginBlockStart: "var(--os-space-3)" }}>
-            <ConfidenceBar
-              value={kpis.courseCompletion.completionPercent}
-              label="שלבי לימוד שאושרו"
+      {/* ONE operational summary — the follow-up queue (actionable). Kept
+          permanently visible, but styled subordinate to the focal panel. */}
+      <Panel variant="panel" style={{ padding: "var(--os-space-5)" }} data-testid="ops-summary">
+        <SectionTitle
+          title="תור פולואו-אפ"
+          subtitle="לידים פתוחים שמועד המעקב שלהם הגיע"
+          icon="alert"
+          action={
+            <Link to="/crm" style={{ color: "var(--os-cyan-text)", fontSize: "var(--os-text-2xs)" }}>
+              ל-CRM ←
+            </Link>
+          }
+        />
+        <div style={{ ...stack("var(--os-space-2)"), marginBlockStart: "var(--os-space-3)" }}>
+          {queue.length === 0 ? (
+            <EmptyState
+              icon="check"
+              title="אין לידים שממתינים לפולואו-אפ"
+              reason="לכל הלידים הפתוחים יש מועד מעקב עתידי."
             />
-            <div style={{ fontSize: "var(--os-text-sm, 13px)", color: "var(--os-text-2)" }}>
-              <div>
-                <span className="os-num">{kpis.courseCompletion.awaitingInstructor}</span> שלבים
-                ממתינים לבדיקת מדריך
+          ) : (
+            queue.map((l) => (
+              <div
+                key={l.id}
+                data-testid="followup-lead"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: "var(--os-space-2)",
+                  fontSize: "var(--os-text-sm, 13px)",
+                  borderBlockEnd: "1px solid var(--os-border)",
+                  paddingBlockEnd: 4,
+                }}
+              >
+                <span>
+                  {l.name}
+                  <span style={{ color: "var(--os-muted)" }}> · {l.interest}</span>
+                </span>
+                <span className="os-num" style={{ color: "var(--warning-text)" }}>
+                  {dateHe(l.followUp)}
+                </span>
               </div>
-              <div>
-                <span className="os-num">{kpis.courseCompletion.blockedStudents}</span> תלמידים
-                חסומים / זקוקים לעזרה
-              </div>
+            ))
+          )}
+        </div>
+      </Panel>
+
+      {/* SECONDARY — moved out of the initial focal view into ONE disclosure:
+          sales funnel, course/service/revenue trends, today's timeline and the
+          activity feed. Still in the DOM (searchable), just not competing with
+          מרכז ההחלטות for attention. */}
+      <details className="os-more-metrics" data-testid="cc-secondary">
+        <summary>פירוט נוסף · משפך מכירות, מגמות, ציר זמן ופעילות</summary>
+        <div style={{ ...stack("var(--os-space-4)"), marginBlockStart: "var(--os-space-4)" }}>
+          <Panel variant="panel" style={{ padding: "var(--os-space-5)" }}>
+            <SectionTitle title="משפך המכירות" subtitle="מצטבר, נגזר מהלידים בפועל" icon="target" />
+            <div style={{ ...stack("var(--os-space-2)"), marginBlockStart: "var(--os-space-3)" }}>
+              {funnel.map((s) => (
+                <MiniBarRow
+                  key={s.stage}
+                  label={s.stage}
+                  value={s.count}
+                  max={maxFunnel}
+                  accent="cyan"
+                />
+              ))}
             </div>
-          </div>
-        </Panel>
+          </Panel>
 
-        <Panel variant="panel" style={{ padding: "var(--os-space-5)" }}>
-          <SectionTitle title="מצב השירות" icon="wrench" />
-          <div style={{ ...stack("var(--os-space-2)"), marginBlockStart: "var(--os-space-3)" }}>
-            <MiniBarRow
-              label="עדיפות גבוהה"
-              value={kpis.openTicketsByPriority["גבוהה"]}
-              max={kpis.openTicketCount}
-              accent="danger"
-            />
-            <MiniBarRow
-              label="עדיפות בינונית"
-              value={kpis.openTicketsByPriority["בינונית"]}
-              max={kpis.openTicketCount}
-              accent="warning"
-            />
-            <MiniBarRow
-              label="עדיפות נמוכה"
-              value={kpis.openTicketsByPriority["נמוכה"]}
-              max={kpis.openTicketCount}
-              accent="blue"
-            />
-          </div>
-        </Panel>
+          <div style={gridStyle("repeat(auto-fit, minmax(260px, 1fr))")}>
+            <Panel variant="panel" style={{ padding: "var(--os-space-5)" }}>
+              <SectionTitle title="מצב הקורסים" icon="graduation" />
+              <div style={{ ...stack("var(--os-space-2)"), marginBlockStart: "var(--os-space-3)" }}>
+                <ConfidenceBar
+                  value={kpis.courseCompletion.completionPercent}
+                  label="שלבי לימוד שאושרו"
+                />
+                <div style={{ fontSize: "var(--os-text-sm, 13px)", color: "var(--os-text-2)" }}>
+                  <div>
+                    <span className="os-num">{kpis.courseCompletion.awaitingInstructor}</span> שלבים
+                    ממתינים לבדיקת מדריך
+                  </div>
+                  <div>
+                    <span className="os-num">{kpis.courseCompletion.blockedStudents}</span> תלמידים
+                    חסומים / זקוקים לעזרה
+                  </div>
+                </div>
+              </div>
+            </Panel>
 
-        <Panel variant="panel" style={{ padding: "var(--os-space-5)" }}>
-          <SectionTitle title="מגמת הכנסות" subtitle="נגזר מהצעות מחיר לפי חודש" icon="gauge" />
-          <div style={{ marginBlockStart: "var(--os-space-3)" }}>
-            {months.length > 1 ? (
-              <>
-                <Sparkline values={months.map((m) => m.approved)} accent="success" />
-                <div
-                  style={{
-                    display: "grid",
-                    gap: 4,
-                    marginBlockStart: "var(--os-space-3)",
-                    fontSize: "var(--os-text-2xs, 11px)",
-                    color: "var(--os-text-2)",
-                  }}
-                >
-                  {months.map((m) => (
-                    <div key={m.month} style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span className="os-num">{m.month}</span>
-                      <span className="os-num">
-                        מאושר {ils(m.approved)} · פתוח {ils(m.open)}
+            <Panel variant="panel" style={{ padding: "var(--os-space-5)" }}>
+              <SectionTitle title="מצב השירות" icon="wrench" />
+              <div style={{ ...stack("var(--os-space-2)"), marginBlockStart: "var(--os-space-3)" }}>
+                <MiniBarRow
+                  label="עדיפות גבוהה"
+                  value={kpis.openTicketsByPriority["גבוהה"]}
+                  max={kpis.openTicketCount}
+                  accent="danger"
+                />
+                <MiniBarRow
+                  label="עדיפות בינונית"
+                  value={kpis.openTicketsByPriority["בינונית"]}
+                  max={kpis.openTicketCount}
+                  accent="warning"
+                />
+                <MiniBarRow
+                  label="עדיפות נמוכה"
+                  value={kpis.openTicketsByPriority["נמוכה"]}
+                  max={kpis.openTicketCount}
+                  accent="blue"
+                />
+              </div>
+            </Panel>
+
+            <Panel variant="panel" style={{ padding: "var(--os-space-5)" }}>
+              <SectionTitle title="מגמת הכנסות" subtitle="נגזר מהצעות מחיר לפי חודש" icon="gauge" />
+              <div style={{ marginBlockStart: "var(--os-space-3)" }}>
+                {months.length > 1 ? (
+                  <>
+                    <Sparkline values={months.map((m) => m.approved)} accent="success" />
+                    <div
+                      style={{
+                        display: "grid",
+                        gap: 4,
+                        marginBlockStart: "var(--os-space-3)",
+                        fontSize: "var(--os-text-2xs, 11px)",
+                        color: "var(--os-text-2)",
+                      }}
+                    >
+                      {months.map((m) => (
+                        <div
+                          key={m.month}
+                          style={{ display: "flex", justifyContent: "space-between" }}
+                        >
+                          <span className="os-num">{m.month}</span>
+                          <span className="os-num">
+                            מאושר {ils(m.approved)} · פתוח {ils(m.open)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <EmptyState
+                    title="אין מספיק נתונים למגמה"
+                    reason="נדרשים לפחות שני חודשי פעילות של הצעות מחיר כדי לצייר מגמה."
+                  />
+                )}
+              </div>
+            </Panel>
+          </div>
+
+          <div style={gridStyle("repeat(auto-fit, minmax(260px, 1fr))")}>
+            <Panel variant="panel" style={{ padding: "var(--os-space-5)" }}>
+              <SectionTitle title="ציר הזמן של היום" icon="clock" />
+              <div style={{ ...stack("var(--os-space-2)"), marginBlockStart: "var(--os-space-3)" }}>
+                {timeline.length === 0 ? (
+                  <EmptyState
+                    icon="clock"
+                    title="אין משימות או פגישות להיום"
+                    reason="לא נמצאו משימות פתוחות עם יעד היום ולא פגישות שמתוזמנות להיום."
+                  />
+                ) : (
+                  timeline.map((e) => (
+                    <div
+                      key={e.id}
+                      style={{
+                        display: "flex",
+                        gap: "var(--os-space-3)",
+                        alignItems: "center",
+                        fontSize: "var(--os-text-sm, 13px)",
+                      }}
+                    >
+                      <span
+                        className="os-num"
+                        style={{ minInlineSize: 42, color: "var(--os-cyan-text)", fontWeight: 600 }}
+                      >
+                        {e.time ?? "היום"}
+                      </span>
+                      <span>{e.title}</span>
+                      <span
+                        style={{ color: "var(--os-muted)", fontSize: "var(--os-text-2xs, 11px)" }}
+                      >
+                        {e.kind}
+                        {e.priority ? ` · ${e.priority}` : ""}
                       </span>
                     </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <EmptyState
-                title="אין מספיק נתונים למגמה"
-                reason="נדרשים לפחות שני חודשי פעילות של הצעות מחיר כדי לצייר מגמה."
-              />
-            )}
-          </div>
-        </Panel>
-      </div>
+                  ))
+                )}
+              </div>
+            </Panel>
 
-      {/* timeline / follow-up / activity */}
-      <div style={gridStyle("repeat(auto-fit, minmax(260px, 1fr))")}>
-        <Panel variant="panel" style={{ padding: "var(--os-space-5)" }}>
-          <SectionTitle title="ציר הזמן של היום" icon="clock" />
-          <div style={{ ...stack("var(--os-space-2)"), marginBlockStart: "var(--os-space-3)" }}>
-            {timeline.length === 0 ? (
-              <EmptyState
-                icon="clock"
-                title="אין משימות או פגישות להיום"
-                reason="לא נמצאו משימות פתוחות עם יעד היום ולא פגישות שמתוזמנות להיום."
-              />
-            ) : (
-              timeline.map((e) => (
-                <div
-                  key={e.id}
-                  style={{
-                    display: "flex",
-                    gap: "var(--os-space-3)",
-                    alignItems: "center",
-                    fontSize: "var(--os-text-sm, 13px)",
-                  }}
-                >
-                  <span
-                    className="os-num"
-                    style={{ minInlineSize: 42, color: "var(--os-cyan-text)", fontWeight: 600 }}
-                  >
-                    {e.time ?? "היום"}
-                  </span>
-                  <span>{e.title}</span>
-                  <span style={{ color: "var(--os-muted)", fontSize: "var(--os-text-2xs, 11px)" }}>
-                    {e.kind}
-                    {e.priority ? ` · ${e.priority}` : ""}
-                  </span>
-                </div>
-              ))
-            )}
+            <Panel variant="panel" style={{ padding: "var(--os-space-5)" }}>
+              <SectionTitle title="פעילות אחרונה" icon="inbox" />
+              <div style={{ ...stack("var(--os-space-2)"), marginBlockStart: "var(--os-space-3)" }}>
+                {feed.length === 0 ? (
+                  <EmptyState title="אין פעילות" reason="טרם נרשמו אירועי פעילות במערכת." />
+                ) : (
+                  feed.map((a) => (
+                    <div
+                      key={a.id}
+                      style={{
+                        fontSize: "var(--os-text-2xs, 12px)",
+                        color: "var(--os-text-2)",
+                        display: "flex",
+                        gap: "var(--os-space-2)",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <span>{a.text}</span>
+                      <span
+                        className="os-num"
+                        style={{ color: "var(--os-muted)", whiteSpace: "nowrap" }}
+                      >
+                        {dateTimeHe(a.at)}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </Panel>
           </div>
-        </Panel>
 
-        <Panel variant="panel" style={{ padding: "var(--os-space-5)" }}>
-          <SectionTitle
-            title="תור פולואו-אפ"
-            subtitle="לידים פתוחים שמועד המעקב שלהם הגיע"
-            icon="alert"
-            action={
-              <Link to="/crm" style={{ color: "var(--os-cyan-text)", fontSize: "var(--os-text-2xs)" }}>
-                ל-CRM ←
-              </Link>
-            }
-          />
-          <div style={{ ...stack("var(--os-space-2)"), marginBlockStart: "var(--os-space-3)" }}>
-            {queue.length === 0 ? (
-              <EmptyState
-                icon="check"
-                title="אין לידים שממתינים לפולואו-אפ"
-                reason="לכל הלידים הפתוחים יש מועד מעקב עתידי."
-              />
-            ) : (
-              queue.map((l) => (
-                <div
-                  key={l.id}
-                  data-testid="followup-lead"
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: "var(--os-space-2)",
-                    fontSize: "var(--os-text-sm, 13px)",
-                    borderBlockEnd: "1px solid var(--os-border)",
-                    paddingBlockEnd: 4,
-                  }}
-                >
-                  <span>
-                    {l.name}
-                    <span style={{ color: "var(--os-muted)" }}> · {l.interest}</span>
-                  </span>
-                  <span className="os-num" style={{ color: "var(--warning-text)" }}>
-                    {dateHe(l.followUp)}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </Panel>
+          {/* memory/knowledge + local health — moved here from the left rail */}
+          <div style={gridStyle("repeat(auto-fit, minmax(260px, 1fr))")}>
+            <Panel variant="panel" style={{ padding: "var(--os-space-5)" }}>
+              <SectionTitle title="זיכרון · ידע · למידה" icon="inbox" />
+              <div style={{ marginBlockStart: "var(--os-space-3)" }}>
+                <MemoryBand />
+              </div>
+            </Panel>
 
-        <Panel variant="panel" style={{ padding: "var(--os-space-5)" }}>
-          <SectionTitle title="פעילות אחרונה" icon="inbox" />
-          <div style={{ ...stack("var(--os-space-2)"), marginBlockStart: "var(--os-space-3)" }}>
-            {feed.length === 0 ? (
-              <EmptyState title="אין פעילות" reason="טרם נרשמו אירועי פעילות במערכת." />
-            ) : (
-              feed.map((a) => (
-                <div
-                  key={a.id}
-                  style={{
-                    fontSize: "var(--os-text-2xs, 12px)",
-                    color: "var(--os-text-2)",
-                    display: "flex",
-                    gap: "var(--os-space-2)",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <span>{a.text}</span>
-                  <span
-                    className="os-num"
-                    style={{ color: "var(--os-muted)", whiteSpace: "nowrap" }}
-                  >
-                    {dateTimeHe(a.at)}
-                  </span>
+            <Panel variant="panel" style={{ padding: "var(--os-space-5)" }}>
+              <SectionTitle title="בריאות המערכת" icon="gauge" />
+              <div
+                style={{
+                  marginBlockStart: "var(--os-space-3)",
+                  fontSize: "var(--os-text-2xs, 11px)",
+                  color: "var(--os-text-2)",
+                  display: "grid",
+                  gap: 4,
+                }}
+              >
+                <div>אחסון: IndexedDB מקומי (דפדפן) — פעיל</div>
+                <div>
+                  נתוני הדגמה נזרעו לעוגן <span className="os-num">{dateHe(SEED_ANCHOR)}</span>
                 </div>
-              ))
-            )}
+                <div>ספק AI מרוחק: לא מחובר — כל הלוגיקה דטרמיניסטית מקומית</div>
+                <ProviderStateBadge provider="local-rules" />
+              </div>
+            </Panel>
           </div>
-        </Panel>
-      </div>
+        </div>
+      </details>
 
       {/* decision details — evidence, related records, run link, audit trail */}
       {detailsRec &&

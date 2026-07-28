@@ -18,6 +18,9 @@ test.describe("3.1 command center", () => {
     await expect(page.locator("h1")).toContainText("צחי");
     // KPI strip derived from repositories
     await expect(page.getByText("לידים פתוחים").first()).toBeVisible();
+    // "שווי צבר פתוח" is a SECONDARY metric — under Visual-Calm density it lives
+    // in the "מדדים נוספים" disclosure, so open it before asserting visibility.
+    await page.getByTestId("command-more-metrics").locator("summary").click();
     await expect(page.getByText("שווי צבר פתוח")).toBeVisible();
     // AI decision center with the honest envelope
     await expect(page.getByText("מרכז ההחלטות של ה-AI")).toBeVisible();
@@ -56,7 +59,10 @@ test.describe("3.2 crm", () => {
     await page.getByRole("button", { name: "שמירה" }).click();
     await expect(page.locator(".os-toast").first()).toContainText("נוצר");
 
-    // appears in the table (new lead follow-up = today ⇒ first page under default sort)
+    // A new lead's follow-up = today, which sorts LAST under the default
+    // followUp-ascending order (so it is NOT on page 1). Filter to it rather
+    // than assume its page.
+    await page.getByLabel("חיפוש חופשי בלידים").fill("בדיקת E2E ליד");
     await expect(page.getByTestId("leads-table")).toContainText("בדיקת E2E ליד");
 
     // and instantly on the dashboard follow-up queue (TanStack invalidation)
@@ -128,7 +134,7 @@ test.describe("3.4 sales journey", () => {
     const results = page.getByTestId("match-results");
     await expect(results).toBeVisible();
     await expect(results).toContainText("Bambu Lab");
-    await expect(results).toContainText("התאמה:");
+    await expect(results).toContainText("ההתאמה המובילה");
     await expect(results).toContainText("אומדן פתרון מלא");
   });
 });

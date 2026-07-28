@@ -100,6 +100,9 @@ test("Command-Center memory band: derived rows only, click-through lands on /mem
 }) => {
   const errors = collectConsoleErrors(page);
   await page.goto("/");
+  // VC density round-2: the Command-Center memory band moved into the
+  // "פירוט נוסף" disclosure — open it before asserting the band.
+  await page.getByTestId("cc-secondary").locator("summary").click();
   const band = page.getByTestId("cc-memory-band");
   await expect(band).toBeVisible({ timeout: 20_000 });
 

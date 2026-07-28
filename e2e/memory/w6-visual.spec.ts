@@ -161,8 +161,10 @@ test("cross-domain surfaces — 11 customer-360 memory tab, 12 command-center me
   await expect(page.getByTestId("c360-memory-tab")).toBeVisible({ timeout: 20_000 });
   await shoot(page, "11-customer360-memory-tab");
 
-  // 12 — Command-Center memory rail (derived band)
+  // 12 — Command-Center memory band (derived) — moved into the "פירוט נוסף"
+  // disclosure under VC density round-2, so open it first.
   await page.goto("/");
+  await page.getByTestId("cc-secondary").locator("summary").click();
   await expect(page.getByTestId("cc-memory-band")).toBeVisible({ timeout: 20_000 });
   await page.getByTestId("cc-memory-band").scrollIntoViewIfNeeded();
   await shoot(page, "12-command-center-memory-rail");

@@ -123,15 +123,42 @@ export function AgentNetworkLive({
         </Link>
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-          gap: "var(--os-space-3)",
-          marginBlockStart: "var(--os-space-3)",
-        }}
-      >
-        {agents.map((a) => {
+      {openConflicts.length > 0 && (
+        <div
+          style={{
+            marginBlockStart: "var(--os-space-3)",
+            display: "grid",
+            gap: "var(--os-space-2)",
+            fontSize: "var(--os-text-2xs, 11px)",
+          }}
+        >
+          <strong style={{ color: "var(--warning-text)" }}>קונפליקטים הממתינים להכרעה אנושית:</strong>
+          {openConflicts.map((c) => (
+            <div key={c.id} style={{ color: "var(--os-text-2)" }}>
+              {c.description}{" "}
+              <Link to="/agents/collaboration" style={{ color: "var(--os-cyan-text)" }}>
+                להכרעה ←
+              </Link>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* VC density round-2: the per-agent cards + recent messages/handoffs are
+          DETAIL — moved behind a disclosure so the band stays a compact status
+          summary. The summary line above (queues/approvals/conflicts) is the
+          "one agent-status summary" kept permanently visible. */}
+      <details className="os-more-metrics" data-testid="agent-network-detail">
+        <summary>כרטיסי הסוכנים, הודעות ומסירות</summary>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+            gap: "var(--os-space-3)",
+            marginBlockStart: "var(--os-space-3)",
+          }}
+        >
+          {agents.map((a) => {
           const inFlight = agentTasks
             .filter((t) => t.agentId === a.id && IN_FLIGHT.has(t.status))
             .sort((x, y) => y.updatedAt.localeCompare(x.updatedAt));
@@ -170,38 +197,17 @@ export function AgentNetworkLive({
         {agents.length === 0 && (
           <EmptyState title="אין סוכנים" reason="אוסף agents ריק במאגר המקומי." />
         )}
-      </div>
+        </div>
 
-      {openConflicts.length > 0 && (
         <div
           style={{
             marginBlockStart: "var(--os-space-4)",
             display: "grid",
             gap: "var(--os-space-2)",
             fontSize: "var(--os-text-2xs, 11px)",
+            color: "var(--os-text-2)",
           }}
         >
-          <strong style={{ color: "var(--warning-text)" }}>קונפליקטים הממתינים להכרעה אנושית:</strong>
-          {openConflicts.map((c) => (
-            <div key={c.id} style={{ color: "var(--os-text-2)" }}>
-              {c.description}{" "}
-              <Link to="/agents/collaboration" style={{ color: "var(--os-cyan-text)" }}>
-                להכרעה ←
-              </Link>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div
-        style={{
-          marginBlockStart: "var(--os-space-4)",
-          display: "grid",
-          gap: "var(--os-space-2)",
-          fontSize: "var(--os-text-2xs, 11px)",
-          color: "var(--os-text-2)",
-        }}
-      >
         <strong style={{ color: "var(--os-text)" }}>הודעות סוכנים אחרונות:</strong>
         {recentMessages.length === 0 ? (
           <span style={{ color: "var(--os-muted)" }}>אין הודעות סוכנים שמורות</span>
@@ -227,7 +233,8 @@ export function AgentNetworkLive({
               ))}
           </>
         )}
-      </div>
+        </div>
+      </details>
     </Panel>
   );
 }

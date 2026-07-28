@@ -31,7 +31,7 @@ import {
 } from "./quick-create/QuickCreateHost";
 import { RailProvider } from "./rail";
 import { useRailContent, useRailHidden } from "./railContext";
-import { ThemeToggle } from "@/theme/ThemeToggle";
+import { ThemeSelect } from "@/theme/ThemeSelect";
 import CopilotWorkspace from "@/modules/ai-copilot/CopilotWorkspace";
 import { CopilotProvider } from "@/modules/ai-copilot/copilotContext";
 import { useCopilot } from "@/modules/ai-copilot/copilotApi";
@@ -240,7 +240,7 @@ function OsShellInner(): ReactElement {
           onSearchOpen: () => setPalette({ mode: "search", initialQuery: "" }),
           actions: (
             <>
-              <ThemeToggle />
+              <ThemeSelect />
               <button
                 type="button"
                 className="os-header__iconbtn os-header__hamburger"

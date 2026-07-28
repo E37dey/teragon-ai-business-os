@@ -26,19 +26,22 @@ test("/memory loads: derived metrics + the two mandated Obsidian status lines", 
   const errors = collectConsoleErrors(page);
   await gotoMemory(page);
 
-  // 8 derived KPI cards
+  // 4 PRIMARY derived KPI cards (VC density: the four passive metrics moved to
+  // the "מדדים נוספים" disclosure below).
   const metrics = page.getByTestId("memory-metrics");
   for (const title of [
-    "פריטים מאושרים",
     "הצעות ממתינות",
-    "קישורים",
+    "סקירות שהגיע זמנן",
     "קישורים לא פתורים",
     "סתירות פתוחות",
-    "סקירות שהגיע זמנן",
-    "ייבואים היום",
-    "שימושי AI היום",
   ]) {
     await expect(metrics.getByText(title, { exact: true })).toBeVisible();
+  }
+  // the remaining 4 metrics live in the disclosure
+  const moreMetrics = page.getByTestId("memory-more-metrics");
+  await moreMetrics.locator("summary").click();
+  for (const title of ["פריטים מאושרים", "קישורים", "ייבואים היום", "שימושי AI היום"]) {
+    await expect(moreMetrics.getByText(title, { exact: true })).toBeVisible();
   }
 
   // the EXACT two mandated status lines (rail — honest, no fake sync)
@@ -276,7 +279,16 @@ test("offline (honest scope): with the SPA loaded, /memory keeps reading from In
   // navigation and data work with the network fully offline.
   const errors = collectConsoleErrors(page);
   await page.goto("/"); // load the shell + command-center chunk online
-  await expect(page.getByTestId("cc-memory-band")).toBeVisible({ timeout: 20_000 });
+  // gate on the command center itself (the memory band now lives inside the
+  // "פירוט נוסף" disclosure; this test only needs the CC chunk warmed).
+  await expect(page.getByTestId("command-center")).toBeVisible({ timeout: 20_000 });
+  // VC collapses non-active nav groups — expand them so the /memory link is
+  // reachable for a client-side (chunk-warming) navigation.
+  for (let i = 0; i < 8; i++) {
+    const collapsed = page.locator('.os-nav__group-head[aria-expanded="false"]').first();
+    if ((await collapsed.count()) === 0) break;
+    await collapsed.click();
+  }
   await page.getByRole("link", { name: "זיכרון Obsidian" }).first().click(); // warm the /memory chunk
   await expect(page.getByTestId("memory-page")).toBeVisible({ timeout: 20_000 });
 
@@ -284,7 +296,7 @@ test("offline (honest scope): with the SPA loaded, /memory keeps reading from In
 
   // client-side round trip with zero network — data still renders from IDB
   await page.goBack();
-  await expect(page.getByTestId("cc-memory-band")).toBeVisible();
+  await expect(page.getByTestId("command-center")).toBeVisible();
   await page.goForward();
   await expect(page.getByTestId("memory-page")).toBeVisible();
   await expect(page.getByTestId("memory-note-list").locator("button")).not.toHaveCount(0);
