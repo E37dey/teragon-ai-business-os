@@ -237,9 +237,12 @@ test.afterAll(() => {
     },
     { total: 0, buttons: 0, links: 0, inputs: 0, tabs: 0, disabled: 0, violations: 0 },
   );
+  // NOTE: intentionally NO volatile `generatedAt` — the tally is a committed
+  // generated artifact, so it must be deterministic (change only when the real
+  // control inventory changes, never merely because time passed).
   writeFileSync(
     join(HERE, "w9a-control-tally.json"),
-    JSON.stringify({ generatedAt: new Date().toISOString(), totals, routes: allCensus }, null, 2),
+    JSON.stringify({ totals, routes: allCensus }, null, 2),
     "utf8",
   );
 });
