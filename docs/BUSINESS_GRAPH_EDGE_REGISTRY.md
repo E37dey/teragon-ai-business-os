@@ -29,18 +29,29 @@ first-class states (never silently dropped).
 
 `CANONICAL` · `DERIVED` · `UNVERIFIED` · `REJECTED`.
 
-## The refinement rules (enforced by `businessGraphEdgeSchema.superRefine`)
+## Authority rules — centralized policy (updated in Phase 2.1)
 
-1. **Only an `EXPLICIT` edge may claim `CANONICAL` authority.** An `INFERRED` or `FOREIGN_KEY_DERIVED`
-   edge that declares `CANONICAL` is **rejected** — an inferred edge can never masquerade as canonical.
-2. **A `PROPOSED` edge is always `UNVERIFIED` and never `approved`** — a proposed relationship can never
-   enter authoritative traversal without approval.
-3. **A `REJECTED`-authority edge is never authoritative** (and never `approved`).
-4. **Cross-organization edges are rejected** — the schema parses `source`/`target` node ids and requires
-   `source.org === target.org === edge.organizationId`.
+Authority is decided by ONE central function, **`resolveEdgeAuthority(input)`**
+(`src/graph/contracts/authority.ts`) — the rules are **not scattered across factories**. It returns
+`{ authority, reasons[] }`:
 
-`edgeIsAuthoritative(edge)` is the **deny-by-default** helper: returns `false` for `REJECTED`/
-`UNVERIFIED`/`PROPOSED`, `true` only for a `CANONICAL` (⇒ EXPLICIT) or `DERIVED` edge.
+1. **`EXPLICIT`** (a dedicated link/join record) ⇒ may be `CANONICAL` by construction.
+2. **`FOREIGN_KEY_DERIVED`** ⇒ may reach `CANONICAL` **only when ALL six hold**: the registry marks the
+   relationship authoritative · the source is canonical + eligible · the **target exists** · source and
+   target share `organizationId` · the source is **not archived/rejected/invalid** · **no ambiguous
+   resolution** was used. If any fails, it downgrades to `DERIVED` (e.g. registry-not-authoritative /
+   archived) or `UNVERIFIED` (broken FK / cross-org / ineligible). A broken/missing FK yields a
+   non-authoritative result **and instructs the caller to emit an issue, not an edge.**
+3. **`INFERRED`** ⇒ capped at `DERIVED` — **can never be `CANONICAL`.**
+4. **`PROPOSED`** ⇒ always `UNVERIFIED` until a named-human approval (never authoritative without it).
+5. **`REJECTED`** ⇒ never authoritative. **Name/substring/ambiguous** resolution ⇒ capped at `UNVERIFIED`.
+
+The static `businessGraphEdgeSchema.superRefine` enforces the *shape* invariants (rejects
+`INFERRED`+`CANONICAL`, `PROPOSED`+non-UNVERIFIED/approved, `REJECTED`-authoritative, and cross-org where
+`source.org === target.org === edge.organizationId`), while the runtime six-condition gate for
+`FOREIGN_KEY_DERIVED → CANONICAL` lives in `resolveEdgeAuthority`. `edgeIsAuthoritative(edge)` remains
+**deny-by-default**: `false` for `REJECTED`/`UNVERIFIED`/`PROPOSED`, `true` only for `CANONICAL` or
+`DERIVED`.
 
 ## `EDGE_REGISTRY` (30 entries)
 

@@ -18,9 +18,16 @@ yet. (Design rationale in [SECURITY_MODEL](BUSINESS_GRAPH_SECURITY_MODEL.md).)
   values — the seam for "no unlimited recursive traversal."
 - **`GraphAuditContext`** `{ actorRef, action, rootRef, correlationId }` — the shape every future graph
   query must emit so it is auditable (`action` e.g. `graph.query`).
-- **`humanApproverGuard(approverRef)`** — a pure guard that **throws** if the approver is an agent
-  (`entityType === 'agent'` or an `ag-*` id, reusing `isAiAgentId`). **AI can never be a human
-  approver.** `HumanUserId` semantics from `src/domain/administration/guards.ts` are preserved.
+- **`ActorRef`** (Phase-2.1) — a discriminated actor contract: `{ kind:"HUMAN"; userId }` |
+  `{ kind:"AGENT"; agentId }` | `{ kind:"SYSTEM" }`. The **kind is authoritative** — actor type is
+  **never inferred from an `ag-*` id prefix** (a HUMAN whose userId merely contains "ag" is still a
+  HUMAN). `GraphViewerContext.actor` is an `ActorRef`.
+- **`assertHumanApprover(actor, { eligibility, requesterUserId?, prohibitSelfApproval? })`** (Phase-2.1,
+  replaces the old prefix-sniffing `humanApproverGuard`) — a pure guard that **throws
+  `GraphSecurityError`** unless ALL hold: `actor.kind === "HUMAN"`; a canonical user id (non-empty, no
+  whitespace, not an array-position id); the caller-injected `eligibility.active === true`;
+  `eligibility.hasRequiredPermission === true`; and no prohibited self-approval
+  (`requesterUserId !== actor.userId` when `prohibitSelfApproval`). **AI can never be a human approver.**
 
 ## Security invariants (each is unit-tested)
 
@@ -31,7 +38,9 @@ yet. (Design rationale in [SECURITY_MODEL](BUSINESS_GRAPH_SECURITY_MODEL.md).)
 3. **Sensitive bodies never leave via the envelope** — `BusinessGraphNode` carries no body/content;
    sensitive content is reachable only through a separate `ProtectedPayloadReference` (a pointer, with
    `requiresRevealReason`), and `mayRevealBody` gates the reveal.
-4. **AI ≠ human approver** — `humanApproverGuard` throws for any agent/`ag-*` approver.
+4. **AI ≠ human approver** — `assertHumanApprover` throws for any AGENT/SYSTEM actor, inactive/
+   ineligible user, missing permission, or prohibited self-approval; actor kind (never an id prefix)
+   decides.
 5. **Proposed ≠ authoritative** — a PROPOSED edge is UNVERIFIED and cannot be approved (edge refinement).
 6. **Rejected/unverified evidence is non-authoritative** — `edgeIsAuthoritative` denies REJECTED/
    UNVERIFIED/PROPOSED.

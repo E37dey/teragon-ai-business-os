@@ -144,3 +144,31 @@ export {
 export type { EdgeRegistryEntry, EdgeCardinality } from "./registry/edgeRegistry";
 
 export { CORE_V1_ENTITY_SPINE, CORE_V1_PRIORITY_RELATIONSHIPS } from "./registry/coreV1Spine";
+
+// --- derivation (Phase 3 — PURE, deterministic derivation functions) ---
+export {
+  deriveGraphNode,
+  deriveGraphEdges,
+  deriveEntityGraph,
+  deriveOrganizationGraphSnapshot,
+  validateDerivedGraph,
+  buildEdgeId,
+  DERIVATION_STATUS,
+  DERIVATION_STATUSES,
+  DERIVATION_ISSUE_CODES,
+} from "./derivation";
+export type {
+  DerivationStatus,
+  DerivationIssueCode,
+  DerivationSeverity,
+  GraphDerivationContext,
+  GraphDerivationIssue,
+  GraphUnmappableRecord,
+  GraphDerivationStats,
+  GraphDerivationResult,
+  GraphDerivationLookup,
+  GraphLookupTarget,
+  CanonicalRecord,
+  DeriveNodeOutcome,
+  DeriveEdgesOutcome,
+} from "./derivation";
