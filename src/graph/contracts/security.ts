@@ -6,8 +6,8 @@
 // SECURITY_MODEL §3/§4/§8/§10.
 import { z } from "zod";
 import { SENSITIVITY_ORDER } from "@/domain/memory/types";
-import { isAiAgentId } from "@/domain/administration/guards";
-import { graphEntityRefSchema, type GraphEntityRef } from "./identity";
+import { graphEntityRefSchema, isArrayPositionId, type GraphEntityRef } from "./identity";
+import { actorRefSchema, type ActorRef } from "./actor";
 import {
   GRAPH_HIDDEN_SENSITIVITIES,
   GRAPH_SENSITIVITIES,
@@ -18,7 +18,12 @@ import {
 // errors
 // ---------------------------------------------------------------------------
 
-export type GraphSecurityErrorCode = "GRAPH_AI_APPROVER_FORBIDDEN";
+export type GraphSecurityErrorCode =
+  | "GRAPH_APPROVER_NOT_HUMAN"
+  | "GRAPH_APPROVER_INVALID_ID"
+  | "GRAPH_APPROVER_INACTIVE"
+  | "GRAPH_APPROVER_MISSING_PERMISSION"
+  | "GRAPH_SELF_APPROVAL_FORBIDDEN";
 
 export class GraphSecurityError extends Error {
   readonly code: GraphSecurityErrorCode;
@@ -30,6 +35,16 @@ export class GraphSecurityError extends Error {
     this.code = code;
     this.detailHe = detailHe;
   }
+
+  /** Alias for `code` — the machine-readable reason. */
+  get reasonCode(): GraphSecurityErrorCode {
+    return this.code;
+  }
+
+  /** Alias for `detailHe` — the human-readable Hebrew reason. */
+  get reasonHe(): string {
+    return this.detailHe;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -38,18 +53,14 @@ export class GraphSecurityError extends Error {
 
 export interface GraphViewerContext {
   organizationId: string;
-  actorRef: GraphEntityRef;
+  actor: ActorRef;
   role?: string;
-  isAgent: boolean;
-  agentId?: string;
 }
 
 export const graphViewerContextSchema = z.object({
   organizationId: z.string().min(1),
-  actorRef: graphEntityRefSchema,
+  actor: actorRefSchema,
   role: z.string().min(1).optional(),
-  isAgent: z.boolean(),
-  agentId: z.string().min(1).optional(),
 }) satisfies z.ZodType<GraphViewerContext>;
 
 // ---------------------------------------------------------------------------
@@ -155,20 +166,60 @@ export const graphAuditContextSchema = z.object({
 }) satisfies z.ZodType<GraphAuditContext>;
 
 // ---------------------------------------------------------------------------
-// human-approver guard — AI can never be a human approver
+// human-approver guard — AI/SYSTEM can never be a human approver
 // ---------------------------------------------------------------------------
 
+/** Eligibility facts the caller supplies (the contract cannot read the users repo). */
+export interface HumanApproverEligibility {
+  active: boolean;
+  hasRequiredPermission: boolean;
+}
+
+export interface HumanApproverContext {
+  eligibility: HumanApproverEligibility;
+  /** the actor who requested the change (for self-approval checks) */
+  requesterUserId?: string;
+  /** when true, an actor may not approve their own request */
+  prohibitSelfApproval?: boolean;
+}
+
 /**
- * Throws if the proposed approver is an AI agent — either by node type
- * (`agent`) or by id shape (`ag-*` / a registered agent id, via isAiAgentId).
- * Mirrors administration/guards.ts (toHumanUserId) at the graph layer. Never
- * weaken: "AI proposes, only a NAMED human approves" (SECURITY_MODEL §4).
+ * Throws unless `actor` is a HUMAN with a canonical id who is active, holds the
+ * required permission, and (when prohibited) is not self-approving. Actor TYPE
+ * is read from the discriminant `kind` — NEVER inferred from an id prefix
+ * (`ag-*`), so a HUMAN whose userId merely contains "ag" is still a HUMAN.
+ * Enforces "AI proposes, only a NAMED human approves" (SECURITY_MODEL §4).
  */
-export function humanApproverGuard(approverRef: GraphEntityRef): void {
-  if (approverRef.entityType === "agent" || isAiAgentId(approverRef.entityId)) {
+export function assertHumanApprover(actor: ActorRef, ctx: HumanApproverContext): void {
+  if (actor.kind !== "HUMAN") {
     throw new GraphSecurityError(
-      "GRAPH_AI_APPROVER_FORBIDDEN",
-      `סוכן AI (${approverRef.entityId}) לעולם אינו יכול לשמש מאשר אנושי — נדרש משתמש אנושי בשם`,
+      "GRAPH_APPROVER_NOT_HUMAN",
+      `שחקן מסוג ${actor.kind} לעולם אינו יכול לשמש מאשר אנושי — נדרש משתמש אנושי בשם`,
+    );
+  }
+  const userId = actor.userId;
+  if (!userId.trim() || /\s/u.test(userId) || isArrayPositionId(userId)) {
+    throw new GraphSecurityError(
+      "GRAPH_APPROVER_INVALID_ID",
+      `מזהה משתמש לא קנוני (${userId}) אינו יכול לשמש מאשר — נדרש מזהה יציב ללא רווחים`,
+    );
+  }
+  if (!ctx.eligibility.active) {
+    throw new GraphSecurityError(
+      "GRAPH_APPROVER_INACTIVE",
+      `המשתמש (${userId}) אינו פעיל/כשיר — אינו יכול לאשר`,
+    );
+  }
+  if (!ctx.eligibility.hasRequiredPermission) {
+    throw new GraphSecurityError(
+      "GRAPH_APPROVER_MISSING_PERMISSION",
+      `למשתמש (${userId}) אין את הרשאת האישור הנדרשת`,
+    );
+  }
+  if (ctx.prohibitSelfApproval === true && ctx.requesterUserId === userId) {
+    throw new GraphSecurityError(
+      "GRAPH_SELF_APPROVAL_FORBIDDEN",
+      `אישור עצמי חסום — המבקש (${userId}) אינו יכול לאשר את בקשתו`,
     );
   }
 }

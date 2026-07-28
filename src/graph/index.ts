@@ -70,6 +70,14 @@ export type {
   BusinessGraphEdge,
 } from "./contracts/edge";
 
+// --- edge-authority policy (centralized) ---
+export { resolveEdgeAuthority } from "./contracts/authority";
+export type { EdgeAuthorityInput, EdgeAuthorityDecision } from "./contracts/authority";
+
+// --- actor ---
+export { actorRefSchema } from "./contracts/actor";
+export type { ActorRef } from "./contracts/actor";
+
 // --- references ---
 export {
   LEGACY_REFERENCE_KINDS,
@@ -100,7 +108,7 @@ export {
   DEFAULT_GRAPH_TRAVERSAL_LIMITS,
   graphTraversalLimitsSchema,
   graphAuditContextSchema,
-  humanApproverGuard,
+  assertHumanApprover,
 } from "./contracts/security";
 export type {
   GraphSecurityErrorCode,
@@ -109,6 +117,8 @@ export type {
   GraphSensitivityPolicy,
   GraphTraversalLimits,
   GraphAuditContext,
+  HumanApproverEligibility,
+  HumanApproverContext,
 } from "./contracts/security";
 
 // --- registries ---

@@ -40,10 +40,18 @@ describe("edge contract", () => {
     expect(r.success).toBe(false);
   });
 
-  it("refuses CANONICAL on a FOREIGN_KEY_DERIVED edge (only EXPLICIT may)", () => {
+  it("allows CANONICAL on a FOREIGN_KEY_DERIVED edge (now gated at runtime, not statically rejected)", () => {
     expect(
       businessGraphEdgeSchema.safeParse(
         baseEdge({ provenance: "FOREIGN_KEY_DERIVED", authority: "CANONICAL" }),
+      ).success,
+    ).toBe(true);
+  });
+
+  it("still refuses CANONICAL on a PROPOSED edge", () => {
+    expect(
+      businessGraphEdgeSchema.safeParse(
+        baseEdge({ provenance: "PROPOSED", authority: "CANONICAL", approvalState: "none" }),
       ).success,
     ).toBe(false);
   });

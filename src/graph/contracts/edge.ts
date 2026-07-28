@@ -2,10 +2,12 @@
 // The 22 CLOSED relationship types plus the provenance/authority/staleness
 // vocabulary. The zod schema enforces the non-negotiable trust invariants from
 // EDGE_MAP §2 and SECURITY_MODEL §4/§5:
-//   (a) only an EXPLICIT edge may be CANONICAL;
+//   (a) an INFERRED/PROPOSED edge may never be CANONICAL (EXPLICIT always may,
+//       FOREIGN_KEY_DERIVED may — gated at runtime by resolveEdgeAuthority);
 //   (b) a PROPOSED edge is always UNVERIFIED and never approved;
 //   (c) a REJECTED-authority edge can never be approved;
 //   plus: no cross-organization edge (source.org === target.org === edge.org).
+// The full authority decision lives in ./authority.ts (the centralized policy).
 import { z } from "zod";
 import type { ISODate } from "@/domain/types";
 import {
@@ -145,12 +147,18 @@ export const businessGraphEdgeSchema = z
     staleState: graphEdgeStaleStateSchema,
   })
   .superRefine((val, ctx) => {
-    // (a) only an EXPLICIT edge may claim CANONICAL authority.
-    if (val.authority === "CANONICAL" && val.provenance !== "EXPLICIT") {
+    // (a) INFERRED and PROPOSED edges may NEVER claim CANONICAL authority. An
+    //     EXPLICIT edge always may; a FOREIGN_KEY_DERIVED edge MAY be CANONICAL
+    //     — that combination is now legal statically and is gated at runtime by
+    //     resolveEdgeAuthority (authority.ts), not rejected here.
+    if (
+      val.authority === "CANONICAL" &&
+      (val.provenance === "INFERRED" || val.provenance === "PROPOSED")
+    ) {
       ctx.addIssue({
         code: "custom",
         message:
-          "רק קשת EXPLICIT יכולה להיות CANONICAL — קשת נגזרת/מוסקת/מוצעת לעולם אינה סמכותית",
+          "קשת מוסקת (INFERRED) או מוצעת (PROPOSED) לעולם אינה CANONICAL — נדרשת EXPLICIT או FOREIGN_KEY_DERIVED כשירה",
         path: ["authority"],
       });
     }
