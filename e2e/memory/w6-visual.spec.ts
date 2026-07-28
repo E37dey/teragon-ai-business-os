@@ -120,6 +120,8 @@ test("knowledge surfaces — 05 page, 06 article open, 07 conflict panel", async
   await approveArticle("סתירה ויזואלית א");
   await createDraft("סתירה ויזואלית ב", "עבור ASA מיוחד: טמפ' מיטה 85 חובה.");
   await approveArticle("סתירה ויזואלית ב");
+  // VC moved the contradiction scanner into the "סתירות בידע" tab — open it first.
+  await page.getByRole("tab", { name: "סתירות בידע" }).click();
   await page.getByRole("button", { name: "סריקת סתירות" }).click();
   await expect(page.getByText(/נמצאו \d+ סתירות חדשות/).first()).toBeVisible({ timeout: 20_000 });
   await page.getByText("סתירות בידע", { exact: false }).first().scrollIntoViewIfNeeded();

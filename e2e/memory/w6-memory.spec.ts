@@ -107,7 +107,9 @@ test("Markdown import: staged preview → proposals created NOT approved → nam
   await expect(note).toContainText(TITLE_A);
   await expect(note.getByTestId("note-markdown")).toContainText(TITLE_B); // inert wikilink text
 
-  // link click-through: the graph node button for B selects the linked note
+  // link click-through: the link graph lives in the "גרף קישורים" center tab
+  // (VC-E density made the note-list and graph two center tabs) — open it first.
+  await page.getByRole("tab", { name: "גרף קישורים" }).click();
   await page.getByTestId("memory-link-graph").getByRole("button", { name: TITLE_B }).click();
   await expect(note).toContainText(TITLE_B);
   await expect(note.getByTestId("note-governance")).toContainText("אישור: מאושר");
