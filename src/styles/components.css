@@ -339,7 +339,7 @@
   gap: var(--os-space-5);
   padding: var(--os-space-4) var(--os-space-6);
   border-block-start: var(--os-border-thin);
-  background: var(--os-nav);
+  background: var(--os-surface-2);
   font-size: var(--os-text-xs);
   color: var(--os-text-2);
 }
@@ -444,17 +444,18 @@
 
 /* Approval-flow buttons (per reference: אשר=green solid, דחה=red outline) */
 .os-btn--approve {
-  background: var(--os-success);
-  color: #04150c;
+  background: var(--os-success-soft);
+  color: var(--success-text);
+  border-color: var(--os-success-border);
 }
 .os-btn--approve:hover:not(:disabled) {
-  background: #2bde92;
-  box-shadow: var(--os-glow-success);
+  background: var(--success-soft);
+  border-color: var(--success);
 }
 
 .os-btn--reject {
   background: transparent;
-  color: var(--os-danger);
+  color: var(--danger-text);
   border-color: var(--os-danger-border);
 }
 .os-btn--reject:hover:not(:disabled) {
@@ -1119,7 +1120,7 @@
 }
 
 .os-tabs__tab--active {
-  color: var(--os-cyan);
+  color: var(--os-cyan-text);
   border-block-end-color: var(--os-cyan);
   font-weight: var(--os-weight-semibold);
 }
@@ -1135,7 +1136,7 @@
 }
 
 .os-tabs__tab--active .os-tabs__badge {
-  color: var(--os-cyan);
+  color: var(--os-cyan-text);
   border-color: var(--os-cyan-border);
   background: var(--os-cyan-soft);
 }
@@ -1268,7 +1269,7 @@
   gap: var(--os-space-4);
   padding: var(--os-space-5) var(--os-space-6);
   border-block-start: var(--os-border-thin);
-  background: var(--os-nav);
+  background: var(--os-surface-2);
   border-end-start-radius: var(--os-radius-xl);
   border-end-end-radius: var(--os-radius-xl);
 }
@@ -1383,10 +1384,10 @@
   min-block-size: 100vh;
 }
 
-/* ── RightPrimaryNavigation ── */
+/* ── RightPrimaryNavigation — HYBRID: always dark, in both themes ── */
 .os-nav {
-  background: var(--os-nav);
-  border-inline-end: var(--os-border-thin);
+  background: var(--os-nav-bg);
+  border-inline-end: 1px solid var(--os-nav-border);
   display: flex;
   flex-direction: column;
   position: sticky;
@@ -1401,14 +1402,14 @@
   flex-direction: column;
   gap: var(--os-space-1);
   padding: var(--os-space-7) var(--os-space-6) var(--os-space-6);
-  border-block-end: var(--os-border-thin);
+  border-block-end: 1px solid var(--os-nav-border);
 }
 
 .os-nav__logo-name {
   font-size: var(--os-text-lg);
   font-weight: var(--os-weight-bold);
   letter-spacing: 0.14em;
-  color: var(--os-text);
+  color: var(--os-nav-text-strong);
   direction: ltr;
   unicode-bidi: isolate;
 }
@@ -1416,7 +1417,7 @@
 .os-nav__logo-sub {
   font-size: 9px;
   letter-spacing: 0.22em;
-  color: var(--os-text-2);
+  color: var(--os-nav-text-muted);
   direction: ltr;
   unicode-bidi: isolate;
 }
@@ -1437,7 +1438,7 @@
   gap: var(--os-space-4);
   padding: var(--os-space-4) var(--os-space-5);
   border-radius: var(--os-radius-md);
-  color: var(--text-muted); /* VC-B: inactive de-emphasis (AA-verified) */
+  color: var(--os-nav-text-muted); /* inactive de-emphasis, light-on-dark */
   font-size: var(--os-text-sm);
   font-weight: var(--os-weight-medium);
   cursor: pointer;
@@ -1452,14 +1453,14 @@
 }
 
 .os-nav__link:hover {
-  color: var(--text-primary);
-  background: var(--surface-2);
+  color: var(--os-nav-text-strong);
+  background: var(--os-nav-surface);
 }
 
 .os-nav__link--active {
-  color: var(--accent-primary-text);
-  background: var(--surface-selected);
-  border-color: var(--accent-primary-border);
+  color: var(--os-nav-selected-text);
+  background: var(--os-nav-selected-bg);
+  border-color: transparent;
   box-shadow: none;
 }
 
@@ -1472,7 +1473,7 @@
   block-size: 60%;
   inline-size: 3px;
   border-radius: var(--os-radius-full);
-  background: var(--accent-primary);
+  background: var(--os-nav-selected-bar);
 }
 
 .os-nav__icon {
@@ -1491,17 +1492,17 @@
 .os-nav__badge {
   font-size: var(--os-text-2xs);
   font-variant-numeric: tabular-nums;
-  background: var(--os-highlight);
-  border: var(--os-border-thin);
+  background: var(--os-nav-surface);
+  border: 1px solid var(--os-nav-border);
   border-radius: var(--os-radius-full);
   padding: 1px 6px;
-  color: var(--os-text-2);
+  color: var(--os-nav-text-muted);
   flex: none;
 }
 
 .os-nav__link--active .os-nav__badge {
-  color: var(--accent-primary-text);
-  border-color: var(--accent-primary-border);
+  color: var(--os-nav-selected-text);
+  border-color: var(--os-nav-border);
 }
 
 /* ── Copilot card (bottom of nav) ── */
@@ -1570,8 +1571,8 @@
   text-align: start;
   gap: var(--os-space-4);
   padding: var(--os-space-4) var(--os-space-5);
-  background: var(--surface-1);
-  border-color: var(--border-default);
+  background: var(--os-nav-surface);
+  border-color: var(--os-nav-border);
   box-shadow: none;
   cursor: pointer;
   transition:
@@ -1579,8 +1580,8 @@
     border-color var(--os-transition-fast);
 }
 .os-copilot--compact:hover {
-  background: var(--surface-2);
-  border-color: var(--border-strong);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--os-nav-border);
 }
 .os-copilot--compact .os-copilot__labels {
   display: flex;
@@ -1588,12 +1589,15 @@
   flex: 1;
   min-inline-size: 0;
 }
+.os-copilot--compact .os-copilot__title {
+  color: var(--os-nav-text-strong);
+}
 .os-copilot--compact .os-copilot__sub {
-  color: var(--text-muted);
+  color: var(--os-nav-text-muted);
 }
 .os-copilot--compact > svg,
 .os-copilot--compact > .os-icon {
-  color: var(--text-muted);
+  color: var(--os-nav-text-muted);
   flex: none;
 }
 
@@ -1652,7 +1656,7 @@
   gap: var(--os-space-5);
   block-size: var(--os-header-height);
   padding-inline: var(--os-space-6);
-  background: var(--os-nav);
+  background: var(--os-header-bg);
   border-block-end: var(--os-border-thin);
   position: sticky;
   inset-block-start: 0;
@@ -1877,7 +1881,7 @@
   justify-content: space-between;
   gap: var(--os-space-3);
   padding: var(--os-space-3) var(--os-space-5);
-  color: var(--os-muted);
+  color: var(--os-nav-text-muted);
   font-family: var(--os-font);
   font-size: var(--os-text-2xs);
   font-weight: var(--os-weight-semibold);
@@ -1890,8 +1894,8 @@
 }
 
 .os-nav__group-head:hover {
-  color: var(--os-text-2);
-  background: var(--os-highlight);
+  color: var(--os-nav-text);
+  background: var(--os-nav-surface);
 }
 
 .os-nav__group-chevron {

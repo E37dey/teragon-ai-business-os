@@ -188,6 +188,23 @@ export const SETTING_DEFINITIONS: readonly SettingDefinition[] = [
       "מנגנון האנימציות הגלובלי טרם קורא דגל override מקומי — בקשת אינטגרציה פתוחה; אין כאן מתג מת",
     control: "toggle",
   },
+  {
+    key: "interface.theme",
+    group: "interface",
+    labelHe: "ערכת נושא",
+    explanationHe:
+      "בהיר (ברירת מחדל) / כהה / לפי המערכת. משפיע רק על ערכת הצבעים — חל מיידית ונשמר; ההדפסה תמיד בהירה.",
+    allowedHe: "בהיר / כהה / לפי המערכת",
+    owner: SETTINGS_OWNER,
+    schema: z.enum(["בהיר", "כהה", "לפי המערכת"]),
+    defaultValue: "בהיר",
+    sensitive: false,
+    requiresApproval: false,
+    editable: true,
+    readOnlyReasonHe: null,
+    control: "select",
+    options: ["בהיר", "כהה", "לפי המערכת"],
+  },
   // ── התראות ─────────────────────────────────────────────────────────────
   {
     key: "notifications.navBadges",
@@ -641,9 +658,32 @@ export const DENSITY_FONT_SIZE: Record<string, string> = {
  * density ⇒ root font-size scale (immediate, reversible). Boot re-application
  * is requested from the Integration Lead (docs/integration-requests-w8d.md).
  */
+const THEME_HE_TO_CODE: Record<string, "light" | "dark" | "system"> = {
+  בהיר: "light",
+  כהה: "dark",
+  "לפי המערכת": "system",
+};
+
 export function applyUiSettings(record: SettingsRecord, doc: Document | null = null): void {
   const target = doc ?? (typeof document === "undefined" ? null : document);
   if (!target) return;
   const density = effectiveValue(record, settingDefinition("interface.density"));
   target.documentElement.style.fontSize = DENSITY_FONT_SIZE[String(density)] ?? "";
+
+  // Theme: reconcile the canonical setting → localStorage mirror (read by
+  // public/theme-init.js before paint) and apply data-theme now. The pre-paint
+  // script already applied the mirror; this keeps repo↔mirror in sync at boot.
+  const themeHe = String(effectiveValue(record, settingDefinition("interface.theme")));
+  const pref = THEME_HE_TO_CODE[themeHe] ?? "light";
+  let resolved: "light" | "dark" = pref === "dark" ? "dark" : "light";
+  if (pref === "system" && typeof window !== "undefined" && typeof window.matchMedia === "function") {
+    resolved = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  target.documentElement.setAttribute("data-theme", resolved);
+  target.documentElement.setAttribute("data-theme-pref", pref);
+  try {
+    if (typeof localStorage !== "undefined") localStorage.setItem("teragon.theme.preference", pref);
+  } catch {
+    /* storage disabled — theme still applied for the session */
+  }
 }

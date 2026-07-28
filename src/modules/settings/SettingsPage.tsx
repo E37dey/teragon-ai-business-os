@@ -7,6 +7,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactElement } from "react";
 import { Link } from "react-router-dom";
 import { PageRail } from "@/app/rail";
+import { useTheme } from "@/theme/themeContext";
+import { HE_TO_PREF } from "@/theme/themeContract";
 import { useCollection, useInvalidateCollections } from "@/app/data/hooks";
 import {
   KpiCard,
@@ -65,6 +67,7 @@ function lockProps(
 
 export default function SettingsPage(): ReactElement {
   const { toast } = useToast();
+  const theme = useTheme();
   const invalidate = useInvalidateCollections();
   const { active: demoActive, guard } = useDemoModeGuard();
   const auditQ = useCollection<AuditEvent>("auditEvents");
@@ -107,6 +110,17 @@ export default function SettingsPage(): ReactElement {
     const verdict = guard(`שינוי ההגדרה «${def.labelHe}»`);
     if (!verdict.allowed && def.key !== "demo.destructiveProtection") {
       toast(verdict.reasonHe, "warning");
+      return;
+    }
+    // Theme routes through the ThemeProvider so it applies live + stays in sync
+    // (setPreference persists to the canonical settings repo AND the mirror).
+    if (def.key === "interface.theme") {
+      theme.setPreference(HE_TO_PREF[String(value)] ?? "light");
+      toast(`«${def.labelHe}» עודכן`, "success");
+      void (async () => {
+        const rec = await readSettingsRecord(productionSettingsStores());
+        setRecord(rec);
+      })();
       return;
     }
     setBusy(true);

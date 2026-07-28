@@ -1,76 +1,138 @@
 /**
- * TERAGON AI BUSINESS OS — Design Tokens
+ * TERAGON AI BUSINESS OS — Design Tokens (Theme System v3)
  *
- * QUIET ENTERPRISE INTELLIGENCE (Visual Calm v2 — post-release/visual-calm-v2).
- * This supersedes the earlier high-intensity "cyber command center" palette
- * mandated by docs/VISUAL_DNA.md. Per the operator's Visual Calm directive,
- * the canonical system is now ~85% neutral surfaces/typography, ~10% brand
- * accent, ~5% semantic status — color communicates meaning, never decoration.
+ * LIGHT ENTERPRISE HYBRID (default) + DARK QUIET ENTERPRISE (optional).
+ * Theme is selected by the root attribute `data-theme="light|dark"`. `system`
+ * resolves to light/dark before paint (see src/theme/themeInit.ts).
  *
- * ARCHITECTURE: the canonical tokens (--bg-*, --surface-*, --text-*, --accent-*,
- * --success/--warning/--danger/--info) are the single source of truth. The
- * legacy --os-* tokens are REMAPPED onto them, so every existing component
- * (43 files referencing the old cyan accent, 28 glow usages) calms at the
- * source with no per-component edits. New code should prefer the canonical
- * names below.
+ * ARCHITECTURE
+ *  - Only CANONICAL COLOR values differ per theme (the two blocks below).
+ *  - Everything else (spacing, radius, type, transitions, layout, z, the
+ *    legacy --os-* remaps, the semantic --os-* aliases, the nav tokens) lives
+ *    once in the shared block and inherits the active theme via var().
+ *  - Components consume semantic tokens (--os-bg-*, --os-surface-*, --os-text-*,
+ *    --os-accent-*, --os-success/-soft, …) or the legacy --os-* names, NEVER a
+ *    hardcoded light/dark hex. Theme switching changes token VALUES only.
+ *  - HYBRID: the RIGHT navigation stays dark in BOTH themes — its --os-nav-*
+ *    tokens are fixed (see shared block), so the nav never flips to light.
  *
- * RTL-first: consumers must use CSS logical properties (margin-inline-start etc.).
+ * FONTS: system Hebrew stack only — no external font requests (CSP-safe).
+ * RTL-first: consumers must use CSS logical properties.
  */
-@import url("https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&family=Assistant:wght@400;600;700&display=swap");
 
+/* ══════════════════════════════════════════════════════════════════════
+   LIGHT theme — the DEFAULT (also applied when data-theme is absent)
+   ══════════════════════════════════════════════════════════════════════ */
 :root,
-.theme-os {
-  /* ══════════════════════════════════════════════════════════════
-     CANONICAL CALM SYSTEM (single source of truth)
-     ══════════════════════════════════════════════════════════════ */
+:root[data-theme="light"],
+.theme-os[data-theme="light"] {
+  --bg-app: #eef2f5;
+  --bg-workspace: #f5f7f9;
+  --bg-navigation: #111b26; /* nav stays dark in light mode (hybrid) */
 
-  /* ── Backgrounds ──────────────────────────────────────────── */
+  --surface-1: #ffffff;
+  --surface-2: #f8fafb;
+  --surface-3: #eef2f5;
+  --surface-selected: #e7f0f3;
+  --surface-hover: #f1f5f7;
+
+  --border-subtle: rgba(39, 57, 73, 0.08);
+  --border-default: rgba(39, 57, 73, 0.14);
+  --border-strong: rgba(39, 57, 73, 0.22);
+
+  --text-primary: #18232d;
+  --text-secondary: #4f5f6e;
+  --text-muted: #5b6773; /* darkened from spec #74818d to hold WCAG AA on light surfaces */
+  --text-disabled: #8b96a1;
+
+  --accent-primary: #3f7e8d;
+  --accent-primary-hover: #356e7b;
+  --accent-primary-soft: #e2eef1;
+  --accent-primary-text: #2c5f6b; /* darker for AA-as-text on white */
+  --accent-primary-border: rgba(63, 126, 141, 0.34);
+
+  --accent-ai: #665cb5;
+  --accent-ai-soft: #eceaf8;
+  --accent-ai-text: #514795; /* darker for AA on light */
+  --accent-ai-border: rgba(102, 92, 181, 0.34);
+
+  --success: #367653;
+  --success-soft: #e5f1e9;
+  --success-text: #2c6244;
+  --success-border: rgba(54, 118, 83, 0.34);
+
+  --warning: #916724;
+  --warning-soft: #f5ebd8;
+  --warning-text: #7a561e;
+  --warning-border: rgba(145, 103, 36, 0.34);
+
+  --danger: #a34e58;
+  --danger-soft: #f6e5e7;
+  --danger-text: #8a414a;
+  --danger-border: rgba(163, 78, 88, 0.34);
+
+  --info: #476f91;
+  --info-soft: #e5edf4;
+  --info-text: #3c5f7c;
+  --info-border: rgba(71, 111, 145, 0.34);
+
+  /* Depth: very subtle neutral shadows (no heavy black, no glow) */
+  --os-shadow-panel: 0 1px 2px rgba(39, 57, 73, 0.05), 0 1px 3px rgba(39, 57, 73, 0.04);
+  --os-shadow-raised: 0 1px 3px rgba(39, 57, 73, 0.07), 0 4px 14px rgba(39, 57, 73, 0.07);
+  --os-shadow-overlay: 0 10px 30px rgba(39, 57, 73, 0.16), 0 2px 8px rgba(39, 57, 73, 0.1);
+
+  /* No glow in light mode — "active" glows resolve to a plain ring */
+  --os-glow-active-ai: inset 0 0 0 1px var(--accent-ai-border);
+  --os-glow-active-live: inset 0 0 0 1px var(--accent-primary-border);
+  --os-glow-critical: inset 0 0 0 1px var(--danger-border);
+
+  --os-focus-ring: 0 0 0 2px rgba(63, 126, 141, 0.55);
+
+  /* header matches the workspace theme (light top bar in light mode) */
+  --os-header-bg: var(--surface-1);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   DARK theme — Quiet Enterprise (preserved from commit 269f9e0)
+   ══════════════════════════════════════════════════════════════════════ */
+:root[data-theme="dark"],
+.theme-os[data-theme="dark"] {
   --bg-app: #070d15;
-  --bg-navigation: #09111c;
   --bg-workspace: #0a1420;
+  --bg-navigation: #09111c;
 
-  /* ── Surfaces (progressive elevation, not glow) ───────────── */
   --surface-1: #0d1723;
   --surface-2: #111e2d;
   --surface-3: #172536;
   --surface-selected: #1a2b3b;
+  --surface-hover: #111e2d;
 
-  /* ── Borders (neutral slate — NOT blue) ───────────────────── */
   --border-subtle: rgba(148, 163, 184, 0.1);
   --border-default: rgba(148, 163, 184, 0.16);
   --border-strong: rgba(148, 163, 184, 0.24);
 
-  /* ── Text (never pure white for body) ─────────────────────── */
   --text-primary: #e5ebf2;
   --text-secondary: #a7b2c1;
-  --text-muted: #8593a5; /* calm slate; lifted from spec #748194 to hold WCAG AA (≥4.5:1) on --surface-1 */
+  --text-muted: #8593a5;
   --text-disabled: #586575;
 
-  /* ── Brand accent (steel-blue — the only decorative color) ── */
   --accent-primary: #4d91a3;
   --accent-primary-hover: #5aa0b1;
   --accent-primary-soft: rgba(77, 145, 163, 0.14);
-  --accent-primary-text: #7fc0d1; /* readable steel on dark surfaces (links/active labels) */
+  --accent-primary-text: #7fc0d1;
   --accent-primary-border: rgba(77, 145, 163, 0.32);
 
-  /* ── AI violet (reserved for Copilot / agents / AI evidence) ─ */
   --accent-ai: #7268c9;
   --accent-ai-soft: rgba(114, 104, 201, 0.13);
-  --accent-ai-text: #a99fe6; /* readable violet on dark surfaces */
+  --accent-ai-text: #a99fe6;
   --accent-ai-border: rgba(114, 104, 201, 0.32);
 
-  /* ── Semantic status (soft, meaning-only) ──────────────────
-     NOTE: the SOLID base values are lifted slightly from the spec hexes
-     (#57936f / #b8606a) so they clear WCAG AA (≥4.5:1) when used as text/icon
-     on dark surfaces — the spec palette is "approximate", AA is mandatory.
-     The soft fills + borders below keep the calm spec intensity (separate
-     rgba literals), so surfaces are unchanged. */
   --success: #6bb083;
   --success-soft: rgba(87, 147, 111, 0.13);
   --success-text: #7fc59a;
   --success-border: rgba(87, 147, 111, 0.32);
 
-  --warning: #ca9a55; /* lifted from #b98e4e for AA-as-text; soft fill unchanged */
+  --warning: #ca9a55;
   --warning-soft: rgba(185, 142, 78, 0.14);
   --warning-text: #d9b177;
   --warning-border: rgba(185, 142, 78, 0.32);
@@ -85,56 +147,99 @@
   --info-text: #86b0cf;
   --info-border: rgba(87, 131, 165, 0.32);
 
-  /* ══════════════════════════════════════════════════════════════
-     LEGACY --os-* TOKENS — remapped onto the canonical system.
-     Do not hand-tune these; change the canonical values above.
-     ══════════════════════════════════════════════════════════════ */
+  --os-shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3), 0 3px 10px rgba(0, 0, 0, 0.2);
+  --os-shadow-raised: 0 2px 6px rgba(0, 0, 0, 0.4), 0 8px 22px rgba(0, 0, 0, 0.28);
+  --os-shadow-overlay: 0 8px 32px rgba(0, 0, 0, 0.62), 0 2px 8px rgba(0, 0, 0, 0.48);
 
-  /* ── Surfaces ─────────────────────────────────────────────── */
+  --os-glow-active-ai: 0 0 0 1px var(--accent-ai-border), 0 0 12px rgba(114, 104, 201, 0.12);
+  --os-glow-active-live: 0 0 0 1px var(--accent-primary-border), 0 0 12px rgba(77, 145, 163, 0.12);
+  --os-glow-critical: 0 0 0 1px var(--danger-border), 0 0 12px rgba(184, 96, 106, 0.12);
+
+  --os-focus-ring: 0 0 0 2px rgba(77, 145, 163, 0.6);
+
+  /* dark mode: header stays the deep nav tone (unchanged from 269f9e0) */
+  --os-header-bg: var(--bg-navigation);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   SHARED — theme-independent (inherits colors above via var())
+   ══════════════════════════════════════════════════════════════════════ */
+:root,
+.theme-os {
+  /* ── Canonical semantic aliases (preferred names for new/component code) ── */
+  --os-bg-app: var(--bg-app);
+  --os-bg-workspace: var(--bg-workspace);
+  --os-bg-navigation: var(--bg-navigation);
+  --os-surface-1: var(--surface-1);
+  --os-surface-2: var(--surface-2);
+  --os-surface-3: var(--surface-3);
+  --os-surface-selected: var(--surface-selected);
+  --os-surface-hover: var(--surface-hover);
+  --os-border-subtle: var(--border-subtle);
+  --os-border-default: var(--border-default);
+  --os-border-strong: var(--border-strong);
+  --os-text-primary: var(--text-primary);
+  --os-text-secondary: var(--text-secondary);
+  --os-text-muted: var(--text-muted);
+  --os-text-disabled: var(--text-disabled);
+  --os-accent-primary: var(--accent-primary);
+  --os-accent-primary-soft: var(--accent-primary-soft);
+  --os-accent-ai: var(--accent-ai);
+  --os-accent-ai-soft: var(--accent-ai-soft);
+  --os-success: var(--success);
+  --os-success-soft: var(--success-soft);
+  --os-warning: var(--warning);
+  --os-warning-soft: var(--warning-soft);
+  --os-danger: var(--danger);
+  --os-danger-soft: var(--danger-soft);
+  --os-info: var(--info);
+  --os-info-soft: var(--info-soft);
+
+  /* ── HYBRID nav tokens — ALWAYS dark-on-light-text (nav stays dark in both) ── */
+  --os-nav-bg: var(--bg-navigation);
+  --os-nav-surface: rgba(255, 255, 255, 0.04);
+  --os-nav-text: #c7cfd9;
+  --os-nav-text-strong: #eef2f6;
+  --os-nav-text-muted: #8b97a6;
+  --os-nav-border: rgba(148, 163, 184, 0.12);
+  --os-nav-selected-bg: rgba(79, 143, 160, 0.2);
+  --os-nav-selected-text: #9fd0dd;
+  --os-nav-selected-bar: #4d91a3;
+  --os-nav-badge-text: #9fd0dd;
+
+  /* ── Legacy --os-* tokens — remapped onto the canonical (theme-aware) set ── */
   --os-bg: var(--bg-app);
   --os-nav: var(--bg-navigation);
   --os-panel: var(--surface-1);
   --os-raised: var(--surface-2);
   --os-highlight: var(--surface-3);
-
-  /* ── Borders ──────────────────────────────────────────────── */
   --os-border: var(--border-default);
   --os-border-strong: var(--border-strong);
-
-  /* ── Text ─────────────────────────────────────────────────── */
   --os-text: var(--text-primary);
   --os-text-2: var(--text-secondary);
   --os-muted: var(--text-muted);
-
-  /* ── Accents (cyan + blue both collapse to the single steel accent) ── */
   --os-blue: var(--accent-primary);
   --os-cyan: var(--accent-primary);
   --os-violet: var(--accent-ai);
   --os-success: var(--success);
   --os-warning: var(--warning);
   --os-danger: var(--danger);
-
-  /* ── Accent tints (soft fills / chips) ────────────────────── */
   --os-blue-soft: var(--accent-primary-soft);
   --os-cyan-soft: var(--accent-primary-soft);
   --os-violet-soft: var(--accent-ai-soft);
   --os-success-soft: var(--success-soft);
   --os-warning-soft: var(--warning-soft);
   --os-danger-soft: var(--danger-soft);
-
-  /* ── Accent borders (calmed from 0.45 → 0.32) ─────────────── */
   --os-blue-border: var(--accent-primary-border);
   --os-cyan-border: var(--accent-primary-border);
   --os-violet-border: var(--accent-ai-border);
   --os-success-border: var(--success-border);
   --os-warning-border: var(--warning-border);
   --os-danger-border: var(--danger-border);
-
-  /* readable accent text variants on near-black surfaces */
   --os-violet-text: var(--accent-ai-text);
   --os-cyan-text: var(--accent-primary-text);
 
-  /* ── Spacing scale (dense enterprise) ─────────────────────── */
+  /* ── Spacing scale ─────────────────────────────────────────── */
   --os-space-0: 0;
   --os-space-1: 2px;
   --os-space-2: 4px;
@@ -156,41 +261,31 @@
   --os-radius-xl: 14px;
   --os-radius-full: 999px;
 
-  /* ── Typography ───────────────────────────────────────────── */
-  --os-font: "Heebo", "Assistant", "Rubik", -apple-system, "Segoe UI", sans-serif;
+  /* ── Typography — SYSTEM Hebrew stack (no external fonts) ──── */
+  --os-font: "Segoe UI", "Arial Hebrew", Arial, sans-serif;
   --os-font-mono: "JetBrains Mono", "Consolas", "Courier New", monospace;
 
-  /* calm enterprise type scale — operational body ≥14px */
-  --os-text-2xs: 11px; /* decorative/superscript only — never operational text */
-  --os-text-xs: 12px; /* metadata floor */
-  --os-text-sm: 13px; /* secondary floor */
-  --os-text-md: 14px; /* operational body floor */
-  --os-text-base: 15px; /* comfortable body */
-  --os-text-lg: 17px; /* card / section title */
-  --os-text-xl: 19px; /* section title */
-  --os-text-2xl: 24px; /* page title */
-  --os-text-kpi: 30px; /* KPI number */
+  --os-text-2xs: 11px;
+  --os-text-xs: 12px;
+  --os-text-sm: 13px;
+  --os-text-md: 14px;
+  --os-text-base: 15px;
+  --os-text-lg: 17px;
+  --os-text-xl: 19px;
+  --os-text-2xl: 24px;
+  --os-text-kpi: 30px;
 
   --os-leading-tight: 1.3;
-  --os-leading-normal: 1.55; /* calm reading (was 1.45) */
+  --os-leading-normal: 1.55;
   --os-leading-relaxed: 1.65;
-  --os-measure: 72ch; /* max paragraph width */
+  --os-measure: 72ch;
 
   --os-weight-regular: 400;
   --os-weight-medium: 500;
   --os-weight-semibold: 600;
   --os-weight-bold: 700;
 
-  /* ── Depth: quiet shadows (black alpha, NOT colored glow) ─── */
-  --os-shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3), 0 3px 10px rgba(0, 0, 0, 0.2);
-  --os-shadow-raised: 0 2px 6px rgba(0, 0, 0, 0.4), 0 8px 22px rgba(0, 0, 0, 0.28);
-  --os-shadow-overlay: 0 8px 32px rgba(0, 0, 0, 0.62), 0 2px 8px rgba(0, 0, 0, 0.48);
-
-  /* ── Glow REMOVED from default state ───────────────────────
-     Legacy --os-glow-* now resolve to a plain hairline ring — NO neon halo —
-     so all 28 legacy usages (cards, nav, tabs, rows) calm globally. Reserve
-     real (still subtle, ≤0.12) glow for the few allowed live/critical states
-     via --os-glow-active-* below. */
+  /* ── Glow default = hairline ring (no halo), theme-aware via border ── */
   --os-glow-blue: inset 0 0 0 1px var(--accent-primary-border);
   --os-glow-cyan: inset 0 0 0 1px var(--accent-primary-border);
   --os-glow-violet: inset 0 0 0 1px var(--accent-ai-border);
@@ -198,27 +293,19 @@
   --os-glow-warning: inset 0 0 0 1px var(--warning-border);
   --os-glow-danger: inset 0 0 0 1px var(--danger-border);
 
-  /* Allowed exceptional glow — active Copilot / live agent / critical alert */
-  --os-glow-active-ai: 0 0 0 1px var(--accent-ai-border), 0 0 12px rgba(114, 104, 201, 0.12);
-  --os-glow-active-live: 0 0 0 1px var(--accent-primary-border), 0 0 12px rgba(77, 145, 163, 0.12);
-  --os-glow-critical: 0 0 0 1px var(--danger-border), 0 0 12px rgba(184, 96, 106, 0.12);
-
-  /* focus ring — steel-blue (was cyan) */
-  --os-focus-ring: 0 0 0 2px rgba(77, 145, 163, 0.6);
-
-  /* ── Borders (composed) ───────────────────────────────────── */
+  /* ── Composed borders ─────────────────────────────────────── */
   --os-border-thin: 1px solid var(--os-border);
   --os-border-subtle-line: 1px solid var(--border-subtle);
   --os-border-strong-line: 1px solid var(--os-border-strong);
   --os-divider: 1px solid var(--border-subtle);
 
-  /* ── Transitions (calm, 120–180ms for state; 200 base) ────── */
+  /* ── Transitions ──────────────────────────────────────────── */
   --os-ease: cubic-bezier(0.4, 0, 0.2, 1);
   --os-transition-fast: 140ms var(--os-ease);
   --os-transition-base: 180ms var(--os-ease);
   --os-transition-slow: 220ms var(--os-ease);
 
-  /* ── Layout dimensions (app shell) ────────────────────────── */
+  /* ── Layout dimensions ────────────────────────────────────── */
   --os-nav-width: 220px;
   --os-rail-width: 300px;
   --os-rail-collapsed-width: 44px;
@@ -237,5 +324,71 @@
     --os-transition-fast: 0ms;
     --os-transition-base: 0ms;
     --os-transition-slow: 0ms;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   PRINT — ALWAYS a light print theme, independent of the selected theme.
+   White paper, dark ink, no chrome, no dark surfaces, no shadows, RTL kept.
+   ══════════════════════════════════════════════════════════════════════ */
+@media print {
+  :root,
+  :root[data-theme="light"],
+  :root[data-theme="dark"],
+  .theme-os {
+    --bg-app: #ffffff;
+    --bg-workspace: #ffffff;
+    --bg-navigation: #ffffff;
+    --surface-1: #ffffff;
+    --surface-2: #ffffff;
+    --surface-3: #ffffff;
+    --surface-selected: #ffffff;
+    --surface-hover: #ffffff;
+    --border-subtle: rgba(0, 0, 0, 0.12);
+    --border-default: rgba(0, 0, 0, 0.18);
+    --border-strong: rgba(0, 0, 0, 0.28);
+    --text-primary: #111418;
+    --text-secondary: #333a41;
+    --text-muted: #4d545b;
+    --text-disabled: #6b727a;
+    --accent-primary-text: #2c5f6b;
+    --accent-ai-text: #4a4088;
+    --success-text: #275a3d;
+    --warning-text: #6d4d1a;
+    --danger-text: #7d3a43;
+    --os-shadow-panel: none;
+    --os-shadow-raised: none;
+    --os-shadow-overlay: none;
+    --os-header-bg: #ffffff;
+  }
+  .os-nav,
+  .os-header,
+  .os-rail,
+  .os-copilot,
+  .os-nav-drawer,
+  .os-toast,
+  .qs-no-print,
+  .os-header__hamburger {
+    display: none !important;
+  }
+  .os-shell {
+    grid-template-columns: 1fr !important;
+  }
+  body,
+  #root,
+  .os-shell,
+  .os-shell__main {
+    background: #ffffff !important;
+    color: #111418 !important;
+  }
+  .os-table th,
+  .os-table td {
+    border-color: rgba(0, 0, 0, 0.2) !important;
+  }
+  * {
+    box-shadow: none !important;
+  }
+  @page {
+    margin: 14mm;
   }
 }

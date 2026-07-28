@@ -160,7 +160,8 @@ export function GovernanceAuditorRail({
             <li key={f.id} data-testid={`finding-${f.kind}`} style={{ fontSize: "var(--os-text-2xs, 11px)" }}>
               <span
                 style={{
-                  color: f.severityHe === "חמור" ? "var(--os-danger, #EC5D68)" : "var(--os-warning, #E7A93D)",
+                  color:
+                    f.severityHe === "חמור" ? "var(--danger-text)" : "var(--warning-text)",
                   fontWeight: 600,
                 }}
               >

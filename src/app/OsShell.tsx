@@ -31,6 +31,7 @@ import {
 } from "./quick-create/QuickCreateHost";
 import { RailProvider } from "./rail";
 import { useRailContent, useRailHidden } from "./railContext";
+import { ThemeToggle } from "@/theme/ThemeToggle";
 import CopilotWorkspace from "@/modules/ai-copilot/CopilotWorkspace";
 import { CopilotProvider } from "@/modules/ai-copilot/copilotContext";
 import { useCopilot } from "@/modules/ai-copilot/copilotApi";
@@ -238,15 +239,18 @@ function OsShellInner(): ReactElement {
           onSearch: (query) => setPalette({ mode: "search", initialQuery: query }),
           onSearchOpen: () => setPalette({ mode: "search", initialQuery: "" }),
           actions: (
-            <button
-              type="button"
-              className="os-header__iconbtn os-header__hamburger"
-              aria-label="פתיחת תפריט הניווט"
-              title="תפריט ניווט"
-              onClick={() => setNavDrawerOpen(true)}
-            >
-              <OsIcon name="menu" size={15} />
-            </button>
+            <>
+              <ThemeToggle />
+              <button
+                type="button"
+                className="os-header__iconbtn os-header__hamburger"
+                aria-label="פתיחת תפריט הניווט"
+                title="תפריט ניווט"
+                onClick={() => setNavDrawerOpen(true)}
+              >
+                <OsIcon name="menu" size={15} />
+              </button>
+            </>
           ),
         }}
         copilotSlot={<NavCopilotCard />}

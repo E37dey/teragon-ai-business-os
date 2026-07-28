@@ -528,7 +528,7 @@ export default function CrmPage(): ReactElement {
                 hottest.map((l) => (
                   <div key={l.id} style={{ display: "flex", justifyContent: "space-between" }}>
                     <span>{l.name}</span>
-                    <span style={{ color: "var(--os-cyan)" }}>{l.status}</span>
+                    <span style={{ color: "var(--os-cyan-text)" }}>{l.status}</span>
                   </div>
                 ))
               )}
@@ -543,7 +543,7 @@ export default function CrmPage(): ReactElement {
                 aging.map(({ lead, daysOverdue }) => (
                   <div key={lead.id} style={{ display: "flex", justifyContent: "space-between" }}>
                     <span>{lead.name}</span>
-                    <span className="os-num" style={{ color: "var(--os-danger)" }}>
+                    <span className="os-num" style={{ color: "var(--danger-text)" }}>
                       {daysOverdue} ימים
                     </span>
                   </div>

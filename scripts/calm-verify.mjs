@@ -7,7 +7,7 @@ import { mkdirSync } from "node:fs";
 const base = process.argv[2] ?? "http://localhost:4800";
 const routeArg = process.argv[3] ?? "";
 const sizeCsv = process.argv[4] ?? "1440x900";
-const OUT = "docs/screenshots/visual-calm";
+const OUT = process.env.CALM_OUT ?? "docs/screenshots/visual-calm";
 mkdirSync(OUT, { recursive: true });
 
 const routes = routeArg.split(",").filter(Boolean).map((s) => {
@@ -26,6 +26,12 @@ for (const { name, path } of routes) {
   const ctx = await browser.newContext({ viewport: { width: primary.w, height: primary.h }, deviceScaleFactor: 1 });
   const page = await ctx.newPage();
   const errors = [];
+  if (process.env.THEME) {
+    const t = process.env.THEME;
+    await page.addInitScript((theme) => {
+      try { localStorage.setItem("teragon.theme.preference", theme); } catch {}
+    }, t);
+  }
   page.on("pageerror", (e) => errors.push(String(e)));
   let axeRes = { serious: -1, critical: -1, contrast: -1 };
   let overflow = null;

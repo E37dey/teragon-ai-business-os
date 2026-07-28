@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import type { CSSProperties, ReactElement } from "react";
 import { PageRail } from "@/app/rail";
 import { useCollection, useInvalidateCollections } from "@/app/data/hooks";
+import { ThemeHealthCard } from "@/theme/ThemeHealthCard";
 import {
   DataTable,
   Drawer,
@@ -362,6 +363,7 @@ export default function SystemHealthPage(): ReactElement {
             )}
           </div>
         </Panel>
+        <ThemeHealthCard />
         <Panel variant="raised" style={{ padding: "var(--os-space-5)" }}>
           <SectionTitle icon="network" title="מיגרציות" />
           <div style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-sm)" }}>
