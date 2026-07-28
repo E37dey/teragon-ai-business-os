@@ -61,20 +61,28 @@ Fonts request; `script-src 'self'`) · Visual-Calm hierarchy · Command Center d
 corrections · approved Hebrew copy · all existing business behavior (repositories, approvals,
 memory, knowledge, agents, governance untouched).
 
-## 5. Post-reconciliation fixes (2) — both stale test expectations, NOT product defects
+## 5. Post-reconciliation fixes — ALL stale test expectations, NOT product defects
 
-The theme branch's suite was green **except two** tests whose expectations pre-dated a
-Visual-Calm tab restructure they never adopted (they failed identically on `main`, so they are
-pre-existing drift, not regressions from this work):
+The running suite surfaced **7 stale tests** across 5 files whose expectations pre-dated a
+Visual-Calm tab/drawer/nav restructure they never adopted. Every one failed **identically on
+`main`** (pre-existing drift, not regressions from this work), every one is **test-only**
+(approved product behavior unchanged), and none needed a regression assertion (the approved
+behavior is exactly what the tests now drive). No timeouts raised, no skips, no unrelated UI.
 
-| Test | Root cause | Fix | Product change? |
-|------|-----------|-----|-----------------|
-| `e2e/memory/w6-memory.spec.ts` — Markdown import | the note-view link graph moved into the "גרף קישורים" center tab (VC-E); the test clicked a graph node without opening that tab | open the "גרף קישורים" tab first | **No** — test-only |
-| `e2e/memory/w6-visual.spec.ts` — knowledge surfaces | the contradiction scanner moved into the "סתירות בידע" tab (VC-E); the test clicked "סריקת סתירות" without opening it | open the "סתירות בידע" tab first | **No** — test-only |
+Commit `dc459bc`:
+| Test | Root cause | Fix |
+|------|-----------|-----|
+| `w6-memory` — Markdown import | note-view link graph moved into the "גרף קישורים" center tab (VC-E) | open that tab before clicking a graph node |
+| `w6-visual` — knowledge surfaces | contradiction scanner moved into the "סתירות בידע" tab (VC-E) | open that tab before "סריקת סתירות" |
 
-No timeouts were raised, no tests skipped, no unrelated UI changed. Because neither is a
-product defect, no regression assertion was added — the approved tab behavior is what the
-tests now correctly drive.
+Commit `9f94e93`:
+| Test | Root cause | Fix |
+|------|-----------|-----|
+| `w8f-cross` — offline warm-walk | VC-B collapses non-active nav groups | expand groups before clicking route links |
+| `w4-flows` — courses | KPI renamed `→ ממתין לבדיקת מדריך`, tab `→ מטלות והגשות`, button `→ אישור השלמת השלב` | update the three labels |
+| `w4-flows` — service | full timeline/history moved into an on-demand drawer (VC-D) | open the "ציר זמן והיסטוריה" drawer first |
+| `w4-flows` — tasks | per-card state control moved into the detail drawer (VC-C) | open the task card first |
+| `shell` — grouped nav (×2) | VC-B collapses non-active groups by default | assert collapsed default; expand to reveal links/badge; explicit expand persists |
 
 ## 6. Release gate (this branch)
 
@@ -86,10 +94,25 @@ tests now correctly drive.
 | Vitest | 1706 / 1706 (187 files) |
 | Secret scanner | CLEAN (0 findings) |
 | Production build | pass |
-| Full Playwright (non-live) | _in progress — result recorded in the final report_ |
+| Full Playwright (non-live) | **~587 passed, 0 failed, 0 skipped** |
+
+**Full Playwright note:** this machine is RAM-starved, so a single ~20-min run exhausts memory
+and the vite-preview webServer dies mid-run (surfacing as `ERR_CONNECTION_REFUSED`, an
+infrastructure artifact — not code failures). The suite was therefore run in **5 chunks**,
+each with a fresh server; every chunk passed with **0 real failures**:
+admin/adoption/agents/ai/analytics = 136 · final-*/governance = 234 ·
+knowledge/learning/memory/presentation = 37 · settings/submission/system-health = 73 (incl.
+fixed `w8f-cross`) · top-level (courses-v3/screenshots/shell/w3/w4/w5d) = 107.
 
 > The 68 `e2e/live/*` specs are **post-deploy** (need a deployed URL + Netlify functions) and
 > are validated separately after a deploy — out of scope for this no-deploy reconciliation.
+
+**Final commit of this branch:** `9f94e93` (integration/theme-v3-green-baseline).
+
+**Minor test-infra observation (non-blocking):** `e2e/final-interactions/w9a-control-tally.json`
+carries a `generatedAt` timestamp that the control-census rewrites on each run (control totals
+unchanged). It is restored to a clean state; a future hygiene fix could drop the volatile
+timestamp so census runs never dirty the tree.
 
 ## 7. Recommendation
 
