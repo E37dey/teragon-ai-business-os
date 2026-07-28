@@ -13,21 +13,22 @@ test.describe("grouped navigation", () => {
   test("groups expand/collapse and persist after reload", async ({ page }) => {
     await gotoReady(page);
     const serviceGroup = page.getByRole("button", { name: "שירות והדרכה" });
-    await expect(serviceGroup).toHaveAttribute("aria-expanded", "true");
-    await expect(page.getByRole("link", { name: /שירות ותיקונים/ })).toBeVisible();
-
-    await serviceGroup.click();
+    // VC-B collapses non-active nav groups by default (on "/" the service group
+    // is not active) — so it starts collapsed and its links are hidden.
     await expect(serviceGroup).toHaveAttribute("aria-expanded", "false");
     await expect(page.getByRole("link", { name: /שירות ותיקונים/ })).toHaveCount(0);
 
+    // expand it → the group's links become visible
+    await serviceGroup.click();
+    await expect(serviceGroup).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByRole("link", { name: /שירות ותיקונים/ })).toBeVisible();
+
+    // the explicit expand persists across reload
     await page.reload();
     await expect(page.getByRole("button", { name: "שירות והדרכה" })).toHaveAttribute(
       "aria-expanded",
-      "false",
+      "true",
     );
-
-    // restore for the following tests' default state
-    await page.getByRole("button", { name: "שירות והדרכה" }).click();
     await expect(page.getByRole("link", { name: /שירות ותיקונים/ })).toBeVisible();
   });
 
@@ -49,6 +50,8 @@ test.describe("grouped navigation", () => {
 
   test("service badge shows the real open-ticket count from the seed", async ({ page }) => {
     await gotoReady(page);
+    // VC-B: expand the "שירות והדרכה" group so its service link (and badge) show.
+    await page.getByRole("button", { name: "שירות והדרכה" }).click();
     const serviceLink = page.getByRole("link", { name: /שירות ותיקונים/ });
     const badge = serviceLink.locator(".os-nav__badge");
     await expect(badge).toBeVisible();

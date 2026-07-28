@@ -29,10 +29,10 @@ test.describe("courses — assignment approval flow", () => {
   test("page loads with KPIs and the approvals queue approves a stage", async ({ page }) => {
     await gotoReady(page, "/courses");
     await expect(page.getByText("קורסים והכשרות").first()).toBeVisible();
-    await expect(page.getByText("ממתינים לאישור מדריך").first()).toBeVisible();
+    await expect(page.getByText("ממתינים לבדיקת מדריך").first()).toBeVisible();
 
     // approvals tab — seed has 3 stages awaiting the instructor
-    await page.getByRole("tab", { name: /מטלות ואישורים/ }).click();
+    await page.getByRole("tab", { name: /מטלות והגשות/ }).click();
     const reviewButtons = page.getByRole("button", { name: "לבדיקה ←" });
     await expect(reviewButtons.first()).toBeVisible();
     const before = await reviewButtons.count();
@@ -40,13 +40,13 @@ test.describe("courses — assignment approval flow", () => {
 
     // open the first awaiting stage in the workbench and approve it
     await reviewButtons.first().click();
-    const approve = page.getByRole("button", { name: "אישור השלב" });
+    const approve = page.getByRole("button", { name: "אישור השלמת השלב" }).first();
     await expect(approve).toBeEnabled();
     await approve.click();
     await expect(page.getByText("השלב אושר ונרשם ביומן הפעילות")).toBeVisible();
 
     // queue shrank by one
-    await page.getByRole("tab", { name: /מטלות ואישורים/ }).click();
+    await page.getByRole("tab", { name: /מטלות והגשות/ }).click();
     await expect(page.getByRole("button", { name: "לבדיקה ←" })).toHaveCount(before - 1);
   });
 });
@@ -70,8 +70,9 @@ test.describe("service — ticket lifecycle", () => {
     await page.getByRole("button", { name: "העברה ל: בבדיקה" }).click();
     await expect(page.getByText(/עברה ל«בבדיקה»/)).toBeVisible();
 
-    // timeline shows both events (open + status change)
-    await expect(page.getByText("ציר זמן מלא")).toBeVisible();
+    // VC-D: the full timeline/history opens on demand in a drawer — open it,
+    // then verify the status-change event is recorded.
+    await page.getByText(/ציר זמן והיסטוריה/).first().click();
     await expect(page.getByText(/עברה לסטטוס «בבדיקה»/)).toBeVisible();
   });
 });
@@ -96,6 +97,9 @@ test.describe("printers — registry + derived maintenance", () => {
 test.describe("tasks — state change persists", () => {
   test("moving a task to ממתין לאישור survives reload", async ({ page }) => {
     await gotoReady(page, "/tasks");
+    // VC-C: the per-card state control moved into the task detail drawer — open
+    // the card first, then change state inside the drawer.
+    await page.getByRole("button", { name: /פולואו-אפ: רותם פלד/ }).first().click();
     const select = page.getByLabel("שינוי מצב עבור פולואו-אפ: רותם פלד");
     await expect(select).toBeVisible();
     await select.selectOption("ממתין לאישור");
@@ -103,6 +107,8 @@ test.describe("tasks — state change persists", () => {
 
     await page.reload();
     await expect(page.locator("nav.os-nav").first()).toBeVisible();
+    // re-open the drawer to read back the persisted state
+    await page.getByRole("button", { name: /פולואו-אפ: רותם פלד/ }).first().click();
     await expect(page.getByLabel("שינוי מצב עבור פולואו-אפ: רותם פלד")).toHaveValue("ממתין לאישור");
   });
 });

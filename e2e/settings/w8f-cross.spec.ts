@@ -96,10 +96,21 @@ test("offline warm walk: the five Wave-8 routes render from the local stores wit
     ["/settings", "הגדרות מנוהלות"],
   ] as const;
 
+  // VC-B collapses non-active nav groups — expand them so every nav link is
+  // reachable (client-side, works offline too).
+  const expandNav = async (): Promise<void> => {
+    for (let i = 0; i < 8; i++) {
+      const collapsed = page.locator('.os-nav__group-head[aria-expanded="false"]').first();
+      if ((await collapsed.count()) === 0) break;
+      await collapsed.click();
+    }
+  };
+
   // WARM phase (online): load the app + every lazy route chunk once
   await page.goto("/");
   await expect(page.getByText("רצועת הניהול")).toBeVisible({ timeout: 30_000 });
   for (const [path, anchor] of routes) {
+    await expandNav();
     await page.locator(`a[href="${path}"]`).first().click();
     await expect(page.getByText(anchor).first()).toBeVisible({ timeout: 30_000 });
   }
@@ -108,6 +119,7 @@ test("offline warm walk: the five Wave-8 routes render from the local stores wit
   // loaded bundle + the local IndexedDB stores, no network required
   await context.setOffline(true);
   for (const [path, anchor] of routes) {
+    await expandNav();
     await page.locator(`a[href="${path}"]`).first().click();
     await expect(page).toHaveURL(new RegExp(`${path}$`), { timeout: 15_000 });
     await expect(page.getByText(anchor).first()).toBeVisible({ timeout: 30_000 });
