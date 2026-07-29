@@ -1,4 +1,4 @@
-// TERAGON Business Graph — event-driven rebuild COORDINATOR (Phase 5).
+// TERAGON Business Graph — event-driven rebuild COORDINATOR (Phase 5 / 5.1).
 // ---------------------------------------------------------------------------
 // PHASE-5 PRINCIPLE: a canonical mutation may TRIGGER a rebuild, but every
 // successful update still produces a COMPLETE org snapshot via
@@ -7,15 +7,31 @@
 // inside an ACTIVE snapshot — deletion/archival/rejection/supersession are all
 // handled naturally by the complete rebuild. Correctness over partial-update speed.
 //
+// DELIVERY GUARANTEE — the REAL model (do NOT read exactly-once / durable-outbox
+// into this): `Repository.subscribe` is best-effort in-process notification, NOT a
+// durable transactional outbox. `graphPendingEvents` protects an event only AFTER
+// it has been durably ingested here, so an event can be LOST between the canonical
+// commit and this queue's durable write. The guarantee we actually provide is:
+//   best-effort event ingestion + durable replay AFTER ingestion
+//     + startup canonical reconciliation  ⇒  EVENTUAL graph consistency.
+// Startup reconciliation is what closes the commit-before-enqueue gap: it compares
+// the ACTIVE snapshot's sourceHash against a freshly-derived canonical sourceHash
+// and rebuilds when they differ, so a lost event cannot leave the graph stale
+// forever. There is NO exactly-once and NO durable outbox here.
+//
 // Per-organization guarantees: at most ONE in-flight rebuild; strict org isolation;
-// never two activations at once; deterministic ordering (aggregateVersion then a
-// monotonic ingest sequence, NEVER wall-clock); dedup by eventId; bounded-window
-// coalescing into ONE rebuild; a preserved highest watermark (checkpoint); events
-// arriving DURING a rebuild mark the org dirty ⇒ exactly ONE subsequent rebuild.
+// never two activations at once; deterministic ordering (aggregateVersion nulls
+// last, then the durable per-org ingest sequence, NEVER wall-clock); durable event
+// identity is `gidxevt:{org}:{seq}` (a monotonic sequence, never the colliding
+// source tuple); a re-delivered VERSIONED source event is deduped by its
+// source fingerprint; replay is deduped by the durable eventId (processed ledger);
+// bounded-window coalescing into ONE rebuild; a preserved highest watermark
+// (checkpoint); events arriving DURING a rebuild mark the org dirty ⇒ exactly ONE
+// subsequent rebuild.
 //
 // Time and task execution are INJECTED (clock + scheduler) — no Date.now, no
 // setTimeout in the coordinator itself. Durability is the coordinator's OWN
-// IndexedDB pending-queue/checkpoint stores (not a competing product bus).
+// IndexedDB queue/checkpoint/sequence stores (not a competing product bus).
 import type { BaseEntity } from "@/domain/types";
 import type { ChangeEvent, Repository, Unsubscribe } from "@/repositories/Repository";
 import { deriveOrganizationGraphSnapshot } from "../derivation";
@@ -114,8 +130,8 @@ export class GraphIndexingCoordinator {
   private readonly inFlight = new Set<string>();
   private readonly dirty = new Set<string>();
   private readonly retryCounts = new Map<string, number>();
-  private nextSequence = 0;
-  private initialized = false;
+  /** orgs whose startup reconciliation could not complete ⇒ DEGRADED until a rebuild. */
+  private readonly reconcileDegraded = new Set<string>();
 
   constructor(options: GraphIndexingCoordinatorOptions) {
     this.graphStore = options.graphStore;
@@ -152,20 +168,29 @@ export class GraphIndexingCoordinator {
     item?: T,
   ): Promise<GraphIndexingEvent | null> {
     if (!this.enabled) return null;
-    await this.ensureInitialized();
 
     const normalized = normalizeChangeEvent(change, item);
-    const event: GraphIndexingEvent = { ...normalized, ingestSequence: this.nextSequence };
-    this.nextSequence += 1;
 
     // an unsupported collection / clear event / unmappable-org record is a valid,
-    // SAFE record but has no org to rebuild — never enqueued, never fabricated.
-    if (!event.supported || event.organizationId === null) {
-      return event;
+    // SAFE record but has no org to rebuild — never enqueued, never fabricated. No
+    // durable sequence is allocated for it (it never enters the queue).
+    if (!normalized.supported || normalized.organizationId === null) {
+      return {
+        ...normalized,
+        eventId: `gidxevt:unmapped:${normalized.sourceRepository}:${normalized.aggregateId ?? "-"}`,
+        ingestSequence: -1,
+      };
     }
 
-    await this.stateStore.appendPending(event);
-    const org = event.organizationId;
+    // durable atomic ingest: allocate the per-org sequence + write the pending event
+    // + (for a versioned event) the source fingerprint, all in one transaction.
+    const outcome = await this.stateStore.ingestEvent(normalized);
+    if (outcome.event === null) {
+      // a re-delivered VERSIONED source event (or unroutable) ⇒ no new work.
+      return null;
+    }
+    const event = outcome.event;
+    const org = event.organizationId as string;
     if (this.inFlight.has(org)) {
       // an event arrived DURING an in-flight rebuild ⇒ mark dirty (one subsequent).
       this.dirty.add(org);
@@ -176,32 +201,158 @@ export class GraphIndexingCoordinator {
   }
 
   // -------------------------------------------------------------------------
-  // startup — replay durable pending events after the last checkpoint
+  // startup — canonical reconciliation THEN durable replay (flag ON only)
   // -------------------------------------------------------------------------
 
-  async start(): Promise<void> {
+  /**
+   * On an ENABLED startup: (a) reconcile each known org against a freshly-loaded
+   * canonical snapshot to close any commit-before-enqueue gap, then (b) replay any
+   * durable pending events. When the flag is OFF this performs NO repository scan
+   * and NO reconciliation. `reconcileOrganizations` lets a caller name orgs to
+   * reconcile that have no durable checkpoint yet (e.g. an org with an active graph
+   * but an empty queue); it is unioned with the orgs discovered from durable state.
+   */
+  async start(options: { reconcileOrganizations?: readonly string[] } = {}): Promise<void> {
     if (!this.enabled) return;
-    await this.ensureInitialized();
-    const orgs = await this.stateStore.pendingOrganizations();
-    for (const org of orgs) {
+
+    // (1) canonical reconciliation — the durable-outbox gap closer. The ONLY place
+    // startup reads the canonical source; skipped entirely when the flag is OFF.
+    const pendingOrgs = await this.stateStore.pendingOrganizations();
+    const checkpointOrgs = (await this.stateStore.allCheckpoints()).map((c) => c.organizationId);
+    const reconcileTargets = new Set<string>([
+      ...(options.reconcileOrganizations ?? []),
+      ...pendingOrgs,
+      ...checkpointOrgs,
+    ]);
+    for (const org of [...reconcileTargets].sort()) {
+      await this.reconcileOrganization(org);
+    }
+
+    // (2) durable replay of any events committed-but-unprocessed before the crash.
+    for (const org of pendingOrgs) {
       this.scheduler.enqueue(() => this.drainOrganization(org));
     }
   }
 
-  private async ensureInitialized(): Promise<void> {
-    if (this.initialized) return;
-    this.initialized = true;
-    // continue the monotonic sequence beyond any durable pending / checkpoint.
-    let max = -1;
-    const orgs = await this.stateStore.pendingOrganizations();
-    for (const org of orgs) {
-      const rows = await this.stateStore.pendingAfter(org, -1);
-      for (const r of rows) if (r.ingestSequence > max) max = r.ingestSequence;
+  // -------------------------------------------------------------------------
+  // startup canonical reconciliation (operational metadata, NOT a CRM event)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Reconcile one org against its canonical source. A `RECONCILE` here is
+   * OPERATIONAL METADATA — we NEVER synthesize a GraphIndexingEvent for a canonical
+   * record that did not change. No entity bodies are ever logged.
+   *   • active sourceHash === canonical sourceHash ⇒ RECONCILED_NO_OP (no rebuild)
+   *   • different, or NO active graph              ⇒ full rebuild (RECONCILE signal)
+   *   • reconciliation fails                       ⇒ preserve active + mark DEGRADED
+   */
+  private async reconcileOrganization(org: string): Promise<void> {
+    const startedAt = this.clock();
+    try {
+      const snap = await this.loadOrganizationRecords(org);
+      const context = this.derivationContext(org, snap);
+
+      const active = await this.graphStore.getActiveSnapshot(org);
+      const derivation = deriveOrganizationGraphSnapshot(snap.records, context);
+      const candidate = await buildIndexSnapshot(derivation, context, { now: this.clock });
+      const canonicalSourceHash = candidate.snapshot.sourceHash;
+
+      if (active !== null && active.sourceHash === canonicalSourceHash) {
+        // (4) equal ⇒ no rebuild; record the reconciliation NO_OP.
+        await this.recordReconcileRun(org, "RECONCILED_NO_OP", startedAt, {
+          previousSnapshotId: active.snapshotId,
+          resultingSnapshotId: active.snapshotId,
+          sourceHashBefore: active.sourceHash,
+          sourceHashAfter: canonicalSourceHash,
+        });
+        this.reconcileDegraded.delete(org);
+        return;
+      }
+
+      // (5) different, or (6) no active graph ⇒ a full rebuild driven by a RECONCILE
+      // signal (never a fabricated event). The rebuild preserves the active snapshot
+      // on any failure and only activates a fully-validated replacement.
+      const rebuild = await rebuildOrganizationGraph(snap.records, context, this.graphStore, {
+        now: this.clock,
+      });
+      if (rebuild.outcome === "ACTIVATED") {
+        const nowActive = await this.graphStore.getActiveSnapshot(org);
+        await this.recordReconcileRun(org, "ACTIVATED", startedAt, {
+          previousSnapshotId: active?.snapshotId ?? null,
+          resultingSnapshotId: rebuild.snapshotId,
+          sourceHashBefore: active?.sourceHash ?? null,
+          sourceHashAfter: nowActive?.sourceHash ?? canonicalSourceHash,
+        });
+        this.reconcileDegraded.delete(org);
+        return;
+      }
+
+      // (7) rebuild rejected/failed ⇒ active snapshot preserved, org DEGRADED.
+      this.reconcileDegraded.add(org);
+      await this.recordReconcileRun(org, "RECONCILE_FAILED", startedAt, {
+        previousSnapshotId: active?.snapshotId ?? null,
+        resultingSnapshotId: null,
+        sourceHashBefore: active?.sourceHash ?? null,
+        sourceHashAfter: null,
+        errorCode: rebuild.errorCode ?? "GRAPH_INDEX_REBUILD_REJECTED",
+      });
+    } catch (e) {
+      // (7) reconciliation itself failed ⇒ preserve whatever is active + DEGRADED.
+      this.reconcileDegraded.add(org);
+      await this.recordReconcileRun(org, "RECONCILE_FAILED", startedAt, {
+        previousSnapshotId: null,
+        resultingSnapshotId: null,
+        sourceHashBefore: null,
+        sourceHashAfter: null,
+        errorCode: safeErrorCode(e),
+      });
     }
-    for (const cp of await this.stateStore.allCheckpoints()) {
-      if (cp.lastIngestSequence > max) max = cp.lastIngestSequence;
-    }
-    this.nextSequence = max + 1;
+  }
+
+  private derivationContext(
+    org: string,
+    snap: OrganizationRecordsSnapshot,
+  ): GraphDerivationContext {
+    return {
+      organizationId: org,
+      registryVersion: snap.registryVersion ?? this.policy.registryVersion,
+      sourceSnapshotVersion: snap.sourceSnapshotVersion,
+      allowOrgInheritance: snap.allowOrgInheritance ?? this.policy.allowOrgInheritance,
+    };
+  }
+
+  private async recordReconcileRun(
+    org: string,
+    result: GraphIndexingRunResult,
+    startedAt: string,
+    fields: {
+      previousSnapshotId: string | null;
+      resultingSnapshotId: string | null;
+      sourceHashBefore: string | null;
+      sourceHashAfter: string | null;
+      errorCode?: string;
+    },
+  ): Promise<void> {
+    const cp = await this.stateStore.getCheckpoint(org);
+    const checkpoint = cp === null || cp.lastIngestSequence < 0 ? 0 : cp.lastIngestSequence;
+    const run: GraphIndexingRun = {
+      runId: `reconcile-${org}-${startedAt}`,
+      organizationId: org,
+      batchEventIds: [], // reconciliation folds NO events — it is not event-driven.
+      eventCount: 0,
+      startingCheckpoint: checkpoint,
+      endingCheckpoint: checkpoint, // reconciliation never advances the watermark.
+      startedAt,
+      completedAt: this.clock(),
+      result,
+      previousSnapshotId: fields.previousSnapshotId,
+      resultingSnapshotId: fields.resultingSnapshotId,
+      sourceHashBefore: fields.sourceHashBefore,
+      sourceHashAfter: fields.sourceHashAfter,
+      retryCount: 0,
+      safeErrorCodes: fields.errorCode === undefined ? [] : [fields.errorCode],
+    };
+    await this.stateStore.putRun(run);
   }
 
   // -------------------------------------------------------------------------
@@ -314,12 +465,7 @@ export class GraphIndexingCoordinator {
     let sourceHashBefore: string | null = null;
     try {
       const snap = await this.loadOrganizationRecords(org);
-      const context: GraphDerivationContext = {
-        organizationId: org,
-        registryVersion: snap.registryVersion ?? this.policy.registryVersion,
-        sourceSnapshotVersion: snap.sourceSnapshotVersion,
-        allowOrgInheritance: snap.allowOrgInheritance ?? this.policy.allowOrgInheritance,
-      };
+      const context = this.derivationContext(org, snap);
 
       const active = await this.graphStore.getActiveSnapshot(org);
       previousSnapshotId = active?.snapshotId ?? null;
@@ -522,9 +668,10 @@ export class GraphIndexingCoordinator {
     const cp = await this.stateStore.getCheckpoint(org);
     const retryPending = (this.retryCounts.get(org) ?? 0) > 0;
     const halted = cp?.halted ?? false;
+    const degraded = retryPending || this.reconcileDegraded.has(org);
     const state: OrganizationIndexingStatus["state"] = halted
       ? "REBUILD_REQUIRED"
-      : retryPending
+      : degraded
         ? "DEGRADED"
         : "HEALTHY";
     return {

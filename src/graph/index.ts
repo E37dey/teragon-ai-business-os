@@ -226,6 +226,8 @@ export {
   STORE_PROCESSED_EVENTS,
   STORE_FAILED_BATCHES,
   STORE_PENDING_EVENTS,
+  STORE_INGEST_SEQUENCES,
+  STORE_SOURCE_FINGERPRINTS,
 } from "./store";
 export type {
   GraphIndexBuildState,
@@ -277,6 +279,8 @@ export {
   graphIndexingRunSchema,
   graphIndexingFailureSchema,
   graphProcessedEventRowSchema,
+  graphIngestSequenceRowSchema,
+  graphSourceFingerprintRowSchema,
   MicrotaskIndexingScheduler,
   GraphIndexingStateStore,
   GraphIndexingCoordinator,
@@ -293,6 +297,9 @@ export type {
   GraphIndexingRun,
   GraphIndexingFailure,
   GraphProcessedEventRow,
+  GraphIngestSequenceRow,
+  GraphSourceFingerprintRow,
+  IngestOutcome,
   GraphIndexingPolicy,
   GraphIndexingScheduler,
   GraphIndexingCoordinatorOptions,

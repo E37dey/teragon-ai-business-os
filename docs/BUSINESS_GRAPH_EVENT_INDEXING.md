@@ -6,21 +6,39 @@ successful update still produces a **complete** organization snapshot through
 no in-place mutation of an active snapshot.** Source: `src/graph/indexing/**`. **Flag-gated, default OFF
 — not wired into app runtime.**
 
+## Delivery guarantee (the REAL model — Phase 5.1)
+
+`Repository.subscribe` is **best-effort in-process notification, NOT a durable transactional outbox**.
+The durable `graphPendingEvents` queue protects an event **only after** it has been ingested — it cannot
+guarantee an event survives the gap between the canonical commit and durable graph-queue persistence.
+The honest model is therefore:
+
+> **best-effort event ingestion + durable replay after ingestion + startup canonical reconciliation =
+> eventual graph consistency.**
+
+There is **no exactly-once** and **no durable-outbox** semantics. Startup **canonical reconciliation**
+(below) is what closes any commit-before-enqueue gap.
+
 ## What it consumes
 
-The app has **no durable outbox** (see [EVENT_DISCOVERY](BUSINESS_GRAPH_EVENT_DISCOVERY.md)) — only the
-in-process `Repository.subscribe` emitting `ChangeEvent {type, collection, id?, item?}` post-commit.
-`GraphIndexingCoordinator.register()` (only when the flag is ON) subscribes; each event is normalized,
-stamped with a monotonic ingest sequence, and **durably appended** to the coordinator's own IndexedDB
-pending queue (its private checkpoint/replay substrate — **not** a competing product bus).
+Only the in-process `Repository.subscribe` `ChangeEvent {type, collection, id?, item?}` (post-commit).
+`GraphIndexingCoordinator.register()` (flag ON only) subscribes; each event is normalized and, in **one
+atomic IndexedDB transaction**, allocated a per-org monotonic **ingest sequence**, written to the durable
+pending queue, and recorded with a safe **source fingerprint** — the coordinator's private checkpoint/
+replay substrate, **not** a competing product bus.
 
 ## Normalized `GraphIndexingEvent`
 
-`eventId` (deterministic `${collection}:${id}:${aggregateVersion ?? "-"}:${operation}`) · `ingestSequence`
-· `organizationId` (via registry `organizationField` + `classifyOrganization`, else null — **never
-invented**) · `aggregateType` · `aggregateId` · `operation` · `aggregateVersion` · `occurredAt`
-(item.updatedAt) · `sourceRepository` · `transactionId`/`correlationId` (null) · `changedFields` (empty
-— the channel carries no diff) · `approvalState` · `supported` · `unmappableReason`.
+`eventId` = **`gidxevt:{organizationId}:{ingestSequence}`** (durable per-org monotonic sequence, always
+unique — Phase 5.1; no timestamps/display values, no collision when `aggregateVersion` is null) ·
+`ingestSequence` · `sourceFingerprint` (`collection:id:aggregateVersion:operation`, present only when
+version is non-null — used for **versioned** duplicate-source detection; a **versionless** event is never
+fingerprint-deduped, so two versionless updates to a record remain two events) · `organizationId` (via
+registry `organizationField` + `classifyOrganization`, else null — **never invented**) · `aggregateType`
+· `aggregateId` · `operation` · `aggregateVersion` (retained for ordering + versioned dedup, not as
+identity) · `occurredAt` (item.updatedAt) · `sourceRepository` · `transactionId`/`correlationId` (null)
+· `changedFields` (empty — the channel carries no diff) · `approvalState` · `supported` ·
+`unmappableReason`.
 
 `operation ∈ { CREATE, UPDATE, DELETE, ARCHIVE, RESTORE, APPROVE, REJECT, SUPERSEDE }` — create/update/
 remove are mapped; ARCHIVE/RESTORE/APPROVE/REJECT/SUPERSEDE are inferred from `archivedAt`/

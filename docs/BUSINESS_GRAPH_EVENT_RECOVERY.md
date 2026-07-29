@@ -32,6 +32,23 @@ A fresh coordinator over the same durable IndexedDB stores:
 Replaying the same events is **idempotent** — a repeated batch yields the same `sourceHash` and
 resolves as a **NO_OP**; an event received twice never creates two distinct active snapshots.
 
+## Startup canonical reconciliation (Phase 5.1) — closes the commit-before-enqueue gap
+
+Because ingestion is best-effort (a change committed to canonical storage can be lost before it reaches
+the durable pending queue), an **enabled** coordinator, on startup, reconciles per organization: read a
+consistent canonical snapshot → derive its deterministic `sourceHash` → compare with the ACTIVE graph
+snapshot's `sourceHash`:
+- **equal** → `RECONCILED_NO_OP` (no rebuild);
+- **different**, or **no active graph** → enqueue an internal `RECONCILE` signal and perform a full
+  rebuild (recorded as an `ACTIVATED` reconcile run);
+- reconciliation **fails** (canonical load throws / rebuild rejected) → preserve the active snapshot,
+  mark health **DEGRADED** (`RECONCILE_FAILED`).
+
+A `RECONCILE` signal is **operational metadata, not a fabricated CRM event** — no `GraphIndexingEvent`
+is synthesized for a canonical record that did not change, and **no entity bodies** appear in
+reconciliation logs. When the flag is **OFF**, startup performs **no repository scan** and no
+reconciliation.
+
 ## What recovery never does
 
 - It never mutates canonical CRM records (the index is derived).

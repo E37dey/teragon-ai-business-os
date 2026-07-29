@@ -83,20 +83,26 @@ describe("coordinator — a committed event triggers one full rebuild", () => {
 });
 
 describe("coordinator — dedup + coalesce", () => {
-  it("processes a duplicate eventId only once", async () => {
+  it("deduplicates a re-delivered VERSIONED source event (same fingerprint) at ingest", async () => {
+    const org = "org-dup";
     const book = new SourceBook();
-    book.set("org-1", baseRecords("org-1"), "v1");
+    book.set(org, { ...baseRecords(org), memoryRecords: [memoryRecord(org, "mem-1", 2)] }, "v1");
     const h = makeHarness({ loader: book.loader });
 
-    const { change, item } = customerChange("org-1", "cu-1", "update");
-    await h.coordinator.ingest(change, item);
-    await h.coordinator.ingest(change, item); // identical eventId
+    const item = memoryRecord(org, "mem-1", 2) as unknown as import("@/domain/types").BaseEntity;
+    const first = await h.coordinator.ingest({ type: "update", collection: "memoryRecords", id: "mem-1", item }, item);
+    // an identical re-delivery of the SAME versioned source event ⇒ deduped, no sequence.
+    const second = await h.coordinator.ingest({ type: "update", collection: "memoryRecords", id: "mem-1", item }, item);
+    expect(first).not.toBeNull();
+    expect(second).toBeNull();
     await h.scheduler.runUntilIdle();
 
-    const runs = await h.coordinator.listRuns("org-1");
+    const runs = await h.coordinator.listRuns(org);
     const activated = runs.filter((r) => r.result === "ACTIVATED");
     expect(activated.length).toBe(1);
     expect(activated[0]?.batchEventIds.length).toBe(1);
+    // exactly one durable sequence was allocated (no gap from the deduped re-delivery).
+    expect(await h.stateStore.lastIngestSequence(org)).toBe(0);
   });
 
   it("coalesces multiple events into ONE rebuild", async () => {
@@ -254,10 +260,13 @@ describe("coordinator — deterministic ordering by aggregateVersion (not wall-c
 
     const runs = await h.coordinator.listRuns(org);
     const activated = runs.find((r) => r.result === "ACTIVATED" || r.result === "NO_OP");
-    // canonical order: version 1 (eventId …:1:…) BEFORE version 2 (…:2:…).
+    // durable identity is the per-org ingest sequence; v2 was ingested first (seq 0),
+    // v1 second (seq 1). Canonical order sorts by aggregateVersion, so version 1
+    // (seq 1) comes BEFORE version 2 (seq 0) — proving order is by committed version,
+    // NOT by arrival or occurredAt.
     expect(activated?.batchEventIds).toEqual([
-      "memoryRecords:mem-1:1:APPROVE",
-      "memoryRecords:mem-1:2:APPROVE",
+      "gidxevt:org-order:1",
+      "gidxevt:org-order:0",
     ]);
   });
 });

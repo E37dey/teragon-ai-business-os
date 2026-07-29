@@ -11,8 +11,10 @@ import {
   STORE_EVENT_CHECKPOINTS,
   STORE_FAILED_BATCHES,
   STORE_INDEXING_RUNS,
+  STORE_INGEST_SEQUENCES,
   STORE_PENDING_EVENTS,
   STORE_PROCESSED_EVENTS,
+  STORE_SOURCE_FINGERPRINTS,
   openGraphIndexDb,
 } from "@/graph";
 
@@ -69,6 +71,8 @@ describe("graph-index DB — v1 → v2 upgrade", () => {
       STORE_PROCESSED_EVENTS,
       STORE_FAILED_BATCHES,
       STORE_PENDING_EVENTS,
+      STORE_INGEST_SEQUENCES,
+      STORE_SOURCE_FINGERPRINTS,
     ]) {
       expect(upgraded.objectStoreNames.contains(name)).toBe(true);
     }

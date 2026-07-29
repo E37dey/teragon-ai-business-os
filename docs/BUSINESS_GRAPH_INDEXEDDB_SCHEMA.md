@@ -5,9 +5,12 @@ explicit version, corruption-safe reads, strict per-organization + per-snapshot 
 
 ## Database
 
-- **Name:** `teragon-graph-index` · **Version:** `2` (Phase 5 bumped `1 → 2` via a single additive
-  shared `upgradeGraphIndexDb`; the upgrade preserves all existing snapshots/manifests — proven from a
-  genuine v1 DB). `upgrade` handler creates stores idempotently.
+- **Name:** `teragon-graph-index` · **Version:** `3` (Phase 5 bumped `1 → 2`; Phase 5.1 bumped `2 → 3`,
+  both additive via the single shared `upgradeGraphIndexDb`; every upgrade preserves all existing
+  snapshots/manifests — proven from genuine older DBs). `upgrade` handler creates stores idempotently.
+  Phase 5.1 added `graphIngestSequences` (per-org monotonic durable ingest counter) and
+  `graphSourceFingerprints` (versioned duplicate-source dedup) — the sequence, pending event, and
+  fingerprint are written in **one transaction** so ingestion is atomic (abort ⇒ no gap, no partial row).
 
 ## Coordinator state stores (Phase 5 — separate from graph content)
 

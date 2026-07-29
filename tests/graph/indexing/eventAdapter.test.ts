@@ -13,7 +13,7 @@ function customer(org: string, id: string, extra: Record<string, unknown> = {}):
 }
 
 describe("event adapter — normalization", () => {
-  it("maps create → CREATE with a deterministic eventId + resolved org", () => {
+  it("maps create → CREATE with a resolved org and NO fingerprint for a versionless record", () => {
     const item = customer("org-1", "cu-1");
     const change: ChangeEvent<BaseEntity> = { type: "create", collection: "customers", id: "cu-1", item };
     const ev = normalizeChangeEvent(change, item);
@@ -22,10 +22,15 @@ describe("event adapter — normalization", () => {
     expect(ev.aggregateType).toBe("customer");
     expect(ev.aggregateId).toBe("cu-1");
     expect(ev.sourceRepository).toBe("customers");
-    expect(ev.eventId).toBe("customers:cu-1:-:CREATE");
+    // the adapter assigns NO durable eventId; customers carry no version field, so
+    // there is NO source fingerprint (a versionless update is never fingerprint-deduped).
+    expect("eventId" in ev).toBe(false);
+    expect(ev.sourceFingerprint).toBeNull();
     expect(ev.supported).toBe(true);
-    // the wrapped event (with a sequence) is schema-valid.
-    expect(graphIndexingEventSchema.safeParse({ ...ev, ingestSequence: 0 }).success).toBe(true);
+    // the DURABLY-stamped event (eventId + sequence) is schema-valid.
+    expect(
+      graphIndexingEventSchema.safeParse({ ...ev, eventId: "gidxevt:org-1:0", ingestSequence: 0 }).success,
+    ).toBe(true);
   });
 
   it("maps remove → DELETE and update → UPDATE", () => {
@@ -38,7 +43,8 @@ describe("event adapter — normalization", () => {
     const item = { id: "mem-1", organizationId: "org-1", memoryLayer: "customer", approvalState: "מאושר", currentVersion: 3, createdAt: CREATED, updatedAt: UPDATED } as unknown as BaseEntity;
     const ev = normalizeChangeEvent({ type: "update", collection: "memoryRecords", id: "mem-1", item }, item);
     expect(ev.aggregateVersion).toBe(3);
-    expect(ev.eventId).toBe("memoryRecords:mem-1:3:APPROVE");
+    // a VERSIONED record yields a source fingerprint (used for duplicate detection).
+    expect(ev.sourceFingerprint).toBe("memoryRecords:mem-1:3:APPROVE");
     expect(ev.approvalState).toBe("מאושר");
   });
 

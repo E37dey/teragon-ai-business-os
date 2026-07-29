@@ -35,6 +35,8 @@ export {
   graphIndexingRunSchema,
   graphIndexingFailureSchema,
   graphProcessedEventRowSchema,
+  graphIngestSequenceRowSchema,
+  graphSourceFingerprintRowSchema,
 } from "./types";
 export type {
   GraphIndexingOperation,
@@ -47,6 +49,8 @@ export type {
   GraphIndexingRun,
   GraphIndexingFailure,
   GraphProcessedEventRow,
+  GraphIngestSequenceRow,
+  GraphSourceFingerprintRow,
   GraphIndexingPolicy,
 } from "./types";
 
@@ -56,6 +60,7 @@ export type { GraphIndexingScheduler } from "./scheduler";
 
 // --- durable state store ---
 export { GraphIndexingStateStore } from "./stateStore";
+export type { IngestOutcome } from "./stateStore";
 
 // --- the coordinator ---
 export { GraphIndexingCoordinator } from "./coordinator";

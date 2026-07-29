@@ -1,11 +1,15 @@
 // TERAGON Business Graph — ChangeEvent → GraphIndexingEvent adapter (Phase 5).
 // ---------------------------------------------------------------------------
-// The app has NO durable outbox: the only mutation channel is
+// The app has NO durable transactional outbox: the only mutation channel is
 // `Repository.subscribe` emitting a minimal `ChangeEvent {type, collection, id?,
 // item?}` AFTER a committed write (see docs/BUSINESS_GRAPH_EVENT_DISCOVERY.md).
-// This adapter SYNTHESIZES the normalized indexing contract from that event + the
-// item + the closed ENTITY_REGISTRY. It is PURE: no clock, no randomness, no repo
-// read, no sequence assignment (the coordinator stamps ingestSequence).
+// Delivery is therefore best-effort — an event can be lost between the canonical
+// commit and the durable graph queue. This adapter SYNTHESIZES the normalized
+// indexing contract from that event + the item + the closed ENTITY_REGISTRY. It is
+// PURE: no clock, no randomness, no repo read, and it assigns NEITHER the durable
+// `eventId` NOR the `ingestSequence` (both are allocated atomically in IndexedDB by
+// the state store on ingest). It produces only a SAFE `sourceFingerprint` used for
+// duplicate-source-event detection.
 //
 // It NEVER copies an entity body, notes, prompt, secret or protected content into
 // the event — the event is a rebuild signal + audit reference, not graph content.
@@ -91,9 +95,8 @@ export function normalizeChangeEvent<T extends BaseEntity>(
 
   // --- unsupported collection: record safely, never guess a relationship ---
   if (entry === null) {
-    const eventId = `${collection}:${aggregateId ?? "-"}:-:UNSUPPORTED`;
     return {
-      eventId,
+      sourceFingerprint: null,
       organizationId: null,
       aggregateType: null,
       aggregateId,
@@ -113,7 +116,7 @@ export function normalizeChangeEvent<T extends BaseEntity>(
   // --- clear event: no id, no item — a whole-collection wipe signal ---
   if (change.type === "clear") {
     return {
-      eventId: `${collection}:-:-:UNSUPPORTED`,
+      sourceFingerprint: null,
       organizationId: null,
       aggregateType: entry.entityType,
       aggregateId: null,
@@ -159,10 +162,16 @@ export function normalizeChangeEvent<T extends BaseEntity>(
     supported = false;
   }
 
-  const eventId = `${collection}:${aggregateId ?? "-"}:${aggregateVersion ?? "-"}:${operation}`;
+  // SAFE source fingerprint — only when the source event carries a real version
+  // AND id (a versionless update is never fingerprint-deduped; two legitimate
+  // versionless updates to the same record must remain two distinct events).
+  const sourceFingerprint =
+    aggregateVersion !== null && aggregateId !== null
+      ? `${collection}:${aggregateId}:${aggregateVersion}:${operation}`
+      : null;
 
   return {
-    eventId,
+    sourceFingerprint,
     organizationId,
     aggregateType: entry.entityType,
     aggregateId,

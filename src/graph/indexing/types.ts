@@ -42,15 +42,29 @@ export const graphIndexingOperationSchema = z.enum(GRAPH_INDEXING_OPERATIONS);
 // ---------------------------------------------------------------------------
 
 /**
- * A normalized, coordinator-stamped mutation signal. NEVER contains an entity
- * body. `eventId` is the deterministic dedup key. `ingestSequence` is the
- * coordinator-assigned monotonic total-order tiebreaker (assigned on receipt).
+ * A normalized mutation signal. NEVER contains an entity body.
+ *
+ * DELIVERY MODEL (why identity is a durable sequence, not the source tuple):
+ * `Repository.subscribe` is best-effort in-process notification, NOT a durable
+ * transactional outbox — an event can be lost between the canonical commit and
+ * this queue's durable write. So the DURABLE identity is a per-organization
+ * monotonic ingest sequence allocated in IndexedDB at ingest time — always unique,
+ * never derived from wall-clock or entity display values. The SOURCE tuple
+ * (`sourceFingerprint`) is kept ONLY for duplicate-source-event detection (a
+ * re-delivered VERSIONED source event) and for ordering — never as the identity.
  */
 export interface GraphIndexingEvent {
-  /** deterministic dedup key `${collection}:${id}:${aggregateVersion ?? "-"}:${operation}` */
+  /** durable identity `gidxevt:{organizationId}:{ingestSequence}` — always unique */
   eventId: string;
-  /** coordinator-assigned monotonic order (assigned on receipt; never wall-clock) */
+  /** durable per-org monotonic order (allocated in IndexedDB; never wall-clock) */
   ingestSequence: number;
+  /**
+   * Safe source fingerprint `${collection}:${id}:${aggregateVersion}:${operation}`
+   * for duplicate-source-event detection — present ONLY when `aggregateVersion` is
+   * non-null (a versionless update is never fingerprint-deduped). NO entity body,
+   * NO display values. Null when versionless / unsupported.
+   */
+  sourceFingerprint: string | null;
   /** derived org, or null when the record has no resolvable organization */
   organizationId: string | null;
   /** collection → GraphEntityType, or null for an unsupported collection */
@@ -78,12 +92,17 @@ export interface GraphIndexingEvent {
   unmappableReason: string | null;
 }
 
-/** The adapter output before the coordinator assigns an ingest sequence. */
-export type NormalizedGraphEvent = Omit<GraphIndexingEvent, "ingestSequence">;
+/**
+ * The adapter output before durable ingest. The adapter is PURE and has no access
+ * to the durable sequence, so it assigns NEITHER `eventId` NOR `ingestSequence` —
+ * both are allocated atomically in IndexedDB by the state store on ingest.
+ */
+export type NormalizedGraphEvent = Omit<GraphIndexingEvent, "ingestSequence" | "eventId">;
 
 export const graphIndexingEventSchema = z.object({
   eventId: z.string().min(1),
   ingestSequence: z.number().int().min(0),
+  sourceFingerprint: z.string().min(1).nullable(),
   organizationId: z.string().min(1).nullable(),
   aggregateType: graphEntityTypeSchema.nullable(),
   aggregateId: z.string().min(1).nullable(),
@@ -175,6 +194,9 @@ export const GRAPH_INDEXING_RESULTS = [
   "FAILED",
   "HALTED",
   "DISABLED",
+  // startup canonical reconciliation outcomes (operational metadata, not events):
+  "RECONCILED_NO_OP",
+  "RECONCILE_FAILED",
 ] as const;
 export type GraphIndexingRunResult = (typeof GRAPH_INDEXING_RESULTS)[number];
 export const graphIndexingRunResultSchema = z.enum(GRAPH_INDEXING_RESULTS);
@@ -268,6 +290,57 @@ export const graphProcessedEventRowSchema = z.object({
   runId: z.string().min(1),
   processedAt: z.string(),
 }) satisfies z.ZodType<GraphProcessedEventRow>;
+
+// ---------------------------------------------------------------------------
+// durable per-organization ingest-sequence counter
+// ---------------------------------------------------------------------------
+
+/**
+ * The durable monotonic ingest-sequence allocator, one row per organization. The
+ * next event's `ingestSequence` is `lastIngestSequence + 1`, allocated inside the
+ * SAME IndexedDB transaction that writes the pending event + source fingerprint, so
+ * a sequence is never allocated without its event (no gaps, no partial rows).
+ */
+export interface GraphIngestSequenceRow {
+  organizationId: string;
+  /** the highest ingest sequence handed out so far for this org */
+  lastIngestSequence: number;
+}
+
+export const graphIngestSequenceRowSchema = z.object({
+  organizationId: z.string().min(1),
+  lastIngestSequence: z.number().int().min(0),
+}) satisfies z.ZodType<GraphIngestSequenceRow>;
+
+// ---------------------------------------------------------------------------
+// source-event fingerprint (duplicate-source-event detection — SAFE key only)
+// ---------------------------------------------------------------------------
+
+/**
+ * A durable record that a VERSIONED source event `collection:id:version:operation`
+ * has already been ingested. Used ONLY to skip a re-delivered versioned source
+ * event (allocating no sequence). Carries NO entity body and NO display values —
+ * just the safe source tuple + the durable identity it was first ingested as.
+ */
+export interface GraphSourceFingerprintRow {
+  /** `${organizationId}∅${sourceFingerprint}` */
+  key: string;
+  organizationId: string;
+  /** the safe `collection:id:aggregateVersion:operation` tuple (never a body) */
+  fingerprint: string;
+  /** the ingest sequence this source event was first ingested as */
+  ingestSequence: number;
+  /** the durable eventId this source event was first ingested as */
+  eventId: string;
+}
+
+export const graphSourceFingerprintRowSchema = z.object({
+  key: z.string().min(1),
+  organizationId: z.string().min(1),
+  fingerprint: z.string().min(1),
+  ingestSequence: z.number().int().min(0),
+  eventId: z.string().min(1),
+}) satisfies z.ZodType<GraphSourceFingerprintRow>;
 
 // ---------------------------------------------------------------------------
 // policy

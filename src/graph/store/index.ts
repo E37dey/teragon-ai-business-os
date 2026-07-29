@@ -105,5 +105,7 @@ export {
   STORE_PROCESSED_EVENTS,
   STORE_FAILED_BATCHES,
   STORE_PENDING_EVENTS,
+  STORE_INGEST_SEQUENCES,
+  STORE_SOURCE_FINGERPRINTS,
 } from "./indexeddbStore";
 export type { IndexedDBGraphStoreOptions } from "./indexeddbStore";
