@@ -8,6 +8,10 @@
 export {
   GRAPH_INDEX_SCHEMA_VERSION,
   GRAPH_INDEX_DERIVATION_VERSION,
+  GRAPH_INDEX_CHECKSUM_ALGORITHM,
+  GRAPH_INDEX_CHECKSUM_VERSION,
+  SAFE_NON_INDEXABLE_ACTIVATION_CODES,
+  FORBIDDEN_ACTIVATION_CODES,
   SUPPORTED_GRAPH_INDEX_SCHEMA_VERSIONS,
   SUPPORTED_GRAPH_REGISTRY_VERSIONS,
   GRAPH_INDEX_BUILD_STATES,
@@ -43,13 +47,14 @@ export type {
   GraphIndexHealthFinding,
   GraphIndexHealth,
   GraphIndexErrorCode,
+  GraphIndexChecksumAlgorithm,
   GraphIndexStore,
 } from "./contracts";
 
 // --- deterministic hashing ---
 export {
   canonicalJSON,
-  fnv1a64,
+  sha256Hex,
   hashContent,
   computeChecksum,
   computeSourceHash,

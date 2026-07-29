@@ -1,6 +1,6 @@
-// TERAGON Business Graph — deterministic hashing tests (Phase 4).
+// TERAGON Business Graph — deterministic hashing tests (Phase 4.1, SHA-256).
 import { describe, expect, it } from "vitest";
-import { canonicalJSON, fnv1a64, hashContent, buildSnapshotId } from "@/graph";
+import { canonicalJSON, sha256Hex, hashContent, buildSnapshotId } from "@/graph";
 
 describe("deterministic content hashing", () => {
   it("canonicalJSON is key-order independent", () => {
@@ -22,23 +22,34 @@ describe("deterministic content hashing", () => {
     expect(() => canonicalJSON(Number.POSITIVE_INFINITY)).toThrow();
   });
 
-  it("fnv1a64 is a stable 16-char hex string", () => {
-    const h = fnv1a64("teragon");
-    expect(h).toMatch(/^[0-9a-f]{16}$/u);
-    expect(fnv1a64("teragon")).toBe(h);
+  it("sha256Hex is a stable 64-char (256-bit) hex string via Web Crypto", async () => {
+    const h = await sha256Hex("teragon");
+    expect(h).toMatch(/^[0-9a-f]{64}$/u);
+    // the STANDARD SHA-256("teragon") digest — proves Web Crypto emits the
+    // canonical digest, byte-identical in browser + Node (no external dependency).
+    expect(h).toBe("0610987c75ff7dbd4386657d99479069ebb364f67d87bb30e821c2adf08ff13c");
+    expect(await sha256Hex("teragon")).toBe(h);
   });
 
-  it("different content yields different hashes", () => {
-    expect(hashContent({ a: 1 })).not.toBe(hashContent({ a: 2 }));
+  it("identical input ⇒ identical SHA-256; a one-byte change ⇒ different digest", async () => {
+    const a = await sha256Hex("teragon");
+    const b = await sha256Hex("teragoN"); // one byte changed
+    expect(a).not.toBe(b);
+    expect(await sha256Hex("teragon")).toBe(a);
   });
 
-  it("identical canonical input yields identical hash", () => {
-    expect(hashContent({ x: [1, 2], y: "ק" })).toBe(hashContent({ y: "ק", x: [1, 2] }));
+  it("different content yields different hashes", async () => {
+    expect(await hashContent({ a: 1 })).not.toBe(await hashContent({ a: 2 }));
   });
 
-  it("buildSnapshotId is deterministic and sanitizes the org", () => {
-    const id = buildSnapshotId("org/with:weird chars", "abcdef0123456789");
-    expect(id).toBe("idx-org_with_weird_chars-abcdef0123456789");
-    expect(buildSnapshotId("org-a", "deadbeefdeadbeef")).toBe("idx-org-a-deadbeefdeadbeef");
+  it("identical canonical input yields identical hash (key-order independent)", async () => {
+    expect(await hashContent({ x: [1, 2], y: "ק" })).toBe(await hashContent({ y: "ק", x: [1, 2] }));
+  });
+
+  it("buildSnapshotId embeds the full digest and sanitizes the org", () => {
+    const full = "a".repeat(64);
+    const id = buildSnapshotId("org/with:weird chars", full);
+    expect(id).toBe(`idx-org_with_weird_chars-${full}`);
+    expect(buildSnapshotId("org-a", full)).toBe(`idx-org-a-${full}`);
   });
 });

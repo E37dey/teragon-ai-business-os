@@ -12,9 +12,13 @@
 //     target), and every reference is by real id (no ambiguous name matching);
 //   • NO cross-organization edge is attempted;
 //   • all 15 Core-V1 entities are represented as nodes, wired by their expected
-//     authoritative relationships (follow-up, printer ownership, recurring
-//     service, recommendation→approval→task, course/enrollment, approved
-//     knowledge/memory evidence, memory lineage).
+//     authoritative relationships (organization ownership, follow-up, printer
+//     ownership, recurring service, ticket→repair resolution,
+//     recommendation→approval→task, course/enrollment, approved knowledge/memory
+//     evidence, memory lineage).
+//   • the SOURCE-pointing FKs OWNS(organization→customer) and
+//     RESOLVED_BY(serviceTicket→repairAction) resolve under the SOURCE type
+//     (Phase 4.1 generic-resolver fix) and are BOTH present.
 //
 // Deriving with VALID_CONTEXT yields EXACTLY: 0 error-severity issues,
 // 0 unmappableRecords, 0 orphanReferences, 0 duplicateEdges — asserted by
@@ -61,17 +65,22 @@ export function buildValidRecords(): Partial<Record<string, CanonicalRecord[]>> 
     users: [
       { id: "u-1", name: "מהנדס שירות", status: "פעיל", createdAt: CREATED, updatedAt: UPDATED },
     ],
+    // the owning organization — the SOURCE endpoint of the OWNS(org→customer)
+    // edge. Its id IS VALID_ORG, so the customer's organizationId FK resolves to
+    // this exact record under the SOURCE type (organization), same-org.
+    organizations: [
+      { id: VALID_ORG, name: "ארגון קנוני", status: "פעיל", createdAt: CREATED, updatedAt: UPDATED },
+    ],
     // CRM spine ------------------------------------------------------------
-    // The customer is org-scoped-by-inheritance (registry-approved: customer is
-    // graph-eligible + allowOrgInheritance is on), so it adopts VALID_ORG — the
-    // same org its explicit-org children (memoryRecords) carry. (An org→customer
-    // OWNS edge is intentionally NOT modeled: the current Phase-3 collectRefs
-    // resolves that source-pointing FK under the customer repository, so it is a
-    // capability the pure derivation does not yet emit — see the header note.)
+    // The customer carries organizationId = VALID_ORG explicitly, so it both
+    // resolves its own org AND anchors the OWNS(organization→customer) edge: the
+    // source-pointing FK now resolves under the SOURCE (organization) type, so
+    // the generic resolver emits an authoritative OWNS edge (Phase 4.1 fix).
     customers: [
       {
         id: "cu-1",
         name: "לקוח קנוני",
+        organizationId: VALID_ORG,
         status: "פעיל",
         createdAt: CREATED,
         updatedAt: UPDATED,
@@ -130,6 +139,19 @@ export function buildValidRecords(): Partial<Record<string, CanonicalRecord[]>> 
         id: "st-1",
         customerId: "cu-1",
         status: "פתוח",
+        createdAt: CREATED,
+        updatedAt: UPDATED,
+      },
+    ],
+    // the repair that resolves st-1 — the RESOLVED_BY(serviceTicket→repairAction)
+    // edge. ticketId is a SOURCE-pointing FK (names the serviceTicket source
+    // node); the generic resolver now looks it up under the SOURCE (serviceTicket)
+    // type and emits the edge with the repairAction as target.
+    repairActions: [
+      {
+        id: "ra-1",
+        ticketId: "st-1",
+        outcome: "הושלם",
         createdAt: CREATED,
         updatedAt: UPDATED,
       },
@@ -278,7 +300,9 @@ export const VALID_EXPECTED_RELATIONSHIPS: ReadonlyArray<{
   sourceType: GraphEntityType;
   targetType: GraphEntityType;
 }> = [
+  { relationshipType: "OWNS", sourceType: "organization", targetType: "customer" },
   { relationshipType: "OWNS", sourceType: "customerPrinter", targetType: "customer" },
+  { relationshipType: "RESOLVED_BY", sourceType: "serviceTicket", targetType: "repairAction" },
   { relationshipType: "USES", sourceType: "customerPrinter", targetType: "printerModel" },
   { relationshipType: "ASSIGNED_TO", sourceType: "lead", targetType: "user" },
   { relationshipType: "DERIVED_FROM", sourceType: "opportunity", targetType: "lead" },

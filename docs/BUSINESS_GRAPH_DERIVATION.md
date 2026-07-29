@@ -48,6 +48,12 @@ is marked `MISSING_ORGANIZATION` / unmappable. **`org-teragon` is never fabricat
 - Every edge's authority is set by `resolveEdgeAuthority(...)` — never hand-set. An explicit link record
   or an eligible FK field becomes `CANONICAL`/`DERIVED` only after existence + same-org + not-archived +
   non-ambiguous checks.
+- **Source-pointing FK resolution (Phase 4.1 fix):** the referenced record's type is chosen
+  generically — `referenceEntityType = fkPointsTo === "source" ? registrySourceType : registryTargetType`
+  (no per-relationship special-casing, no name/substring matching). This corrects a defect where
+  `fkPointsTo:"source"` specs looked up the referenced id under the *target* type, so **`OWNS`
+  (organization→customer)** and **`RESOLVED_BY` (serviceTicket→repairAction)** now emit when their
+  reference is valid (and still emit `MISSING_TARGET`/`CROSS_ORGANIZATION` honestly when it is not).
 - Legacy `"kind:id"` / embedded-id / string-key refs pass through `parseKindIdRef`/`classifyReference`
   and must satisfy syntax + registry + target-existence + same-org + lifecycle validation before any
   authoritative edge; on failure the matching **issue** is emitted and **no authoritative edge**.

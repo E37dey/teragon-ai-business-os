@@ -30,7 +30,7 @@ describe("rebuildOrganizationGraph — valid canonical fixture", () => {
     store = freshStore();
   });
 
-  it("builds, validates and activates with zero errors; persists 20 nodes / 20 edges", async () => {
+  it("builds, validates and activates with zero errors; persists 22 nodes / 22 edges", async () => {
     const result = await rebuildOrganizationGraph(buildValidRecords(), VALID_CONTEXT, store, { now: makeClock() });
     expect(result.outcome).toBe("ACTIVATED");
     expect(result.activated).toBe(true);
@@ -40,10 +40,10 @@ describe("rebuildOrganizationGraph — valid canonical fixture", () => {
     const active = await store.getActiveSnapshot(VALID_CONTEXT.organizationId);
     expect(active).not.toBeNull();
     expect(active?.buildState).toBe("ACTIVE");
-    expect(active?.nodeCount).toBe(20);
-    expect(active?.edgeCount).toBe(20);
-    expect(active?.nodes.length).toBe(20);
-    expect(active?.edges.length).toBe(20);
+    expect(active?.nodeCount).toBe(22);
+    expect(active?.edgeCount).toBe(22);
+    expect(active?.nodes.length).toBe(22);
+    expect(active?.edges.length).toBe(22);
   });
 
   it("persisted active graph carries no cross-organization edge", async () => {

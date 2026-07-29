@@ -317,7 +317,13 @@ function findEdgeRegistry(spec: EdgeSpec): EdgeRegistryEntry | undefined {
 
 interface CandidateRef {
   referencedId: string;
-  targetType: GraphEntityType;
+  /**
+   * The entity type the referenced record is looked up under. For a
+   * source-pointing FK this is the SOURCE type (the fk names the source node);
+   * for a target-pointing FK it is the TARGET type. Decided generically by
+   * `fkPointsTo` — never by any name/substring match.
+   */
+  referenceType: GraphEntityType;
   discriminator: string;
 }
 
@@ -328,6 +334,15 @@ function collectRefs(
   const refs: CandidateRef[] = [];
   const malformed: string[] = [];
   const raw = readField(record, spec.fkField);
+
+  // GENERIC: the referenced record's type is the SOURCE type when the fk points
+  // at the source node, otherwise the TARGET type. This is the single rule that
+  // makes a source-pointing FK (e.g. customer.organizationId → OWNS, or
+  // repairAction.ticketId → RESOLVED_BY) resolve under the correct type. The
+  // legacy kind:id path is always target-pointing and keeps its kind-resolved
+  // type below.
+  const referenceEntityType: GraphEntityType =
+    spec.fkPointsTo === "source" ? spec.registrySourceType : spec.registryTargetType;
 
   const pushKindId = (value: string): void => {
     const parsed = parseKindIdRef(value);
@@ -342,7 +357,7 @@ function collectRefs(
     }
     refs.push({
       referencedId: parsed.id,
-      targetType,
+      referenceType: targetType,
       discriminator: `${spec.fkField}:${parsed.kind}:${parsed.id}`,
     });
   };
@@ -358,14 +373,14 @@ function collectRefs(
         if (typeof id === "string" && id.trim() !== "") {
           refs.push({
             referencedId: id,
-            targetType: spec.registryTargetType,
+            referenceType: referenceEntityType,
             discriminator: `${spec.fkField}:${id}`,
           });
         }
       } else if (typeof item === "string" && item.trim() !== "") {
         refs.push({
           referencedId: item,
-          targetType: spec.registryTargetType,
+          referenceType: referenceEntityType,
           discriminator: `${spec.fkField}:${item}`,
         });
       }
@@ -379,7 +394,7 @@ function collectRefs(
   } else {
     refs.push({
       referencedId: raw,
-      targetType: spec.registryTargetType,
+      referenceType: referenceEntityType,
       discriminator: spec.fkField,
     });
   }
@@ -461,8 +476,8 @@ export function deriveGraphEdges(
     }
 
     for (const cand of refs) {
-      const referencedExists = lookup.exists(cand.targetType, cand.referencedId);
-      const referenced = lookup.get(cand.targetType, cand.referencedId);
+      const referencedExists = lookup.exists(cand.referenceType, cand.referencedId);
+      const referenced = lookup.get(cand.referenceType, cand.referencedId);
 
       if (!referencedExists) {
         if (!spec.silentIfMissing) {
@@ -470,7 +485,7 @@ export function deriveGraphEdges(
             makeIssue("MISSING_TARGET", entityType, entityId, {
               field: spec.fkField,
               attemptedRelationship: spec.relationshipType,
-              reasonHe: `יעד ${cand.targetType}:${cand.referencedId} אינו קיים`,
+              reasonHe: `יעד ${cand.referenceType}:${cand.referencedId} אינו קיים`,
             }),
           );
         }
@@ -498,7 +513,7 @@ export function deriveGraphEdges(
       const targetNodeId: GraphNodeId | null =
         spec.fkPointsTo === "source"
           ? ownNode
-          : safeNodeId(organizationId, cand.targetType, cand.referencedId);
+          : safeNodeId(organizationId, cand.referenceType, cand.referencedId);
       if (sourceNodeId === null || targetNodeId === null) continue;
 
       const gate = spec.gate?.(record, referenced) ?? {

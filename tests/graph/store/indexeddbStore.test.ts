@@ -24,7 +24,7 @@ describe("store — staging visibility", () => {
     const org = "org-stage";
     const ctx = contextFor(org);
     const derivation = deriveOrganizationGraphSnapshot(cleanRecords(), ctx);
-    const built = buildIndexSnapshot(derivation, ctx, { now: makeClock() });
+    const built = await buildIndexSnapshot(derivation, ctx, { now: makeClock() });
     await store.stageSnapshot(built.snapshot);
 
     expect(await store.getActiveSnapshot(org)).toBeNull();
@@ -38,7 +38,7 @@ describe("store — invalid snapshot cannot activate", () => {
   it("an INVALID snapshot throws on activateSnapshot", async () => {
     const store = freshStore();
     const derivation = deriveOrganizationGraphSnapshot(buildAdversarialRecords(), ADVERSARIAL_CONTEXT);
-    const built = buildIndexSnapshot(derivation, ADVERSARIAL_CONTEXT, { now: makeClock() });
+    const built = await buildIndexSnapshot(derivation, ADVERSARIAL_CONTEXT, { now: makeClock() });
     await store.stageSnapshot(built.snapshot);
     const validation = await store.validateStagedSnapshot(built.snapshot.snapshotId);
     expect(validation.valid).toBe(false);
@@ -71,7 +71,7 @@ describe("store — organization isolation", () => {
     const store = freshStore();
     const org = "org-nomix";
     const derivation1 = deriveOrganizationGraphSnapshot(cleanRecords(), contextFor(org));
-    const built1 = buildIndexSnapshot(derivation1, contextFor(org), { now: makeClock() });
+    const built1 = await buildIndexSnapshot(derivation1, contextFor(org), { now: makeClock() });
     await store.stageSnapshot(built1.snapshot);
 
     const active = await rebuildOrganizationGraph(cleanRecords(), contextFor(org), store, { now: makeClock() });
@@ -89,7 +89,7 @@ describe("store — discard", () => {
     const org = "org-discard";
     const ctx = contextFor(org);
     const derivation = deriveOrganizationGraphSnapshot(cleanRecords(), ctx);
-    const built = buildIndexSnapshot(derivation, ctx, { now: makeClock() });
+    const built = await buildIndexSnapshot(derivation, ctx, { now: makeClock() });
     await store.stageSnapshot(built.snapshot);
     await store.discardStagedSnapshot(built.snapshot.snapshotId);
     expect(await store.getSnapshot(built.snapshot.snapshotId)).toBeNull();

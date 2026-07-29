@@ -28,20 +28,31 @@ If any step (derivation, validation, checksum, or write) fails:
 
 Proven by the "failed rebuild preserves previous active" test.
 
-## Deterministic hashing (exact algorithm)
+## Deterministic hashing (exact algorithm) — SHA-256 (Phase 4.1)
 
-`canonicalJSON(value)` → `fnv1a64(string)`:
-- **`canonicalJSON`** sorts object keys ASCII-ascending **recursively**, preserves array order (the
-  derivation already sorts every collection deterministically), drops `undefined`, and refuses
-  non-finite numbers. It **excludes** `createdAt`, `activatedAt`, `buildState`, `validationState` from
-  hashed content.
-- **`fnv1a64`** — FNV-1a over the canonical string: offset basis `0xcbf29ce484222325`, prime
-  `0x100000001b3`, modulo 2⁶⁴ (BigInt), rendered as 16-char hex. **No `Date`, no `Math.random`.**
+`canonicalJSON(value)` → `sha256Hex(string)`:
+- **`canonicalJSON`** (unchanged) sorts object keys ASCII-ascending **recursively**, preserves array
+  order (the derivation already sorts every collection deterministically), drops `undefined`, and
+  refuses non-finite numbers. It **excludes** `createdAt`, `activatedAt`, `buildState`,
+  `validationState` from hashed content.
+- **`sha256Hex`** — **SHA-256** over the UTF-8 bytes of the canonical string via **Web Crypto**
+  (`globalThis.crypto.subtle.digest("SHA-256", …)`), returned as a fixed 64-char lowercase hex string.
+  Standardized, non-keyed, **no external dependency**, byte-identical in the browser (same-origin) and
+  in the Node/Vitest runtime (a test asserts the canonical `SHA-256("teragon")` digest). Hashing is
+  **async** and threaded through `hash → snapshot → validation → health → recovery → rebuild → store`.
+  **No `Date`, no `Math.random`.** (The former FNV-1a hash was removed entirely — it is not used even as
+  a non-security hash.)
 - **`checksum`** covers the FULL graph content (nodes + edges + issues + unmappable + versions + org +
-  source version) — the integrity / partial-write / corruption detector.
+  source version) — the integrity / partial-write / corruption detector. Binds
+  `checksumAlgorithm:"SHA-256"` + `checksumVersion:1` into the digest.
 - **`sourceHash`** covers only source-derived nodes + edges + registry + source-snapshot version — the
   **staleness** detector (differs when the underlying canonical data changed).
-- **`snapshotId = idx-{sanitizedOrg}-{checksum}`** — deterministic, no uuid, no timestamp.
+- **`snapshotId = idx-{organizationId}-{fullSha256}`** — the **full** 64-hex digest (≥128-bit),
+  deterministic, no uuid, no timestamp.
+- **Version pin:** the graph-index `schemaVersion` was bumped `graph-index-v1 → graph-index-v2`. Any
+  legacy FNV snapshot is **unsupported** — validation returns `SCHEMA_VERSION_UNSUPPORTED` and health
+  returns `REBUILD_REQUIRED`; it is **never silently accepted**. A rebuild is sufficient because the
+  index is derived.
 
 **Guarantee:** identical canonical input ⇒ identical graph content, identical `sourceHash`, identical
-`checksum`, identical `snapshotId`.
+`checksum`, identical `snapshotId`; a one-byte content change ⇒ a different `checksum`.

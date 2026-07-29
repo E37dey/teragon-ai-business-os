@@ -34,13 +34,13 @@ export function isKnownGoodCandidate(header: GraphIndexSnapshotHeader): boolean 
  * Verify a candidate snapshot is safe to restore: it belongs to `organizationId`
  * and its checksum recomputes. Returns true only when both hold.
  */
-export function verifyRecoveryCandidate(
+export async function verifyRecoveryCandidate(
   snapshot: GraphIndexSnapshot,
   organizationId: string,
-): boolean {
+): Promise<boolean> {
   if (snapshot.organizationId !== organizationId) return false;
   if (snapshot.validationState !== "VALID") return false;
-  return recomputeChecksum(snapshot) === snapshot.checksum;
+  return (await recomputeChecksum(snapshot)) === snapshot.checksum;
 }
 
 /**
@@ -57,7 +57,7 @@ export async function selectRecoveryCandidate(
   for (const header of [...headers].reverse()) {
     if (!isKnownGoodCandidate(header)) continue;
     const snapshot = await store.getSnapshot(header.snapshotId);
-    if (snapshot !== null && verifyRecoveryCandidate(snapshot, organizationId)) {
+    if (snapshot !== null && (await verifyRecoveryCandidate(snapshot, organizationId))) {
       return snapshot;
     }
   }

@@ -27,7 +27,7 @@ describe("retention — selectExpiredSnapshotIds (pure)", () => {
         sourceSnapshotVersion: "",
         sourceHash: "h",
         registryVersion: "core-v1",
-        schemaVersion: "graph-index-v1",
+        schemaVersion: "graph-index-v2",
         derivationVersion: "phase-3",
         nodeCount: 0,
         edgeCount: 0,
@@ -37,6 +37,8 @@ describe("retention — selectExpiredSnapshotIds (pure)", () => {
         activatedAt: null,
         supersedesSnapshotId: null,
         checksum: "c",
+        checksumAlgorithm: "SHA-256",
+        checksumVersion: 1,
         unmappableCount: 0,
       }),
     );
@@ -105,12 +107,12 @@ describe("recovery — restores a previous known-good snapshot non-destructively
 });
 
 describe("recovery — verifyRecoveryCandidate", () => {
-  it("rejects a candidate from a different organization", () => {
+  it("rejects a candidate from a different organization", async () => {
     const ctx = contextFor("org-real");
     const derivation = deriveOrganizationGraphSnapshot(cleanRecords(), ctx);
-    const snapshot = buildIndexSnapshot(derivation, ctx, { now: makeClock() }).snapshot;
+    const snapshot = (await buildIndexSnapshot(derivation, ctx, { now: makeClock() })).snapshot;
     const validated = { ...snapshot, validationState: "VALID" as const };
-    expect(verifyRecoveryCandidate(validated, "org-real")).toBe(true);
-    expect(verifyRecoveryCandidate(validated, "org-other")).toBe(false);
+    expect(await verifyRecoveryCandidate(validated, "org-real")).toBe(true);
+    expect(await verifyRecoveryCandidate(validated, "org-other")).toBe(false);
   });
 });

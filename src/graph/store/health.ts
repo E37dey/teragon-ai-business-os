@@ -29,11 +29,11 @@ export interface HealthOptions {
  * served snapshot). `readError` is set when the store itself failed to
  * reassemble the snapshot (a corruption signal that outranks everything).
  */
-export function computeHealth(
+export async function computeHealth(
   organizationId: string,
   activeSnapshot: GraphIndexSnapshot | null,
   options: HealthOptions & { readError?: boolean } = {},
-): GraphIndexHealth {
+): Promise<GraphIndexHealth> {
   const now = options.now ?? (() => new Date().toISOString());
   const checkedAt = now();
   const findings: GraphIndexHealthFinding[] = [];
@@ -55,7 +55,7 @@ export function computeHealth(
   const activeId = activeSnapshot.snapshotId;
 
   // checksum mismatch — corruption.
-  const checksumVerified = recomputeChecksum(activeSnapshot) === activeSnapshot.checksum;
+  const checksumVerified = (await recomputeChecksum(activeSnapshot)) === activeSnapshot.checksum;
   if (!checksumVerified) {
     findings.push({ code: "CHECKSUM_MISMATCH", severity: "error", messageHe: "סכום הביקורת אינו תואם — תמונת המצב פגומה" });
     return frame(organizationId, "CORRUPT", checkedAt, activeId, false, findings);
@@ -112,7 +112,7 @@ export function computeHealth(
   // staleness — the source has changed since this snapshot was derived.
   let stale = false;
   if (options.latestSourceHash !== undefined) {
-    const ownSourceHash = recomputeSourceHash(activeSnapshot);
+    const ownSourceHash = await recomputeSourceHash(activeSnapshot);
     if (ownSourceHash !== options.latestSourceHash) {
       stale = true;
       findings.push({

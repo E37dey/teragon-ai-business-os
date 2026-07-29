@@ -5,6 +5,8 @@
 import type { GraphDerivationResult } from "../derivation";
 import type { GraphDerivationContext } from "../derivation";
 import {
+  GRAPH_INDEX_CHECKSUM_ALGORITHM,
+  GRAPH_INDEX_CHECKSUM_VERSION,
   GRAPH_INDEX_DERIVATION_VERSION,
   GRAPH_INDEX_SCHEMA_VERSION,
   countIssues,
@@ -25,11 +27,11 @@ export interface SnapshotBuildOptions {
  * already deterministically sorted by the derivation, so the hashes are stable.
  * `createdAt` comes from the clock and is DELIBERATELY excluded from every hash.
  */
-export function buildIndexSnapshot(
+export async function buildIndexSnapshot(
   derivation: GraphDerivationResult,
   context: GraphDerivationContext,
   options: SnapshotBuildOptions = {},
-): GraphIndexBuild {
+): Promise<GraphIndexBuild> {
   const now = options.now ?? (() => new Date().toISOString());
   const schemaVersion = options.schemaVersion ?? GRAPH_INDEX_SCHEMA_VERSION;
   const derivationVersion = options.derivationVersion ?? GRAPH_INDEX_DERIVATION_VERSION;
@@ -37,18 +39,20 @@ export function buildIndexSnapshot(
   const registryVersion = derivation.registryVersion;
   const sourceSnapshotVersion = derivation.sourceSnapshotVersion;
 
-  const sourceHash = computeSourceHash({
+  const sourceHash = await computeSourceHash({
     registryVersion,
     sourceSnapshotVersion,
     nodes: derivation.nodes,
     edges: derivation.edges,
   });
-  const checksum = computeChecksum({
+  const checksum = await computeChecksum({
     schemaVersion,
     registryVersion,
     derivationVersion,
     organizationId,
     sourceSnapshotVersion,
+    checksumAlgorithm: GRAPH_INDEX_CHECKSUM_ALGORITHM,
+    checksumVersion: GRAPH_INDEX_CHECKSUM_VERSION,
     nodes: derivation.nodes,
     edges: derivation.edges,
     issues: derivation.issues,
@@ -77,19 +81,23 @@ export function buildIndexSnapshot(
     activatedAt: null,
     supersedesSnapshotId: null,
     checksum,
+    checksumAlgorithm: GRAPH_INDEX_CHECKSUM_ALGORITHM,
+    checksumVersion: GRAPH_INDEX_CHECKSUM_VERSION,
   };
 
   return { organizationId, snapshot, derivation };
 }
 
-/** Recompute the checksum of an already-built snapshot (integrity re-check). */
-export function recomputeChecksum(snapshot: GraphIndexSnapshot): string {
+/** Recompute the SHA-256 checksum of an already-built snapshot (integrity re-check). */
+export async function recomputeChecksum(snapshot: GraphIndexSnapshot): Promise<string> {
   return computeChecksum({
     schemaVersion: snapshot.schemaVersion,
     registryVersion: snapshot.registryVersion,
     derivationVersion: snapshot.derivationVersion,
     organizationId: snapshot.organizationId,
     sourceSnapshotVersion: snapshot.sourceSnapshotVersion,
+    checksumAlgorithm: snapshot.checksumAlgorithm,
+    checksumVersion: snapshot.checksumVersion,
     nodes: snapshot.nodes,
     edges: snapshot.edges,
     issues: snapshot.issues,
@@ -98,7 +106,7 @@ export function recomputeChecksum(snapshot: GraphIndexSnapshot): string {
 }
 
 /** Recompute the source hash of a snapshot (staleness re-check). */
-export function recomputeSourceHash(snapshot: GraphIndexSnapshot): string {
+export async function recomputeSourceHash(snapshot: GraphIndexSnapshot): Promise<string> {
   return computeSourceHash({
     registryVersion: snapshot.registryVersion,
     sourceSnapshotVersion: snapshot.sourceSnapshotVersion,

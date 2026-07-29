@@ -53,7 +53,7 @@ export async function rebuildOrganizationGraph(
     const derivation = deriveOrganizationGraphSnapshot(records, context);
 
     // 2. wrap as a staged snapshot (deterministic id/checksum/sourceHash).
-    const built = buildIndexSnapshot(derivation, context, options);
+    const built = await buildIndexSnapshot(derivation, context, options);
     const candidate = built.snapshot;
 
     // idempotency short-circuit: an identical build is already the active
@@ -62,7 +62,7 @@ export async function rebuildOrganizationGraph(
       previousActive !== null &&
       previousActive.snapshotId === candidate.snapshotId &&
       previousActive.checksum === candidate.checksum &&
-      recomputeChecksum(previousActive) === previousActive.checksum
+      (await recomputeChecksum(previousActive)) === previousActive.checksum
     ) {
       return {
         outcome: "ACTIVATED",
@@ -88,7 +88,7 @@ export async function rebuildOrganizationGraph(
 
     // 4. checksum verification against the persisted-then-read-back content.
     const persisted = await store.getSnapshot(candidate.snapshotId);
-    if (persisted === null || recomputeChecksum(persisted) !== candidate.checksum) {
+    if (persisted === null || (await recomputeChecksum(persisted)) !== candidate.checksum) {
       return fail("REJECTED_CHECKSUM", "GRAPH_INDEX_CHECKSUM_MISMATCH", "אימות סכום הביקורת נכשל — לא הופעלה", persisted, validation);
     }
 

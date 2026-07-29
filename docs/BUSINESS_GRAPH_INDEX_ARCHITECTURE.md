@@ -43,13 +43,29 @@ atomically in a single IndexedDB transaction. **INVALID or FAILED can never acti
 | File | Responsibility |
 |------|----------------|
 | `store/contracts.ts` | index types + zod schemas + `GraphIndexStore` + build-state + version pins + `GraphIndexError` |
-| `store/hash.ts` | deterministic hashing (`canonicalJSON` + `fnv1a64`, checksum, sourceHash, snapshotId) |
+| `store/hash.ts` | deterministic hashing (`canonicalJSON` + **SHA-256** via Web Crypto, checksum, sourceHash, snapshotId); Phase 4.1 |
 | `store/snapshot.ts` | wrap a `GraphDerivationResult` into a STAGED snapshot |
 | `store/validation.ts` | pure `validateSnapshot` gate |
 | `store/rebuild.ts` | `rebuildOrganizationGraph` atomic full rebuild |
 | `store/recovery.ts` | retention selection + non-destructive recovery |
 | `store/health.ts` | `computeHealth` (stale/orphan/corruption) |
 | `store/indexeddbStore.ts` | Local-Demo IndexedDB adapter (`idb`) |
+
+## Integrity & activation policy (Phase 4.1)
+
+- **Checksum = SHA-256** (Web Crypto, async, no dependency) over the canonical serialization; `checksum`
+  = full content, `sourceHash` = source-derived content; `snapshotId = idx-{org}-{fullSha256}`. The
+  snapshot carries `checksumAlgorithm:"SHA-256"` + `checksumVersion:1`. `schemaVersion` is
+  `graph-index-v2`; legacy FNV/v1 snapshots are **unsupported** → `REBUILD_REQUIRED` (never silently
+  accepted). See [REBUILD_PROTOCOL](BUSINESS_GRAPH_REBUILD_PROTOCOL.md).
+- **Closed activation policy** — activation tolerance is NOT caller-supplied. Two internal constants
+  govern it: `SAFE_NON_INDEXABLE_ACTIVATION_CODES` (the only issue codes that may be tolerated) and
+  `FORBIDDEN_ACTIVATION_CODES` — `CROSS_ORGANIZATION`, `SENSITIVITY_BLOCKED`, `DANGLING_ENDPOINT`,
+  `MISSING_ORGANIZATION`, `DUPLICATE_EDGE`, `MALFORMED_REFERENCE` — which can **never** be allow-listed
+  or downgraded through any configuration. Any caller-passed `allowedErrorCodes` is intersected with the
+  SAFE set and forbidden codes are dropped unconditionally. Structural checks (checksum mismatch,
+  duplicate node/edge id, sensitive-payload-on-node, absent edge endpoint, cross-org) sit outside the
+  allow-list path and can't be downgraded.
 
 ## Security
 

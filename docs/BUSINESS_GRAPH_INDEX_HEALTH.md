@@ -36,7 +36,11 @@ takes the persisted snapshot state (+ optionally the latest canonical `sourceHas
 - **DEGRADED** — structural gap (orphan endpoint); do not treat as authoritative for the affected edges.
 - **CORRUPT** — checksum/partial-write; prefer recovery to a known-good snapshot.
 - **MISSING** — nothing served; rebuild required.
-- **REBUILD_REQUIRED** — schema/registry moved beyond what the snapshot supports; full rebuild.
+- **REBUILD_REQUIRED** — schema/registry moved beyond what the snapshot supports; full rebuild. This
+  includes a **legacy checksum** snapshot (Phase 4.1: `schemaVersion` bumped `graph-index-v1 → v2` for
+  the SHA-256 switch) — a v1/FNV snapshot returns `SCHEMA_VERSION_UNSUPPORTED` + `REBUILD_REQUIRED` and
+  is **never silently accepted**; a rebuild from current canonical data is sufficient (the index is
+  derived).
 
 Corruption and partial-write detections are proven in tests by mutating stored rows through a raw `idb`
 connection and asserting the store reports `CORRUPT`/`DEGRADED`, never `HEALTHY`.

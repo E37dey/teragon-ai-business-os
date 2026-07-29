@@ -19,6 +19,7 @@ import { businessGraphEdgeSchema, type BusinessGraphEdge } from "../contracts/ed
 import { businessGraphNodeSchema, type BusinessGraphNode } from "../contracts/node";
 import {
   DERIVATION_ISSUE_CODES,
+  type DerivationIssueCode,
   type DerivationSeverity,
   type GraphDerivationIssue,
   type GraphUnmappableRecord,
@@ -28,10 +29,26 @@ import {
 // version pins (what this index build understands)
 // ---------------------------------------------------------------------------
 
-/** The persisted graph-index schema version (the shape of a stored snapshot). */
-export const GRAPH_INDEX_SCHEMA_VERSION = "graph-index-v1";
+/**
+ * The persisted graph-index schema version (the shape of a stored snapshot).
+ * Bumped to v2 when the integrity checksum moved from FNV-1a to SHA-256: a
+ * legacy `graph-index-v1` (FNV) snapshot is therefore UNSUPPORTED and must be
+ * rebuilt — it is never silently accepted (validation errors + health
+ * REBUILD_REQUIRED). No production index existed, so a rebuild suffices.
+ */
+export const GRAPH_INDEX_SCHEMA_VERSION = "graph-index-v2";
 /** The derivation vintage this index was built against (Phase-3 pure derivation). */
 export const GRAPH_INDEX_DERIVATION_VERSION = "phase-3";
+
+/**
+ * The integrity-checksum algorithm + version. SHA-256 (Web Crypto, standardized
+ * and byte-identical in browser + Node), NOT a keyed/secret hash. `checksum`,
+ * `sourceHash`, and recovery integrity validation all use it. Any snapshot whose
+ * algorithm/version is not this pair is not a supported integrity checksum.
+ */
+export const GRAPH_INDEX_CHECKSUM_ALGORITHM = "SHA-256" as const;
+export const GRAPH_INDEX_CHECKSUM_VERSION = 1 as const;
+export type GraphIndexChecksumAlgorithm = typeof GRAPH_INDEX_CHECKSUM_ALGORITHM;
 
 /** Schema versions this build can safely activate/read. */
 export const SUPPORTED_GRAPH_INDEX_SCHEMA_VERSIONS: readonly string[] = [
@@ -39,6 +56,41 @@ export const SUPPORTED_GRAPH_INDEX_SCHEMA_VERSIONS: readonly string[] = [
 ];
 /** Registry versions this build can safely activate/read. */
 export const SUPPORTED_GRAPH_REGISTRY_VERSIONS: readonly string[] = ["core-v1"];
+
+// ---------------------------------------------------------------------------
+// closed activation policy (NOT caller-supplied)
+// ---------------------------------------------------------------------------
+
+/**
+ * The CLOSED internal activation policy. `SAFE_NON_INDEXABLE_ACTIVATION_CODES`
+ * is the ONLY set of derivation issue codes that an activation may tolerate at
+ * error severity — "this record is simply not indexable" reasons that carry no
+ * security or integrity risk. It is a fixed constant, NEVER supplied by UI /
+ * agents / caller input.
+ *
+ * `FORBIDDEN_ACTIVATION_CODES` can NEVER be allow-listed or downgraded through
+ * ANY configuration — passing one anywhere is ignored and still blocks
+ * activation. These are the cross-org / duplicate / endpoint / identity /
+ * sensitivity / checksum failures whose whole purpose is to refuse a bad graph.
+ * (CHECKSUM_MISMATCH / DUPLICATE_NODE_ID / DUPLICATE_EDGE_ID / MALFORMED_IDENTITY
+ * / SENSITIVE_PAYLOAD_LEAK / MISSING_EDGE_ENDPOINT map to these derivation codes
+ * plus the always-blocking structural validation checks in validation.ts, which
+ * no allow-list can touch.)
+ */
+export const SAFE_NON_INDEXABLE_ACTIVATION_CODES: readonly DerivationIssueCode[] = [
+  "EXCLUDED_ENTITY",
+  "UNMAPPABLE_ENTITY",
+  "UNSUPPORTED_REFERENCE",
+];
+
+export const FORBIDDEN_ACTIVATION_CODES: readonly DerivationIssueCode[] = [
+  "CROSS_ORGANIZATION",
+  "SENSITIVITY_BLOCKED",
+  "DANGLING_ENDPOINT",
+  "MISSING_ORGANIZATION",
+  "DUPLICATE_EDGE",
+  "MALFORMED_REFERENCE",
+];
 
 // ---------------------------------------------------------------------------
 // build-state machine
@@ -149,7 +201,12 @@ export interface GraphIndexSnapshot {
   /** activation timestamp only — NEVER part of any hash */
   activatedAt: string | null;
   supersedesSnapshotId: string | null;
+  /** the SHA-256 integrity checksum (full 64-hex, ≥128-bit) — see hash.ts */
   checksum: string;
+  /** the integrity algorithm the checksum was computed with (always "SHA-256") */
+  checksumAlgorithm: GraphIndexChecksumAlgorithm;
+  /** the checksum-scheme version (bumped if the hashing scheme ever changes) */
+  checksumVersion: number;
 }
 
 /** The snapshot header (everything except the heavy content arrays). */
@@ -179,6 +236,8 @@ export const graphIndexSnapshotSchema = z.object({
   activatedAt: z.string().nullable(),
   supersedesSnapshotId: z.string().nullable(),
   checksum: z.string().min(1),
+  checksumAlgorithm: z.literal(GRAPH_INDEX_CHECKSUM_ALGORITHM),
+  checksumVersion: z.literal(GRAPH_INDEX_CHECKSUM_VERSION),
 });
 
 // ---------------------------------------------------------------------------

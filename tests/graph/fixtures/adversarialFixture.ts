@@ -96,11 +96,27 @@ export function buildAdversarialRecords(): Partial<Record<string, CanonicalRecor
  * The measured, DETERMINISTIC issue-severity counts for this fixture (asserted by
  * the accompanying test). The 14 error issues are all CROSS_ORGANIZATION — the
  * expected, honest refusal of the mixed-org customer edges.
+ *
+ * PHASE 4.1 DELTA (generic source-pointing FK resolver): warnings dropped
+ * 21 → 18. Previously RESOLVED_BY(serviceTicket→repairAction) resolved the
+ * `ticketId` FK under the wrong (repairAction) type and emitted 3 spurious
+ * MISSING_TARGET warnings; the fix resolves it under the SOURCE (serviceTicket)
+ * type, so those three become real, same-org RESOLVED_BY edges instead of
+ * warnings. OWNS(organization→customer) stays a MISSING_TARGET here because this
+ * adversarial map intentionally supplies NO `organizations` collection, so the
+ * org reference genuinely does not exist — an honest missing target, never a
+ * cross-org edge. errors (all CROSS_ORGANIZATION) are unchanged at 14.
+ *
+ * info dropped 169 → 165: the 3 new RESOLVED_BY edges make their serviceTicket
+ * source nodes and repairAction target nodes edge-incident, so they are no longer
+ * ORPHAN_NODE (info) — a deterministic knock-on of connecting previously-orphan
+ * nodes (in this mixed-org seed the serviceTickets' SERVICED edges are all
+ * cross-org-rejected, so RESOLVED_BY is what now anchors them).
  */
 export const ADVERSARIAL_EXPECTED = {
   errorIssues: 14,
-  warningIssues: 21,
-  infoIssues: 169,
+  warningIssues: 18,
+  infoIssues: 165,
   crossOrgErrors: 14,
   unmappableRecords: 0,
   duplicateEdges: 0,

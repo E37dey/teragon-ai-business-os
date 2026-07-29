@@ -4,14 +4,19 @@
 // Activation policy (enforced by the store, decided here):
 //   • error-severity findings BLOCK activation — no silent suppression;
 //   • warnings are allowed (they never block);
-//   • a derivation error may be explicitly re-classified as safe-non-indexable
-//     ONLY via `allowedErrorCodes` (an explicit opt-in, never a default).
+//   • a derivation error may be tolerated ONLY when its code is in the CLOSED
+//     internal `SAFE_NON_INDEXABLE_ACTIVATION_CODES` policy. Any caller-supplied
+//     `allowedErrorCodes` is INTERSECTED with that closed set and a
+//     `FORBIDDEN_ACTIVATION_CODES` code is ALWAYS dropped — it can never be
+//     allow-listed, no matter what is passed in.
 import { parseNodeId, GraphIdentityError } from "../contracts/identity";
 import { businessGraphEdgeSchema } from "../contracts/edge";
 import { businessGraphNodeSchema } from "../contracts/node";
 import type { DerivationIssueCode } from "../derivation";
 import {
+  FORBIDDEN_ACTIVATION_CODES,
   GRAPH_INDEX_CORE_V1_TYPES,
+  SAFE_NON_INDEXABLE_ACTIVATION_CODES,
   SUPPORTED_GRAPH_INDEX_SCHEMA_VERSIONS,
   SUPPORTED_GRAPH_REGISTRY_VERSIONS,
   type GraphIndexSnapshot,
@@ -19,6 +24,23 @@ import {
   type GraphIndexValidationResult,
 } from "./contracts";
 import { recomputeChecksum } from "./snapshot";
+
+/**
+ * Resolve the EFFECTIVE tolerated-error set. Starts from the closed
+ * `SAFE_NON_INDEXABLE_ACTIVATION_CODES` policy; a caller may only NARROW within
+ * it (never expand). Every `FORBIDDEN_ACTIVATION_CODES` code is removed
+ * unconditionally, so passing one has no effect. When no caller list is given,
+ * the full closed policy applies.
+ */
+function resolveAllowedErrorCodes(
+  requested: readonly DerivationIssueCode[] | undefined,
+): Set<DerivationIssueCode> {
+  const forbidden = new Set<DerivationIssueCode>(FORBIDDEN_ACTIVATION_CODES);
+  const safe = SAFE_NON_INDEXABLE_ACTIVATION_CODES.filter((c) => !forbidden.has(c));
+  if (requested === undefined) return new Set(safe);
+  const requestedSet = new Set(requested);
+  return new Set(safe.filter((c) => requestedSet.has(c)));
+}
 
 /** Metadata keys that would leak a sensitive body onto a node envelope. */
 const BODY_KEYS: readonly string[] = [
@@ -35,20 +57,25 @@ export interface SnapshotValidationOptions {
   now?: () => string;
   supportedSchemaVersions?: readonly string[];
   supportedRegistryVersions?: readonly string[];
-  /** derivation error codes explicitly classified safe-non-indexable (opt-in) */
+  /**
+   * A REQUEST to narrow the tolerated-error set. It can only ever select codes
+   * already inside the closed `SAFE_NON_INDEXABLE_ACTIVATION_CODES` policy — it
+   * can NEVER add a forbidden code (those are dropped unconditionally). This is
+   * NOT a free-form allow-list.
+   */
   allowedErrorCodes?: readonly DerivationIssueCode[];
   /** if given, a checksum mismatch vs. this value is a hard error */
   expectedChecksum?: string;
 }
 
-export function validateSnapshot(
+export async function validateSnapshot(
   snapshot: GraphIndexSnapshot,
   options: SnapshotValidationOptions = {},
-): GraphIndexValidationResult {
+): Promise<GraphIndexValidationResult> {
   const now = options.now ?? (() => new Date().toISOString());
   const supportedSchema = options.supportedSchemaVersions ?? SUPPORTED_GRAPH_INDEX_SCHEMA_VERSIONS;
   const supportedRegistry = options.supportedRegistryVersions ?? SUPPORTED_GRAPH_REGISTRY_VERSIONS;
-  const allowedErrorCodes = new Set(options.allowedErrorCodes ?? []);
+  const allowedErrorCodes = resolveAllowedErrorCodes(options.allowedErrorCodes);
 
   const errors: GraphIndexValidationIssue[] = [];
   const warnings: GraphIndexValidationIssue[] = [];
@@ -68,7 +95,7 @@ export function validateSnapshot(
   }
 
   // --- checksum matches recomputed content (corruption / partial write) ---
-  const recomputed = recomputeChecksum(snapshot);
+  const recomputed = await recomputeChecksum(snapshot);
   const checksumVerified = recomputed === snapshot.checksum;
   if (!checksumVerified) {
     err("CHECKSUM_MISMATCH", `סכום ביקורת אינו תואם — ${snapshot.checksum} מול ${recomputed}`);

@@ -65,8 +65,16 @@ describe("valid canonical fixture — clean derivation", () => {
   });
 
   it("has the exact expected node + edge counts", () => {
-    expect(result.nodes.length).toBe(20);
-    expect(result.edges.length).toBe(20);
+    expect(result.nodes.length).toBe(22);
+    expect(result.edges.length).toBe(22);
+  });
+
+  it("emits the SOURCE-pointing OWNS(organization→customer) + RESOLVED_BY(serviceTicket→repairAction)", () => {
+    const keys = new Set(
+      result.edges.map((e) => `${e.relationshipType}|${nodeType(e.source)}|${nodeType(e.target)}`),
+    );
+    expect(keys.has("OWNS|organization|customer")).toBe(true);
+    expect(keys.has("RESOLVED_BY|serviceTicket|repairAction")).toBe(true);
   });
 
   it("carries every expected authoritative relationship (by real ids, not names)", () => {
