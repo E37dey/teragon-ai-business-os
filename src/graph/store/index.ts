@@ -94,5 +94,16 @@ export { rebuildOrganizationGraph } from "./rebuild";
 export type { RebuildOptions } from "./rebuild";
 
 // --- Local-Demo IndexedDB adapter ---
-export { IndexedDBGraphIndexStore } from "./indexeddbStore";
+export {
+  IndexedDBGraphIndexStore,
+  GRAPH_INDEX_DB_NAME,
+  GRAPH_INDEX_DB_VERSION,
+  openGraphIndexDb,
+  upgradeGraphIndexDb,
+  STORE_EVENT_CHECKPOINTS,
+  STORE_INDEXING_RUNS,
+  STORE_PROCESSED_EVENTS,
+  STORE_FAILED_BATCHES,
+  STORE_PENDING_EVENTS,
+} from "./indexeddbStore";
 export type { IndexedDBGraphStoreOptions } from "./indexeddbStore";

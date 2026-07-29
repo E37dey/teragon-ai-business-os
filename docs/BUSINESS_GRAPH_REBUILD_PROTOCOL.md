@@ -18,6 +18,16 @@ canonical repository snapshot (records passed in — never read from a repo here
 **Idempotent:** identical input ⇒ identical `snapshotId` (deterministic hash) ⇒ the rebuild
 short-circuits, leaving exactly one active snapshot.
 
+## Event-triggered rebuild (Phase 5)
+
+Canonical mutation events (via `Repository.subscribe`) may **trigger** this exact full-rebuild path
+through the `GraphIndexingCoordinator` — they never patch a snapshot. An accepted batch derives the
+whole org, compares `sourceHash` with the active snapshot (**NO_OP** if identical), and otherwise runs
+the same `derive → stage → validate → SHA-256 → atomic activate` steps above. The coordinator is
+**flag-gated (default OFF)** and not wired into app runtime; the manual `rebuildOrganizationGraph` remains
+the tested path. See [EVENT_INDEXING](BUSINESS_GRAPH_EVENT_INDEXING.md) and
+[EVENT_RECOVERY](BUSINESS_GRAPH_EVENT_RECOVERY.md).
+
 ## Failure handling (never expose partial state)
 
 If any step (derivation, validation, checksum, or write) fails:

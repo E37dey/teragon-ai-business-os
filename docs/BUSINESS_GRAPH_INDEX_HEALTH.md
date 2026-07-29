@@ -44,3 +44,11 @@ takes the persisted snapshot state (+ optionally the latest canonical `sourceHas
 
 Corruption and partial-write detections are proven in tests by mutating stored rows through a raw `idb`
 connection and asserting the store reports `CORRUPT`/`DEGRADED`, never `HEALTHY`.
+
+## Coordinator-driven health (Phase 5)
+
+The event-indexing coordinator ([EVENT_RECOVERY](BUSINESS_GRAPH_EVENT_RECOVERY.md)) feeds health: a
+`FAILED`/`RETRY_PENDING` batch leaves the organization **DEGRADED** (active snapshot still served, retry
+bounded); retry **exhaustion HALTS** the organization's queue and leaves **REBUILD_REQUIRED** for human
+review. A `HALTED` organization does not advance its checkpoint and never skips the failed event —
+recovery is a fresh full rebuild, never an in-place patch. Other organizations are unaffected.

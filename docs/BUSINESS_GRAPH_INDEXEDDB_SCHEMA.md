@@ -5,7 +5,22 @@ explicit version, corruption-safe reads, strict per-organization + per-snapshot 
 
 ## Database
 
-- **Name:** `teragon-graph-index` · **Version:** `1` (explicit; `upgrade` handler creates stores).
+- **Name:** `teragon-graph-index` · **Version:** `2` (Phase 5 bumped `1 → 2` via a single additive
+  shared `upgradeGraphIndexDb`; the upgrade preserves all existing snapshots/manifests — proven from a
+  genuine v1 DB). `upgrade` handler creates stores idempotently.
+
+## Coordinator state stores (Phase 5 — separate from graph content)
+
+Added in v2 for the event-indexing coordinator, keyed per organization; **never** hold graph node/edge
+content or sensitive payloads:
+
+| Store | Holds |
+|-------|-------|
+| `graphEventCheckpoints` | per-org highest processed watermark (advances only on activation or NO_OP) |
+| `graphPendingEvents` | the coordinator's durable ingest queue (private replay substrate) |
+| `graphProcessedEvents` | processed-eventId ledger (cross-restart dedup) |
+| `graphIndexingRuns` | safe run observability metadata (see INDEXING_OBSERVABILITY) |
+| `graphFailedBatches` | failed batches + safe diagnostics (no sensitive payload) |
 
 ## Object stores & keys
 

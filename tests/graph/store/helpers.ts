@@ -100,7 +100,9 @@ export function crossOrgFailingRecords(foreignOrg: string): Partial<Record<strin
   };
 }
 
-/** Open the raw graph-index DB (to simulate external corruption in tests). */
+/** Open the raw graph-index DB (to simulate external corruption in tests).
+ *  Opens without a fixed version so it attaches to whatever version the store
+ *  created (the DB was bumped to v2 for the Phase-5 coordinator stores). */
 export async function openRawGraphIndexDb() {
-  return openDB(GRAPH_INDEX_DB_NAME, 1);
+  return openDB(GRAPH_INDEX_DB_NAME);
 }
