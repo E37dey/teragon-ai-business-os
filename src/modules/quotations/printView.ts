@@ -42,7 +42,7 @@ export function buildQuotationPrintHtml(q: Quotation, ownerName: string): string
 <title>הצעת מחיר ${escapeHtml(q.id)} — טרגון טכנולוגיות</title>
 <style>
   * { box-sizing: border-box; }
-  body { font-family: "Heebo", "Assistant", Arial, sans-serif; color: #111827; margin: 0; padding: 32px; direction: rtl; }
+  body { font-family: "Segoe UI", "Arial Hebrew", Arial, sans-serif; color: #111827; margin: 0; padding: 32px; direction: rtl; }
   .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1d4ed8; padding-bottom: 16px; margin-bottom: 24px; }
   .brand { font-size: 22px; font-weight: 700; color: #1d4ed8; }
   .brand small { display: block; font-size: 12px; color: #6b7280; font-weight: 400; }
