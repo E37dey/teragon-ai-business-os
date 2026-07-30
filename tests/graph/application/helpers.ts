@@ -159,7 +159,7 @@ export function cannedResult(query: BusinessQueryName): BusinessQueryResult {
     query,
     organizationId: VALID_ORG,
     snapshotId: "snap-canned",
-    registryVersion: "core-v1",
+    registryVersion: "core-v2",
     health: "HEALTHY",
     stale: false,
     readiness: "SUPPORTED",

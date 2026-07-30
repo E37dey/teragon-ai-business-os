@@ -48,7 +48,7 @@ const ORG = "org-teragon";
 
 const context = (over: Partial<GraphDerivationContext> = {}): GraphDerivationContext => ({
   organizationId: ORG,
-  registryVersion: "core-v1",
+  registryVersion: "core-v2",
   sourceSnapshotVersion: "seed-2026-07-22",
   allowOrgInheritance: true,
   ...over,

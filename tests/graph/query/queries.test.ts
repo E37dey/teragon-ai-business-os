@@ -9,11 +9,13 @@ import {
   detQueryService,
   deriveAugmentedSnapshot,
   deriveValidSnapshot,
+  incompleteServiceSnapshot,
   nid,
   printerImpactSnapshot,
   qctx,
   recurringServiceSnapshot,
 } from "./helpers";
+import { synthEdge, synthNode, synthSnapshot } from "../traversal/helpers";
 
 let valid: GraphIndexSnapshot;
 let augmented: GraphIndexSnapshot;
@@ -107,7 +109,9 @@ describe("Q2 findUnansweredQuotations", () => {
 // ---------------------------------------------------------------------------
 
 describe("Q3 findRecurringServiceIssues", () => {
-  it("returns INSUFFICIENT_GRAPH_DATA on the spine (no ticket→printer edge)", async () => {
+  it("INSTANCE-level INSUFFICIENT when relevant tickets exist but lack printer link / fault category", async () => {
+    // the spine ticket st-1 concerns cu-1 (owner of a pm-1 printer) but carries no
+    // customerPrinterId / faultCategory — a relevant-but-incomplete record.
     const svc = detQueryService(valid);
     const r = await svc.findRecurringServiceIssues(
       { query: "findRecurringServiceIssues", subjects: [nid("printerModel", "pm-1")] },
@@ -118,7 +122,37 @@ describe("Q3 findRecurringServiceIssues", () => {
     expect(r.missingFacts.length).toBeGreaterThan(0);
   });
 
-  it("detects a recurring model with MULTIPLE tickets (synthetic, counts + paths)", async () => {
+  it("INSUFFICIENT when a customer's ticket is not linked to a specific printer (synthetic)", async () => {
+    const { snap, pm } = incompleteServiceSnapshot();
+    const svc = detQueryService(snap);
+    const r = await svc.findRecurringServiceIssues(
+      { query: "findRecurringServiceIssues", subjects: [pm.id] },
+      qctx(),
+    );
+    expect(r.readiness).toBe("INSUFFICIENT_GRAPH_DATA");
+    expect(r.findings).toHaveLength(0);
+  });
+
+  it("SUPPORTED + [] when NO service records match (structurally answerable, empty)", async () => {
+    // a printerModel with a printer whose customer has NO tickets at all.
+    const pm = synthNode("printerModel", "pm-empty");
+    const cp = synthNode("customerPrinter", "cp-empty");
+    const cu = synthNode("customer", "cu-empty");
+    const snap = synthSnapshot([pm, cp, cu], [
+      synthEdge("USES", cp, pm),
+      synthEdge("OWNS", cp, cu),
+    ]);
+    const svc = detQueryService(snap);
+    const r = await svc.findRecurringServiceIssues(
+      { query: "findRecurringServiceIssues", subjects: [pm.id] },
+      qctx(),
+    );
+    expect(r.readiness).toBe("SUPPORTED");
+    expect(r.findings).toHaveLength(0);
+    expect(r.missingFacts).toHaveLength(0);
+  });
+
+  it("detects a recurring model with MULTIPLE tickets grouped by fault category (counts + paths)", async () => {
     const { snap, pm } = recurringServiceSnapshot();
     const svc = detQueryService(snap);
     const r = await svc.findRecurringServiceIssues(
@@ -139,7 +173,7 @@ describe("Q3 findRecurringServiceIssues", () => {
 // ---------------------------------------------------------------------------
 
 describe("Q4 findDelayedEnrollments", () => {
-  it("INSUFFICIENT_GRAPH_DATA when progress/due-date facts are absent (never infer from age)", async () => {
+  it("INSUFFICIENT_GRAPH_DATA when NO stage/due facts exist (never infer from age)", async () => {
     const svc = detQueryService(valid);
     const r = await svc.findDelayedEnrollments(
       { query: "findDelayedEnrollments", subjects: [nid("enrollment", "en-1")] },
@@ -147,10 +181,10 @@ describe("Q4 findDelayedEnrollments", () => {
     );
     expect(r.readiness).toBe("INSUFFICIENT_GRAPH_DATA");
     expect(r.findings).toHaveLength(0);
-    expect(r.missingFacts.some((m) => m.includes("progress") || m.includes("dueDate"))).toBe(true);
+    expect(r.missingFacts.some((m) => m.includes("stage") || m.includes("due"))).toBe(true);
   });
 
-  it("flags a delayed enrollment ONLY when progress + due-date facts exist", async () => {
+  it("flags a delayed enrollment ONLY when an OPEN stage's due is before asOf", async () => {
     const svc = detQueryService(augmented);
     const r = await svc.findDelayedEnrollments(
       { query: "findDelayedEnrollments", subjects: [nid("enrollment", "en-2")], asOf: "2026-07-30T00:00:00.000Z" },
@@ -160,6 +194,28 @@ describe("Q4 findDelayedEnrollments", () => {
     expect(r.findings).toHaveLength(1);
     expect(r.findings[0]!.reasonCodes).toEqual(["DELAYED_ENROLLMENT"]);
   });
+
+  it("SUPPORTED + [] when stage facts exist but the enrollment is NOT delayed", async () => {
+    // en-3 has a COMPLETED stage — facts present, nothing overdue → empty answer.
+    const svc = detQueryService(augmented);
+    const r = await svc.findDelayedEnrollments(
+      { query: "findDelayedEnrollments", subjects: [nid("enrollment", "en-3")], asOf: "2026-07-30T00:00:00.000Z" },
+      qctx(),
+    );
+    expect(r.readiness).toBe("SUPPORTED");
+    expect(r.findings).toHaveLength(0);
+    expect(r.missingFacts).toHaveLength(0);
+  });
+
+  it("the due day is a GRACE day — an OPEN stage due exactly at asOf is NOT delayed", async () => {
+    const svc = detQueryService(augmented);
+    const r = await svc.findDelayedEnrollments(
+      { query: "findDelayedEnrollments", subjects: [nid("enrollment", "en-2")], asOf: "2026-06-01T00:00:00.000Z" },
+      qctx(),
+    );
+    expect(r.readiness).toBe("SUPPORTED");
+    expect(r.findings).toHaveLength(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -167,17 +223,32 @@ describe("Q4 findDelayedEnrollments", () => {
 // ---------------------------------------------------------------------------
 
 describe("Q5 assessPrinterModelSupportImpact", () => {
-  it("is bounded + deterministic + INSUFFICIENT when the model has no outbound impact", async () => {
+  it("walks the USES edge INBOUND on the spine — the model's printer/customer are impacted", async () => {
     const svc = detQueryService(valid);
     const req = { query: "assessPrinterModelSupportImpact" as const, startNodeId: nid("printerModel", "pm-1") };
     const r1 = await svc.assessPrinterModelSupportImpact(req, qctx());
     const r2 = await svc.assessPrinterModelSupportImpact(req, qctx());
-    expect(r1.readiness).toBe("INSUFFICIENT_GRAPH_DATA");
-    expect(r1.findings).toHaveLength(0);
+    expect(r1.readiness).toBe("SUPPORTED");
+    // cp-1 depends on pm-1 through the customerPrinter→printerModel USES edge.
+    const direct = r1.findings.filter((f) => f.reasonCodes.includes("PRINTER_MODEL_IMPACT_DIRECT"));
+    expect(direct.map((f) => f.subject.entityRef.entityId)).toContain("cp-1");
+    // deterministic + bounded (byte-identical repeat).
     expect(JSON.stringify(r1)).toBe(JSON.stringify(r2));
   });
 
-  it("returns DIRECT + INDIRECT affected entities via calculateImpact (synthetic)", async () => {
+  it("SUPPORTED + [] when the model has NO dependent printers (honest empty answer)", async () => {
+    const pm = synthNode("printerModel", "pm-lonely-q5");
+    const snap = synthSnapshot([pm], []);
+    const svc = detQueryService(snap);
+    const r = await svc.assessPrinterModelSupportImpact(
+      { query: "assessPrinterModelSupportImpact", startNodeId: pm.id },
+      qctx(),
+    );
+    expect(r.readiness).toBe("SUPPORTED");
+    expect(r.findings).toHaveLength(0);
+  });
+
+  it("returns DIRECT + INDIRECT affected entities via inbound calculateImpact (synthetic)", async () => {
     const { snap, pm } = printerImpactSnapshot();
     const svc = detQueryService(snap);
     const r = await svc.assessPrinterModelSupportImpact(
@@ -188,6 +259,7 @@ describe("Q5 assessPrinterModelSupportImpact", () => {
     const direct = r.findings.filter((f) => f.reasonCodes.includes("PRINTER_MODEL_IMPACT_DIRECT"));
     const indirect = r.findings.filter((f) => f.reasonCodes.includes("PRINTER_MODEL_IMPACT_INDIRECT"));
     expect(direct).toHaveLength(1);
+    expect(direct[0]!.subject.entityType).toBe("customerPrinter");
     expect(indirect.length).toBeGreaterThanOrEqual(3);
   });
 });

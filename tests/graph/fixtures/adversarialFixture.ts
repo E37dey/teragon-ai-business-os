@@ -54,7 +54,7 @@ export function buildAdversarialContext(
 ): GraphDerivationContext {
   return {
     organizationId: ADVERSARIAL_ORG,
-    registryVersion: "core-v1",
+    registryVersion: "core-v2",
     sourceSnapshotVersion: "seed-2026-07-22",
     allowOrgInheritance: true,
     ...over,

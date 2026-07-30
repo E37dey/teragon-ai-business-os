@@ -7,6 +7,7 @@ import {
 } from "@/graph";
 import {
   VALID_CONTEXT,
+  buildValidContext,
   buildValidRecords,
 } from "../fixtures/validFixture";
 import {
@@ -53,6 +54,28 @@ describe("rebuildOrganizationGraph — valid canonical fixture", () => {
       expect(parseNodeId(edge.source).organizationId).toBe(edge.organizationId);
       expect(parseNodeId(edge.target).organizationId).toBe(edge.organizationId);
     }
+  });
+
+  it("REJECTS a prior core-v1 registry build, then rebuilds cleanly to core-v2 (Phase 9)", async () => {
+    // a build under the retired core-v1 registry is not activatable.
+    const legacy = await rebuildOrganizationGraph(
+      buildValidRecords(),
+      buildValidContext({ registryVersion: "core-v1" }),
+      store,
+      { now: makeClock() },
+    );
+    expect(legacy.outcome).toBe("REJECTED_INVALID");
+    expect(legacy.activated).toBe(false);
+    expect(legacy.validation?.errors.some((e) => e.code === "REGISTRY_VERSION_UNSUPPORTED")).toBe(true);
+    expect(await store.getActiveSnapshot(VALID_CONTEXT.organizationId)).toBeNull();
+
+    // rebuilding under the current (core-v2) context activates cleanly — the index
+    // is derived, so no in-place mutation is needed.
+    const rebuilt = await rebuildOrganizationGraph(buildValidRecords(), VALID_CONTEXT, store, { now: makeClock() });
+    expect(rebuilt.outcome).toBe("ACTIVATED");
+    const active = await store.getActiveSnapshot(VALID_CONTEXT.organizationId);
+    expect(active?.registryVersion).toBe("core-v2");
+    expect(active?.buildState).toBe("ACTIVE");
   });
 
   it("carries NO sensitive body on any persisted node envelope", async () => {

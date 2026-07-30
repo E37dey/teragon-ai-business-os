@@ -81,8 +81,19 @@ export function buildAugmentedRecords(): Partial<Record<string, CanonicalRecord[
     ],
     enrollments: [
       ...(base.enrollments ?? []),
-      // delayed: progress 40% + due-date in the past (BEFORE asOf), carried on the envelope.
-      { id: "en-2", courseId: "co-1", studentId: "s-1", paymentStatus: "שולם", progress: 40, dueDate: "2026-06-01T00:00:00.000Z", createdAt: C, updatedAt: U },
+      // delayed: an OPEN stage whose due is BEFORE asOf — projected from the
+      // embedded stages (StageProgress stays embedded, never a node).
+      {
+        id: "en-2", courseId: "co-1", studentId: "s-1", paymentStatus: "שולם",
+        stages: [{ stageId: "lp-1", status: "בעבודה", due: "2026-06-01T00:00:00.000Z", updated: C }],
+        createdAt: C, updatedAt: U,
+      },
+      // NOT delayed (facts present, all stages completed) — proves SUPPORTED + [].
+      {
+        id: "en-3", courseId: "co-1", studentId: "s-1", paymentStatus: "שולם",
+        stages: [{ stageId: "lp-1", status: "אושר", due: "2026-06-01T00:00:00.000Z", updated: C }],
+        createdAt: C, updatedAt: U,
+      },
     ],
   };
 }
@@ -123,30 +134,38 @@ export function queryServiceWithHealth(
 // synthetic snapshots for the directional / registered-relationship cases
 // ---------------------------------------------------------------------------
 
-/** printerModel ← USES ← {cp1,cp2}; cp1 → RELATED_TO → {st1,st2}; cp2 → st3. */
+/**
+ * printerModel ← USES ← {cp1,cp2}; serviceTickets ← SERVICED → their printer.
+ * All three tickets share one faultCategory so they group into one recurrence
+ * (grouped by (printerModel, faultCategory) through the canonical chain).
+ */
 export function recurringServiceSnapshot(): {
   snap: GraphIndexSnapshot;
   pm: BusinessGraphNode;
   tickets: BusinessGraphNode[];
 } {
+  const cat = { faultCategory: "סתימת אקסטרודר" };
   const pm = synthNode("printerModel", "pm-r");
   const cp1 = synthNode("customerPrinter", "cp-r1");
   const cp2 = synthNode("customerPrinter", "cp-r2");
-  const st1 = synthNode("serviceTicket", "st-r1", { status: "בבדיקה" });
-  const st2 = synthNode("serviceTicket", "st-r2", { status: "בבדיקה" });
-  const st3 = synthNode("serviceTicket", "st-r3", { status: "בבדיקה" });
+  const st1 = synthNode("serviceTicket", "st-r1", { status: "בבדיקה", metadataSummary: cat });
+  const st2 = synthNode("serviceTicket", "st-r2", { status: "בבדיקה", metadataSummary: cat });
+  const st3 = synthNode("serviceTicket", "st-r3", { status: "בבדיקה", metadataSummary: cat });
   const edges: BusinessGraphEdge[] = [
     synthEdge("USES", cp1, pm),
     synthEdge("USES", cp2, pm),
-    synthEdge("RELATED_TO", cp1, st1),
-    synthEdge("RELATED_TO", cp1, st2),
-    synthEdge("RELATED_TO", cp2, st3),
+    synthEdge("SERVICED", st1, cp1),
+    synthEdge("SERVICED", st2, cp1),
+    synthEdge("SERVICED", st3, cp2),
   ];
   const snap = synthSnapshot([pm, cp1, cp2, st1, st2, st3], edges);
   return { snap, pm, tickets: [st1, st2, st3] };
 }
 
-/** printerModel → RELATED_TO → cp → OWNS → cu → RELATED_TO → st → GENERATED_TASK → task. */
+/**
+ * INBOUND impact shape: printerModel ← USES ← cp → OWNS → cu; cp ← SERVICED ← st;
+ * cu ← RELATED_TO ← task(open). Walked incident, DIRECT = cp, INDIRECT = cu/st/task.
+ */
 export function printerImpactSnapshot(): { snap: GraphIndexSnapshot; pm: BusinessGraphNode } {
   const pm = synthNode("printerModel", "pm-i");
   const cp = synthNode("customerPrinter", "cp-i");
@@ -154,12 +173,30 @@ export function printerImpactSnapshot(): { snap: GraphIndexSnapshot; pm: Busines
   const st = synthNode("serviceTicket", "st-i", { status: "בבדיקה" });
   const task = synthNode("task", "t-i", { status: "פתוחה" });
   const edges: BusinessGraphEdge[] = [
-    synthEdge("RELATED_TO", pm, cp),
+    synthEdge("USES", cp, pm),
     synthEdge("OWNS", cp, cu),
-    synthEdge("RELATED_TO", cu, st),
-    synthEdge("GENERATED_TASK", st, task),
+    synthEdge("SERVICED", st, cp),
+    synthEdge("RELATED_TO", task, cu),
   ];
   return { snap: synthSnapshot([pm, cp, cu, st, task], edges), pm };
+}
+
+/**
+ * INCOMPLETE-data shape for INSTANCE-level INSUFFICIENT: printerModel ← USES ← cp
+ * → OWNS → cu ← SERVICED ← st, where the ticket carries NO customerPrinterId /
+ * faultCategory metadata (a relevant-but-incomplete record — never grouped).
+ */
+export function incompleteServiceSnapshot(): { snap: GraphIndexSnapshot; pm: BusinessGraphNode } {
+  const pm = synthNode("printerModel", "pm-in");
+  const cp = synthNode("customerPrinter", "cp-in");
+  const cu = synthNode("customer", "cu-in");
+  const st = synthNode("serviceTicket", "st-in", { status: "בבדיקה" });
+  const edges: BusinessGraphEdge[] = [
+    synthEdge("USES", cp, pm),
+    synthEdge("OWNS", cp, cu),
+    synthEdge("SERVICED", st, cu),
+  ];
+  return { snap: synthSnapshot([pm, cp, cu, st], edges), pm };
 }
 
 /** recA → CONTRADICTS → recB (registered); recC has only a RELATED_TO (no conflict). */

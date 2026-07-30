@@ -32,6 +32,7 @@ export type {
 export {
   BUSINESS_QUERY_CAPABILITIES,
   BUSINESS_QUERY_CAPABILITY_ENTRIES,
+  evaluateStructuralReadiness,
 } from "./capabilities";
 
 export {

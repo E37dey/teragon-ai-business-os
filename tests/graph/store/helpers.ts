@@ -48,7 +48,7 @@ export function cleanRecords(): Partial<Record<string, CanonicalRecord[]>> {
 export function contextFor(organizationId: string, over: Partial<GraphDerivationContext> = {}): GraphDerivationContext {
   return {
     organizationId,
-    registryVersion: "core-v1",
+    registryVersion: "core-v2",
     sourceSnapshotVersion: `src-${organizationId}`,
     allowOrgInheritance: true,
     ...over,

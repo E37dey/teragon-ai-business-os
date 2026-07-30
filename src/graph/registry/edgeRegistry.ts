@@ -177,6 +177,19 @@ export const EDGE_REGISTRY: readonly EdgeRegistryEntry[] = [
     approvalGated: false,
     coreV1: true,
   },
+  // Phase 9 (core-v2) — the canonical ticket→printer link that lets recurrence be
+  // grouped by (printerModel, faultCategory) through customerPrinter→printerModel.
+  {
+    relationshipType: "SERVICED",
+    sourceType: "serviceTicket",
+    targetType: "customerPrinter",
+    direction: "directed",
+    cardinality: "N:1",
+    defaultProvenance: FK,
+    defaultAuthority: DERIVED,
+    approvalGated: false,
+    coreV1: false,
+  },
   {
     relationshipType: "RESOLVED_BY",
     sourceType: "serviceTicket",
@@ -267,6 +280,20 @@ export const EDGE_REGISTRY: readonly EdgeRegistryEntry[] = [
     defaultAuthority: DERIVED,
     approvalGated: false,
     coreV1: true,
+  },
+  // Phase 9 (core-v2) — the canonical recommendation→task link (from
+  // Task.sourceRecommendationId) so an approved recommendation walks to the task
+  // it generated. rec↔task is NEVER matched by title/text.
+  {
+    relationshipType: "GENERATED_TASK",
+    sourceType: "aiRecommendation",
+    targetType: "task",
+    direction: "directed",
+    cardinality: "1:N",
+    defaultProvenance: EXPLICIT,
+    defaultAuthority: DERIVED,
+    approvalGated: false,
+    coreV1: false,
   },
   {
     relationshipType: "ASSIGNED_TO",

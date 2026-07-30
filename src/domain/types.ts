@@ -55,6 +55,22 @@ export type TicketStatus = "חדש" | "בבדיקה" | "ממתין ללקוח" |
 
 export type TicketPriority = "גבוהה" | "בינונית" | "נמוכה";
 
+/**
+ * Closed fault-category taxonomy for a service ticket (Phase 9). A typed,
+ * canonical classifier used to define "recurring" service issues by
+ * (printerModel, faultCategory) — NEVER inferred from the free-text `issue`
+ * body. Additive + optional: legacy tickets carry null and simply do not
+ * contribute recurrence evidence.
+ */
+export type ServiceFaultCategory =
+  | "הידבקות שכבה ראשונה"
+  | "סתימת אקסטרודר"
+  | "כיול"
+  | "תקלת חשמל"
+  | "תוכנה"
+  | "מכני"
+  | "אחר";
+
 export type TaskStatus = "פתוחה" | "בתהליך" | "הושלמה" | "בוטלה";
 
 /** Wave 6 (m001): the 6 operational board states — persisted, not marker-encoded. */
@@ -364,6 +380,19 @@ export interface ServiceTicket extends BaseEntity {
   solution: string;
   /** Wave 6 m007 — set for closed tickets; null = not closed / unknown */
   closedAt?: ISODate | null;
+  /**
+   * Phase 9 (additive, optional) — canonical link to the specific
+   * `CustomerPrinter` this ticket concerns. Absent/null ⇒ the ticket is NOT
+   * linked to a printer and cannot contribute to per-model recurrence (it is
+   * reported incomplete, never grouped by the free-text `printer` name).
+   */
+  customerPrinterId?: string | null;
+  /**
+   * Phase 9 (additive, optional) — the typed fault classifier. Absent/null ⇒
+   * uncategorized; recurrence groups by (printerModelId, faultCategory) and a
+   * ticket without a category is reported incomplete, never grouped by `issue`.
+   */
+  faultCategory?: ServiceFaultCategory | null;
 }
 
 export interface RepairAction extends BaseEntity {
@@ -394,6 +423,13 @@ export interface Task extends BaseEntity {
   ownership?: TaskOwnership;
   /** Wave 6 m001 — original ⟦…⟧ description preserved for rollback */
   legacyMarker?: string;
+  /**
+   * Phase 9 (additive, optional) — canonical id of the `AIRecommendation` this
+   * task was generated from. Absent/null ⇒ the task did not originate from a
+   * recommendation and never appears as recommendation-generated (rec↔task is
+   * NEVER matched by title/text).
+   */
+  sourceRecommendationId?: string | null;
 }
 
 export interface Meeting extends BaseEntity {

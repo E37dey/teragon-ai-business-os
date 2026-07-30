@@ -402,12 +402,16 @@ export class BusinessGraphTraversalService {
     const startNode = this.accessibleStart(index, prep.startNodeId, ctx);
     if (startNode === null) return this.emitOkRefuse(prep, ctx, "calculateImpact", started);
 
+    // Phase 9 — an "incident" impact walks edges in BOTH directions so an origin
+    // reachable only through an INBOUND relationship (e.g. printerModel via the
+    // customerPrinter→printerModel USES edge) still propagates. Default outbound.
+    const mode: "outbound" | "incident" = request.impactDirection === "incident" ? "incident" : "outbound";
     const { reached, truncated } = this.bfsShortest(
       startNode.id,
       index,
       ctx,
       this.policyFor(prep, ctx, false),
-      "outbound",
+      mode,
     );
 
     const direct: GraphImpactedNode[] = [];

@@ -9,7 +9,10 @@
 import type {
   BusinessQueryCapability,
   BusinessQueryName,
+  BusinessQueryReadiness,
 } from "./types";
+import { EDGE_REGISTRY } from "../registry/edgeRegistry";
+import { ENTITY_REGISTRY } from "../registry/entityRegistry";
 
 export const BUSINESS_QUERY_CAPABILITIES: Record<BusinessQueryName, BusinessQueryCapability> = {
   findCustomersNeedingFollowUp: {
@@ -47,55 +50,47 @@ export const BUSINESS_QUERY_CAPABILITIES: Record<BusinessQueryName, BusinessQuer
   },
   findRecurringServiceIssues: {
     query: "findRecurringServiceIssues",
-    baselineReadiness: "INSUFFICIENT_GRAPH_DATA",
+    // Phase 9 — structurally SUPPORTED: the SERVICED serviceTicket→customerPrinter
+    // edge + the typed serviceTicket.faultCategory node-fact now exist in the
+    // contracts. INSTANCE-level INSUFFICIENT is returned by the query service when
+    // relevant tickets exist but lack customerPrinterId / faultCategory.
+    baselineReadiness: "SUPPORTED",
     requiredEntities: ["printerModel", "customerPrinter", "serviceTicket", "customer"],
-    requiredRelationships: ["USES", "SERVICED"],
-    requiredNodeFacts: ["serviceTicket.status"],
-    // the SPINE HAS NO EDGE from a serviceTicket to the customerPrinter / printerModel
-    // it concerns (SERVICED points ticket→customer only), so tickets cannot be
-    // grouped by printer to detect recurrence. This is the honest blocker.
-    missingFacts: [
-      "edge serviceTicket→customerPrinter (no relationship ties a ticket to the printer it concerns)",
-      "edge serviceTicket→printerModel (no direct ticket→model relationship)",
-      "serviceTicket.faultCode / serviceTicket.category (no fault taxonomy to define 'recurring' beyond raw count)",
-    ],
+    requiredRelationships: ["USES", "SERVICED", "OWNS"],
+    requiredNodeFacts: ["serviceTicket.faultCategory", "serviceTicket.customerPrinterId"],
+    missingFacts: [],
     traversalOps: ["getNeighbors"],
     descriptionHe:
-      "תקלות שירות חוזרות לפי דגם מדפסת — דורש קשר בין קריאת שירות למדפסת/דגם",
+      "תקלות שירות חוזרות לפי דגם מדפסת — לפי הקשר קנוני קריאת שירות → מדפסת ומחלקה טיפוסית של תקלה",
   },
   findDelayedEnrollments: {
     query: "findDelayedEnrollments",
-    baselineReadiness: "INSUFFICIENT_GRAPH_DATA",
+    // Phase 9 — structurally SUPPORTED: the enrollment stage-progress projection
+    // (earliest OPEN-stage due + open-stage count) is now derived onto the node.
+    // INSTANCE-level INSUFFICIENT is returned when an enrollment carries no
+    // stage/due facts — delay is NEVER inferred from age.
+    baselineReadiness: "SUPPORTED",
     requiredEntities: ["enrollment", "course", "student"],
     requiredRelationships: ["ENROLLED_IN", "RELATED_TO"],
-    requiredNodeFacts: ["enrollment.progress", "enrollment.dueDate", "enrollment.expectedStage"],
-    // the enrollment envelope carries paymentStatus only — NO stage-progress and
-    // NO due-date facts. Delay MUST NOT be inferred from enrollment age alone.
-    missingFacts: [
-      "enrollment.progress / stageProgress (stages are embedded in Enrollment.stages, not projected onto the node)",
-      "enrollment.dueDate / expectedCompletionAt (no schedule field on the envelope)",
-      "enrollment.expectedStage (no target-stage-by-date fact to compare actual against)",
-    ],
+    requiredNodeFacts: ["enrollment.enrollmentStageFactsPresent", "enrollment.enrollmentEarliestOpenStageDue"],
+    missingFacts: [],
     traversalOps: ["getNode", "getNeighbors"],
     descriptionHe:
-      "הרשמות בפיגור — דורש עובדות התקדמות/תאריך יעד; פיגור לעולם אינו מוסק מגיל ההרשמה בלבד",
+      "הרשמות בפיגור — לפי תאריך יעד של שלב פתוח מול asOf; פיגור לעולם אינו מוסק מגיל ההרשמה בלבד",
   },
   assessPrinterModelSupportImpact: {
     query: "assessPrinterModelSupportImpact",
-    baselineReadiness: "INSUFFICIENT_GRAPH_DATA",
+    // Phase 9 — structurally SUPPORTED via INBOUND impact traversal: the existing
+    // customerPrinter→printerModel USES edge is walked inbound (no inverse edge is
+    // created), reaching the printers/customers/tickets/tasks that depend on it.
+    baselineReadiness: "SUPPORTED",
     requiredEntities: ["printerModel", "customerPrinter", "customer", "serviceTicket", "task"],
-    requiredRelationships: ["USES", "OWNS", "SERVICED"],
+    requiredRelationships: ["USES", "OWNS", "SERVICED", "RELATED_TO"],
     requiredNodeFacts: [],
-    // calculateImpact is OUTBOUND; USES is oriented customerPrinter→printerModel,
-    // so a printerModel has no outbound impact edges and cannot propagate to the
-    // printers/customers that depend on it without a model→printer "affects" edge.
-    missingFacts: [
-      "edge printerModel→customerPrinter (USES is oriented printer→model; impact needs an outbound model→printer / AFFECTS edge)",
-      "operational-consequence fields (no downtime/severity facts — consequences are NOT invented)",
-    ],
+    missingFacts: [],
     traversalOps: ["calculateImpact"],
     descriptionHe:
-      "השפעת סיום תמיכה בדגם מדפסת — מדפסות/לקוחות/קריאות/משימות מושפעות, ישירות ועקיפות (חסום ללא קשת יוצאת מהדגם)",
+      "השפעת סיום תמיכה בדגם מדפסת — מדפסות/לקוחות/קריאות/משימות מושפעות (ישיר מול עקיף) לפי מעבר נכנס על קשת USES",
   },
   findSupersededEvidence: {
     query: "findSupersededEvidence",
@@ -127,21 +122,18 @@ export const BUSINESS_QUERY_CAPABILITIES: Record<BusinessQueryName, BusinessQuer
   },
   findTasksFromApprovedRecommendations: {
     query: "findTasksFromApprovedRecommendations",
-    baselineReadiness: "INSUFFICIENT_GRAPH_DATA",
+    // Phase 9 — structurally SUPPORTED: an aiRecommendation→task GENERATED_TASK
+    // edge (from Task.sourceRecommendationId) now exists, and the approved
+    // APPROVED_BY hop carries the human decider as the approval node's ownerRef.
+    // INSTANCE-level INSUFFICIENT when no approved+human-decided approval is seen.
+    baselineReadiness: "SUPPORTED",
     requiredEntities: ["aiRecommendation", "approval", "task"],
     requiredRelationships: ["APPROVED_BY", "GENERATED_TASK"],
     requiredNodeFacts: ["approval.status"],
-    // the spine ships an APPROVED_BY edge that is NOT marked approved (so it is
-    // not traversable), the approval node carries no NAMED-HUMAN approver, and
-    // GENERATED_TASK originates from an agentRun rather than the recommendation.
-    missingFacts: [
-      "APPROVED_BY edge.approvalState = approved (spine edge is not approval-marked, so it is not a valid hop)",
-      "approval → named-human approver reference (approval node has no approver identity edge/field)",
-      "edge aiRecommendation→task (GENERATED_TASK originates at agentRun, not the recommendation, so rec→task is not walkable outbound)",
-    ],
+    missingFacts: [],
     traversalOps: ["calculateImpact"],
     descriptionHe:
-      "משימות שנוצרו מהמלצות מאושרות — דורש נתיב המלצה → אישור אנושי בשם → משימה שנוצרה",
+      "משימות שנוצרו מהמלצות מאושרות — נתיב המלצה → אישור אנושי מאושר → משימה שנוצרה",
   },
   buildFullEvidencePath: {
     query: "buildFullEvidencePath",
@@ -160,3 +152,21 @@ export const BUSINESS_QUERY_CAPABILITIES: Record<BusinessQueryName, BusinessQuer
 export const BUSINESS_QUERY_CAPABILITY_ENTRIES: readonly BusinessQueryCapability[] = Object.values(
   BUSINESS_QUERY_CAPABILITIES,
 );
+
+const REGISTERED_RELATIONSHIP_TYPES: ReadonlySet<string> = new Set(
+  EDGE_REGISTRY.map((e) => e.relationshipType),
+);
+
+/**
+ * The STRUCTURAL readiness of a query — evaluated against the CONTRACTS/registry,
+ * NOT against whether a fixture happens to contain a record or edge. A query is
+ * structurally SUPPORTED when every required entity is a graph-eligible node type
+ * and every required relationship type is a registered edge; otherwise UNSUPPORTED.
+ * This is the capability floor; the query SERVICE independently downgrades to
+ * INSUFFICIENT_GRAPH_DATA when the required canonical FACTS are absent at runtime.
+ */
+export function evaluateStructuralReadiness(cap: BusinessQueryCapability): BusinessQueryReadiness {
+  const entitiesOk = cap.requiredEntities.every((t) => ENTITY_REGISTRY[t]?.graphEligible === true);
+  const relationshipsOk = cap.requiredRelationships.every((r) => REGISTERED_RELATIONSHIP_TYPES.has(r));
+  return entitiesOk && relationshipsOk ? "SUPPORTED" : "UNSUPPORTED";
+}

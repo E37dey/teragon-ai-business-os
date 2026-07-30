@@ -359,6 +359,6 @@ export interface GraphIndexingPolicy {
 export const DEFAULT_GRAPH_INDEXING_POLICY: GraphIndexingPolicy = {
   maxRetries: 3,
   retryBackoffMs: 1000,
-  registryVersion: "core-v1",
+  registryVersion: "core-v2",
   allowOrgInheritance: true,
 };

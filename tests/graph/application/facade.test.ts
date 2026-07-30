@@ -25,6 +25,7 @@ import {
   spyQueryService,
   storeWithHealth,
   StubStore,
+  synthEdge,
   synthSnapshot,
   synthNode,
   VALID_ORG,
@@ -207,7 +208,7 @@ describe("delegation", () => {
 // ---------------------------------------------------------------------------
 
 describe("honest readiness", () => {
-  it("getQueryReadiness reports all 9 baselines with no synthetic augmentation", () => {
+  it("getQueryReadiness reports all 9 structural baselines (all SUPPORTED after Phase 9)", () => {
     const rp = recordingStoreProvider(emptyStore());
     const facade = buildFacade({ storeProvider: rp.provider });
     const r = facade.getQueryReadiness({ sessionIdentity: { sessionRef: "s" }, correlationId: "c" });
@@ -215,16 +216,24 @@ describe("honest readiness", () => {
     expect(r.readiness).toHaveLength(9);
     const byName = Object.fromEntries(r.readiness.map((x) => [x.query, x]));
     expect(byName["findCustomersNeedingFollowUp"]!.baselineReadiness).toBe("SUPPORTED");
-    const insufficient = byName["findRecurringServiceIssues"]!;
-    expect(insufficient.baselineReadiness).toBe("INSUFFICIENT_GRAPH_DATA");
-    expect(insufficient.missingFacts.length).toBeGreaterThan(0);
+    // the formerly-blocked query is now structurally SUPPORTED at the contract level.
+    expect(byName["findRecurringServiceIssues"]!.baselineReadiness).toBe("SUPPORTED");
     // capability/readiness never touch the store.
     expect(rp.getStoreCalls()).toBe(0);
   });
 
-  it("a live INSUFFICIENT_GRAPH_DATA query stays honest (OK result, missing facts)", async () => {
-    const pm = synthNode("printerModel", "pm-lonely");
-    const snap = synthSnapshot([pm], []);
+  it("a live INSTANCE-level INSUFFICIENT_GRAPH_DATA query stays honest (OK result, missing facts)", async () => {
+    // relevant ticket exists for the model's customer but is not linked to a
+    // specific printer / has no fault category → INSTANCE-level INSUFFICIENT.
+    const pm = synthNode("printerModel", "pm-inc");
+    const cp = synthNode("customerPrinter", "cp-inc");
+    const cu = synthNode("customer", "cu-inc");
+    const st = synthNode("serviceTicket", "st-inc", { status: "בבדיקה" });
+    const snap = synthSnapshot([pm, cp, cu, st], [
+      synthEdge("USES", cp, pm),
+      synthEdge("OWNS", cp, cu),
+      synthEdge("SERVICED", st, cu),
+    ]);
     const facade = buildFacade({ store: healthyStore(snap) });
     const r = await facade.findRecurringServiceIssues(reqCtx("c", { subjects: [pm.id] }));
     expect(r.code).toBe("OK");

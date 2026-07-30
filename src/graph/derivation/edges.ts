@@ -162,6 +162,16 @@ const EDGE_SPECS: Partial<Record<GraphEntityType, EdgeSpec[]>> = {
       fkField: "customerId",
       fkPointsTo: "target",
     },
+    // Phase 9 — canonical ticket→printer link (only when customerPrinterId is set;
+    // legacy tickets simply do not emit this edge and stay incomplete).
+    {
+      relationshipType: "SERVICED",
+      registrySourceType: "serviceTicket",
+      registryTargetType: "customerPrinter",
+      fkField: "customerPrinterId",
+      fkPointsTo: "target",
+      silentIfMissing: true,
+    },
   ],
   repairAction: [
     {
@@ -230,6 +240,16 @@ const EDGE_SPECS: Partial<Record<GraphEntityType, EdgeSpec[]>> = {
       registryTargetType: "user",
       fkField: "ownerId",
       fkPointsTo: "target",
+    },
+    // Phase 9 — canonical recommendation→task link (GENERATED_TASK) from the
+    // task's sourceRecommendationId. fk names the SOURCE (aiRecommendation) node.
+    {
+      relationshipType: "GENERATED_TASK",
+      registrySourceType: "aiRecommendation",
+      registryTargetType: "task",
+      fkField: "sourceRecommendationId",
+      fkPointsTo: "source",
+      silentIfMissing: true,
     },
     {
       relationshipType: "RELATED_TO",

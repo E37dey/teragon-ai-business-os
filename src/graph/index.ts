@@ -384,6 +384,7 @@ export {
   businessQueryRequestSchema,
   BUSINESS_QUERY_CAPABILITIES,
   BUSINESS_QUERY_CAPABILITY_ENTRIES,
+  evaluateStructuralReadiness,
   BUSINESS_QUERY_POLICY_VERSION,
   DEFAULT_THRESHOLD_DAYS,
   subtractCalendarDays,

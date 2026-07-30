@@ -68,6 +68,23 @@ export interface BusinessQueryServiceOptions {
   executionIdProvider?: () => string;
 }
 
+// Phase 9 — INSTANCE-level missing-fact strings surfaced when a structurally
+// SUPPORTED query is downgraded to INSUFFICIENT_GRAPH_DATA because the required
+// canonical FACTS were absent on the encountered records (NOT a contract gap).
+const INSTANCE_MISSING_FACTS: Record<string, readonly string[]> = {
+  findRecurringServiceIssues: [
+    "serviceTicket.customerPrinterId (relevant tickets exist for this model's customers but are not linked to a specific printer)",
+    "serviceTicket.faultCategory (linked tickets are uncategorized, so recurrence cannot be grouped)",
+  ],
+  findDelayedEnrollments: [
+    "enrollment stage due/status facts (the enrollment carries no dated OPEN-stage progress; delay is never inferred from age)",
+  ],
+  findTasksFromApprovedRecommendations: [
+    "aiRecommendation → approved-human APPROVED_BY (no approval with status אושר decided by a canonical human was reached)",
+    "aiRecommendation → task GENERATED_TASK (no task carries sourceRecommendationId back to this recommendation)",
+  ],
+};
+
 // hard traversal refusals that BLOCK the whole business query (not per-subject).
 const HARD_REFUSALS: ReadonlySet<string> = new Set<string>([
   "GRAPH_UNAVAILABLE",
@@ -111,6 +128,12 @@ function newAccum(): Accum {
 // ---------------------------------------------------------------------------
 // pure envelope-safe builders
 // ---------------------------------------------------------------------------
+
+/** Read a non-empty STRING metadata fact off a node envelope, or null. */
+function metaString(node: BusinessGraphNode, key: string): string | null {
+  const v = node.metadataSummary[key];
+  return typeof v === "string" && v.trim() !== "" ? v : null;
+}
 
 function refFromId(id: GraphNodeId): { entityType: GraphEntityType; entityRef: GraphEntityRef } {
   const ref = parseNodeId(id);
@@ -502,7 +525,9 @@ export class BusinessGraphQueryService {
     const { acc, policy, asOf } = pre;
     const tctx = this.traversalCtx(ctx, asOf);
     const findings: BusinessQueryFinding[] = [];
-    let anyTicketLinked = false;
+    // relevant service tickets exist for this model's customers but lack the
+    // canonical facts (printer link / fault category) needed to group recurrence.
+    let anyIncompleteRelevant = false;
 
     for (const modelId of request.subjects ?? []) {
       if (acc.hardRefusal) break;
@@ -512,39 +537,68 @@ export class BusinessGraphQueryService {
       const modelData = modelRes.data;
       const printers = modelData.neighbors.filter((n) => n.node.entityType === "customerPrinter");
 
-      const evidence: BusinessQueryEvidence[] = [];
-      const related: BusinessEntityReference[] = [];
-      const ticketIds = new Set<string>();
+      // canonically-LINKED tickets (SERVICED serviceTicket→customerPrinter),
+      // grouped by (this model, faultCategory). Only tickets carrying a typed
+      // faultCategory are groupable — recurrence is never grouped by free text.
+      const byCategory = new Map<string, { ticket: BusinessGraphNode; ticketVia: GraphPathStep; printer: BusinessGraphNode; printerVia: GraphPathStep }[]>();
+      const seenTickets = new Set<string>();
+      const seenCustomers = new Set<string>();
       for (const printer of printers) {
         if (acc.hardRefusal) break;
         const printerRes = await this.traversal.getNeighbors({ operation: "getNeighbors", startNodeId: printer.node.id }, tctx);
         this.record(printerRes, acc);
         if (!printerRes.ok || printerRes.data === null) continue;
-        const tickets = printerRes.data.neighbors.filter((n) => n.node.entityType === "serviceTicket");
-        for (const ticket of tickets) {
-          anyTicketLinked = true;
-          if (ticketIds.has(ticket.node.id)) continue;
-          ticketIds.add(ticket.node.id);
+        for (const nb of printerRes.data.neighbors) {
+          if (nb.node.entityType === "serviceTicket") {
+            const category = metaString(nb.node, "faultCategory");
+            if (category === null) { anyIncompleteRelevant = true; continue; } // linked but uncategorized
+            if (seenTickets.has(nb.node.id)) continue;
+            seenTickets.add(nb.node.id);
+            const arr = byCategory.get(category) ?? [];
+            arr.push({ ticket: nb.node, ticketVia: nb.via, printer: printer.node, printerVia: printer.via });
+            byCategory.set(category, arr);
+          } else if (nb.node.entityType === "customer") {
+            // INSTANCE completeness probe: does the owning customer have service
+            // tickets NOT linked to a specific printer (or uncategorized)? Such a
+            // ticket is a RELEVANT-but-INCOMPLETE record (never grouped heuristically).
+            if (seenCustomers.has(nb.node.id)) continue;
+            seenCustomers.add(nb.node.id);
+            const custRes = await this.traversal.getNeighbors({ operation: "getNeighbors", startNodeId: nb.node.id }, tctx);
+            this.record(custRes, acc);
+            if (!custRes.ok || custRes.data === null) continue;
+            for (const cn of custRes.data.neighbors) {
+              if (cn.node.entityType !== "serviceTicket") continue;
+              if (metaString(cn.node, "customerPrinterId") === null || metaString(cn.node, "faultCategory") === null) {
+                anyIncompleteRelevant = true;
+              }
+            }
+          }
+        }
+      }
+
+      // a (model, faultCategory) group with MULTIPLE linked tickets is recurring.
+      for (const items of byCategory.values()) {
+        if (items.length < 2) continue;
+        const evidence: BusinessQueryEvidence[] = [];
+        const related: BusinessEntityReference[] = [];
+        for (const it of items) {
           const twoHop: GraphPath = {
-            nodes: [modelData.startNode.id, printer.node.id, ticket.node.id],
-            steps: [printer.via, ticket.via],
+            nodes: [modelData.startNode.id, it.printer.id, it.ticket.id],
+            steps: [it.printerVia, it.ticketVia],
             length: 2,
           };
           evidence.push(makeEvidence({
-            nodeId: ticket.node.id,
-            provenance: ticket.via.provenance,
-            authority: ticket.via.authority,
-            relationshipType: ticket.via.relationshipType,
+            nodeId: it.ticket.id,
+            provenance: it.ticketVia.provenance,
+            authority: it.ticketVia.authority,
+            relationshipType: it.ticketVia.relationshipType,
             direct: false,
-            sensitivity: ticket.node.sensitivity,
+            sensitivity: it.ticket.sensitivity,
             path: twoHop,
           }));
-          related.push(entityRefOfNode(ticket.node));
-          related.push(entityRefOfNode(printer.node));
+          related.push(entityRefOfNode(it.ticket));
+          related.push(entityRefOfNode(it.printer));
         }
-      }
-      // "recurring" requires MULTIPLE authoritative service-ticket relationships.
-      if (ticketIds.size >= 2) {
         findings.push(this.buildFinding({
           acc, ctx, policy,
           subject: entityRefOfNode(modelData.startNode),
@@ -558,11 +612,12 @@ export class BusinessGraphQueryService {
     }
 
     if (acc.hardRefusal) return this.blocked(query, ctx, request, policy, acc);
-    // honest readiness: without any ticket→printer linkage the spine cannot detect
-    // recurrence at all (a missing edge), so report INSUFFICIENT_GRAPH_DATA.
-    const cap = BUSINESS_QUERY_CAPABILITIES[query];
-    const readiness: BusinessQueryReadiness = anyTicketLinked ? "SUPPORTED" : "INSUFFICIENT_GRAPH_DATA";
-    const missingFacts = anyTicketLinked ? [] : [...cap.missingFacts];
+    // structurally SUPPORTED; INSTANCE-level INSUFFICIENT only when relevant tickets
+    // exist that lack the canonical facts AND nothing groupable was found. When no
+    // records match at all → SUPPORTED + [] (an honest empty answer).
+    const insufficient = findings.length === 0 && anyIncompleteRelevant;
+    const readiness: BusinessQueryReadiness = insufficient ? "INSUFFICIENT_GRAPH_DATA" : "SUPPORTED";
+    const missingFacts = insufficient ? [...(INSTANCE_MISSING_FACTS[query] ?? [])] : [];
     const result = this.finalize({ query, ctx, request, policy, acc, findings, readiness, missingFacts, ok: true, refusalReason: null });
     return this.stampExecutionId(findings, result);
   }
@@ -581,7 +636,10 @@ export class BusinessGraphQueryService {
     const { acc, policy, asOf } = pre;
     const tctx = this.traversalCtx(ctx, asOf);
     const findings: BusinessQueryFinding[] = [];
-    let anyDelayFacts = false;
+    // an enrollment with dated OPEN-stage facts is structurally answerable; one
+    // without is INSUFFICIENT (delay is NEVER inferred from enrollment age).
+    let anyStageFacts = false;
+    let anyMissingFacts = false;
 
     for (const subject of request.subjects ?? []) {
       if (acc.hardRefusal) break;
@@ -590,15 +648,16 @@ export class BusinessGraphQueryService {
       if (!r.ok || r.data === null) continue;
       const node = r.data;
       if (node.entityType !== "enrollment") continue;
-      const meta = node.metadataSummary;
-      const dueDate = typeof meta["dueDate"] === "string" ? (meta["dueDate"] as string)
-        : typeof meta["expectedCompletionAt"] === "string" ? (meta["expectedCompletionAt"] as string) : null;
-      const progress = typeof meta["progress"] === "number" ? (meta["progress"] as number) : null;
-      // REQUIRE both a due-date AND a progress fact — otherwise delay is unknowable.
-      if (dueDate === null || progress === null) continue;
-      anyDelayFacts = true;
-      // delayed = past the due date AND not yet complete. Deterministic, fact-based.
-      if (!(dueDate < asOf && progress < 100)) continue;
+      // the enrollment stage-progress projection (derived, clock-free).
+      if (node.metadataSummary["enrollmentStageFactsPresent"] !== true) {
+        anyMissingFacts = true;
+        continue;
+      }
+      anyStageFacts = true;
+      const earliestOpenDue = metaString(node, "enrollmentEarliestOpenStageDue");
+      // delayed ONLY when an OPEN (non-completed) stage's due < asOf. Date-string
+      // boundary: the due day is a grace day (strict <), TZ-independent.
+      if (earliestOpenDue === null || !(earliestOpenDue < asOf)) continue;
       const evidence: BusinessQueryEvidence[] = [];
       const nbRes = await this.traversal.getNeighbors({ operation: "getNeighbors", startNodeId: subject }, tctx);
       this.record(nbRes, acc);
@@ -626,9 +685,11 @@ export class BusinessGraphQueryService {
     }
 
     if (acc.hardRefusal) return this.blocked(query, ctx, request, policy, acc);
-    const cap = BUSINESS_QUERY_CAPABILITIES[query];
-    const readiness: BusinessQueryReadiness = anyDelayFacts ? "SUPPORTED" : "INSUFFICIENT_GRAPH_DATA";
-    const missingFacts = anyDelayFacts ? [] : [...cap.missingFacts];
+    // SUPPORTED when stage facts were present (findings or an honest empty answer);
+    // INSUFFICIENT only when an enrollment carried NO dated stage facts at all.
+    const insufficient = findings.length === 0 && !anyStageFacts && anyMissingFacts;
+    const readiness: BusinessQueryReadiness = insufficient ? "INSUFFICIENT_GRAPH_DATA" : "SUPPORTED";
+    const missingFacts = insufficient ? [...(INSTANCE_MISSING_FACTS[query] ?? [])] : [];
     const result = this.finalize({ query, ctx, request, policy, acc, findings, readiness, missingFacts, ok: true, refusalReason: null });
     return this.stampExecutionId(findings, result);
   }
@@ -650,15 +711,24 @@ export class BusinessGraphQueryService {
     const origin = request.startNodeId ?? (request.subjects ?? [])[0];
     if (origin === undefined) return this.blocked(query, ctx, request, policy, acc);
 
-    const r = await this.traversal.calculateImpact({ operation: "calculateImpact", startNodeId: origin }, tctx);
+    // Phase 9 — INBOUND (incident) impact: walk the customerPrinter→printerModel
+    // USES edge in reverse (no inverse edge) to the customerPrinters, then to their
+    // customers (OWNS), tickets (SERVICED serviceTicket→customerPrinter) and open
+    // tasks (RELATED_TO task→customer). Bounded by a closed entity-type allow-list.
+    const r = await this.traversal.calculateImpact({
+      operation: "calculateImpact",
+      startNodeId: origin,
+      impactDirection: "incident",
+      limits: { allowedEntityTypes: ["customerPrinter", "customer", "serviceTicket", "task"] },
+    }, tctx);
     this.record(r, acc);
     if (acc.hardRefusal) return this.blocked(query, ctx, request, policy, acc);
 
-    let impactedCount = 0;
     if (r.ok && r.data !== null) {
       const data = r.data;
       const emit = (impacted: GraphImpactedNode, direct: boolean): void => {
-        impactedCount += 1;
+        // only OPEN tasks count as impacted work; closed/cancelled tasks are inert.
+        if (impacted.node.entityType === "task" && !isOpenTaskStatus(impacted.node.status)) return;
         const rt = impacted.path.steps[impacted.path.steps.length - 1]?.relationshipType ?? null;
         const ev = makeEvidence({
           nodeId: impacted.node.id,
@@ -680,12 +750,10 @@ export class BusinessGraphQueryService {
       for (const i of data.indirect) emit(i, false);
     }
 
-    const cap = BUSINESS_QUERY_CAPABILITIES[query];
-    // bounded + deterministic: an empty impact means the model has no outbound
-    // impact edge (USES is oriented printer→model) — an honest data gap.
-    const readiness: BusinessQueryReadiness = impactedCount > 0 ? "SUPPORTED" : "INSUFFICIENT_GRAPH_DATA";
-    const missingFacts = impactedCount > 0 ? [] : [...cap.missingFacts];
-    const result = this.finalize({ query, ctx, request, policy, acc, findings, readiness, missingFacts, ok: true, refusalReason: null });
+    // structurally SUPPORTED (traversal-direction only — no canonical fact can be
+    // "missing"): a model with no dependents is an honest SUPPORTED + [] answer.
+    const readiness: BusinessQueryReadiness = "SUPPORTED";
+    const result = this.finalize({ query, ctx, request, policy, acc, findings, readiness, missingFacts: [], ok: true, refusalReason: null });
     return this.stampExecutionId(findings, result);
   }
 
@@ -857,11 +925,10 @@ export class BusinessGraphQueryService {
     }
 
     if (acc.hardRefusal) return this.blocked(query, ctx, request, policy, acc);
-    const cap = BUSINESS_QUERY_CAPABILITIES[query];
-    // SUPPORTED only when the required approved-approval + named-human facts were
-    // actually observed; otherwise the spine lacks them → INSUFFICIENT.
+    // structurally SUPPORTED; INSTANCE-level INSUFFICIENT when no approved,
+    // human-decided approval was reached from any subject recommendation.
     const readiness: BusinessQueryReadiness = sawApprovedApproval ? "SUPPORTED" : "INSUFFICIENT_GRAPH_DATA";
-    const missingFacts = sawApprovedApproval ? [] : [...cap.missingFacts];
+    const missingFacts = sawApprovedApproval ? [] : [...(INSTANCE_MISSING_FACTS[query] ?? [])];
     const result = this.finalize({ query, ctx, request, policy, acc, findings, readiness, missingFacts, ok: true, refusalReason: null });
     return this.stampExecutionId(findings, result);
   }

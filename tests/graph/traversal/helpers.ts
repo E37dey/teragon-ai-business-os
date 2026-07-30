@@ -243,7 +243,7 @@ export function synthSnapshot(
     createdAt: T0,
     sourceSnapshotVersion: "synthetic",
     sourceHash: "synthetic-source-hash",
-    registryVersion: "core-v1",
+    registryVersion: "core-v2",
     schemaVersion: "graph-index-v2",
     derivationVersion: "phase-3",
     nodeCount: nodes.length,

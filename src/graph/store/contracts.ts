@@ -54,8 +54,15 @@ export type GraphIndexChecksumAlgorithm = typeof GRAPH_INDEX_CHECKSUM_ALGORITHM;
 export const SUPPORTED_GRAPH_INDEX_SCHEMA_VERSIONS: readonly string[] = [
   GRAPH_INDEX_SCHEMA_VERSION,
 ];
-/** Registry versions this build can safely activate/read. */
-export const SUPPORTED_GRAPH_REGISTRY_VERSIONS: readonly string[] = ["core-v1"];
+/**
+ * Registry versions this build can safely activate/read. Phase 9 bumped the
+ * derivation registry `core-v1 → core-v2` (new canonical-id edge derivations +
+ * the enrollment stage projection). A snapshot built under `core-v1` is NO LONGER
+ * supported — it reports health REBUILD_REQUIRED (and validation
+ * REGISTRY_VERSION_UNSUPPORTED) and rebuilds cleanly, since the index is derived
+ * (no in-place mutation).
+ */
+export const SUPPORTED_GRAPH_REGISTRY_VERSIONS: readonly string[] = ["core-v2"];
 
 // ---------------------------------------------------------------------------
 // closed activation policy (NOT caller-supplied)

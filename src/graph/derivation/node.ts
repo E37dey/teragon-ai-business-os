@@ -8,6 +8,7 @@ import { ENTITY_REGISTRY } from "../registry/entityRegistry";
 import {
   computeArchived,
   computeAuthoritative,
+  computeEnrollmentStageSummary,
   computeMetadataSummary,
   computeOwnerRef,
   computeSensitivity,
@@ -18,6 +19,7 @@ import {
   readStringField,
   resolveOrganization,
 } from "./internal";
+import type { GraphMetadataValue } from "../contracts/node";
 import { DERIVATION_STATUS, type CanonicalRecord, type DeriveNodeOutcome } from "./types";
 
 /**
@@ -120,7 +122,12 @@ export function deriveGraphNode(
   const createdAt = readStringField(record, "createdAt") ?? "1970-01-01";
   const updatedAt = readStringField(record, "updatedAt") ?? createdAt;
 
-  const extraMeta: Record<string, boolean> = org.inherited ? { orgScopeInherited: true } : {};
+  const extraMeta: Record<string, GraphMetadataValue> = org.inherited ? { orgScopeInherited: true } : {};
+  // Phase 9 (Q4) — project a safe, clock-free enrollment delay summary from the
+  // embedded stages (StageProgress stays embedded, never a node).
+  if (entityType === "enrollment") {
+    Object.assign(extraMeta, computeEnrollmentStageSummary(record));
+  }
   const node: BusinessGraphNode = {
     id,
     organizationId,

@@ -7,7 +7,7 @@ import {
   recomputeChecksum,
   type GraphIndexSnapshot,
 } from "@/graph";
-import { VALID_CONTEXT, buildValidRecords } from "../fixtures/validFixture";
+import { VALID_CONTEXT, buildValidContext, buildValidRecords } from "../fixtures/validFixture";
 import { makeClock } from "./helpers";
 
 /** A served, VALID snapshot (checksum stays valid — build/validation state unhashed). */
@@ -50,6 +50,21 @@ describe("computeHealth", () => {
     const legacy = { ...s, schemaVersion: "graph-index-v999" };
     const bad = { ...legacy, checksum: await recomputeChecksum(legacy) };
     expect((await computeHealth(org, bad, { now: makeClock() })).state).toBe("REBUILD_REQUIRED");
+  });
+
+  it("REBUILD_REQUIRED for a legacy core-v1 registry snapshot — Phase 9 bumped to core-v2", async () => {
+    // a snapshot derived under the old core-v1 registry version is NO LONGER a
+    // supported registry version; the derived index rebuilds cleanly to core-v2.
+    const derivation = deriveOrganizationGraphSnapshot(buildValidRecords(), buildValidContext({ registryVersion: "core-v1" }));
+    const built = (await buildIndexSnapshot(derivation, buildValidContext({ registryVersion: "core-v1" }), { now: makeClock() })).snapshot;
+    const legacy = { ...built, buildState: "ACTIVE" as const, validationState: "VALID" as const, activatedAt: "2026-07-29T00:00:00.000Z" };
+    expect(legacy.registryVersion).toBe("core-v1");
+    const health = await computeHealth(org, legacy, { now: makeClock() });
+    expect(health.state).toBe("REBUILD_REQUIRED");
+    expect(health.findings.some((f) => f.code === "REGISTRY_VERSION_UNSUPPORTED")).toBe(true);
+    // a fresh derivation under the current context is core-v2 and HEALTHY.
+    expect((await computeHealth(org, await servedSnapshot(), { now: makeClock() })).state).toBe("HEALTHY");
+    expect((await servedSnapshot()).registryVersion).toBe("core-v2");
   });
 
   it("REBUILD_REQUIRED for a LEGACY FNV (graph-index-v1) snapshot — never silently accepted", async () => {

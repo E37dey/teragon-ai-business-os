@@ -26,7 +26,7 @@ describe("retention — selectExpiredSnapshotIds (pure)", () => {
         createdAt: "",
         sourceSnapshotVersion: "",
         sourceHash: "h",
-        registryVersion: "core-v1",
+        registryVersion: "core-v2",
         schemaVersion: "graph-index-v2",
         derivationVersion: "phase-3",
         nodeCount: 0,

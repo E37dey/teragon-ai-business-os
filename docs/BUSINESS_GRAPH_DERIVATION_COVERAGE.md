@@ -60,3 +60,23 @@ log; agents are hard-banned from it and it carries no cross-entity graph value a
 (`org-2`/`org-3`) while their child records inherit the single test-context org, so those cross-org edges
 are correctly **refused** (`CROSS_ORGANIZATION`) — a mixed-org fixture artifact, not a defect. A real
 per-organization snapshot (each customer's true org) would not produce them.
+
+## Phase 9 additions (registry `core-v1 → core-v2`)
+
+Two new derived-edge registry entries (existing relationship types only — the closed vocabulary stays at
+22, no inverse `AFFECTS` edge):
+
+| Relationship | Edge | Derived from | Provenance / Authority |
+|--------------|------|--------------|------------------------|
+| `SERVICED` | `serviceTicket → customerPrinter` | `ServiceTicket.customerPrinterId` | FK/EXPLICIT → DERIVED |
+| `GENERATED_TASK` | `aiRecommendation → task` | `Task.sourceRecommendationId` | FK/EXPLICIT → DERIVED |
+
+Plus two non-edge derivation changes: `aiRecommendation → approval` (`APPROVED_BY`) is authoritative only
+when `Approval.status = "אושר"` **and** `decidedById` resolves to a canonical HUMAN decider; and the
+enrollment node projects a clock-free stage summary (`enrollmentStageFactsPresent` /
+`enrollmentEarliestOpenStageDue` / `enrollmentOpenStageCount`) into `metadataSummary` from the embedded
+`Enrollment.stages` (StageProgress remains embedded, never a node).
+
+The derivation registry version bumps to **`core-v2`** (`SUPPORTED_GRAPH_REGISTRY_VERSIONS = ["core-v2"]`).
+A `core-v1` snapshot returns `REBUILD_REQUIRED` / `REGISTRY_VERSION_UNSUPPORTED` and rebuilds cleanly. See
+[CANONICAL_ENRICHMENT](BUSINESS_GRAPH_CANONICAL_ENRICHMENT.md).

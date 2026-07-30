@@ -344,12 +344,26 @@ export const graphQueryContextScalarsSchema = z
 // request
 // ---------------------------------------------------------------------------
 
+/**
+ * The traversal direction of a `calculateImpact` walk. `outbound` (default,
+ * Phase-6 behavior) follows edges source→target; `incident` follows edges in BOTH
+ * directions so an impact origin can be reached via an INBOUND relationship
+ * (Phase 9 — e.g. a printerModel reached through the customerPrinter→printerModel
+ * USES edge walked inbound). No inverse edge is created; the existing edge is
+ * simply traversed in reverse. Ignored by every other operation.
+ */
+export const GRAPH_IMPACT_DIRECTIONS = ["outbound", "incident"] as const;
+export type GraphImpactDirection = (typeof GRAPH_IMPACT_DIRECTIONS)[number];
+export const graphImpactDirectionSchema = z.enum(GRAPH_IMPACT_DIRECTIONS);
+
 export interface GraphTraversalRequest {
   operation: GraphTraversalOperation;
   startNodeId?: GraphNodeId | string;
   targetNodeId?: GraphNodeId | string;
   searchText?: string;
   limits?: GraphTraversalQueryLimitsInput;
+  /** calculateImpact only — traversal direction (default "outbound") */
+  impactDirection?: GraphImpactDirection;
 }
 
 export const graphTraversalRequestSchema = z
@@ -359,6 +373,7 @@ export const graphTraversalRequestSchema = z
     targetNodeId: graphNodeIdSchema.optional(),
     searchText: z.string().optional(),
     limits: graphTraversalQueryLimitsInputSchema.optional(),
+    impactDirection: graphImpactDirectionSchema.optional(),
   })
   .strict();
 

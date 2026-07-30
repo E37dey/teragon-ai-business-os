@@ -1,38 +1,46 @@
-# TERAGON Business Graph — Query Readiness & Data Gaps (Phase 7)
+# TERAGON Business Graph — Query Readiness & Data Gaps (Phase 7, updated Phase 9)
 
-Honesty layer for the business query pack. Source of truth: the `BUSINESS_QUERY_CAPABILITIES` registry in
-`src/graph/query/capabilities.ts` — one entry per query with its baseline readiness against the 15-entity
-spine **as shipped** and, as **structured data** (`missingFacts`), every missing node/edge/metadata fact
-required for full support. No entry claims `SUPPORTED` by fabricating data.
+Honesty layer for the business query pack. Source of truth: `BUSINESS_QUERY_CAPABILITIES` +
+`evaluateStructuralReadiness()` in `src/graph/query/capabilities.ts`. **Phase 9 separates structural
+capability from instance data** (see below); after the canonical enrichment, all 9 queries are
+structurally **SUPPORTED**, and honesty is preserved by returning instance-level `INSUFFICIENT_GRAPH_DATA`
+when the *records themselves* lack required canonical facts.
 
 ## Readiness states
 
 `SUPPORTED` · `PARTIALLY_SUPPORTED` · `INSUFFICIENT_GRAPH_DATA` · `BLOCKED_BY_PERMISSION` ·
 `BLOCKED_BY_HEALTH` · `UNSUPPORTED`.
 
-A query returns an honest readiness when a required fact is missing — it does **not** guess. In particular:
-delayed enrollment is never inferred from enrollment age; recurring issues need stable
-printer/customer/service relationships; unanswered quotations need an explicit status + deterministic
-cutoff; recommendation conflicts need a registered contradiction / incompatible authoritative state (never
-semantic AI inference).
+## Structural vs instance (Phase 9)
 
-## Baseline readiness against the spine as shipped
+- **SUPPORTED + []** — the contracts/derivation support the query, but no matching records exist.
+- **INSUFFICIENT_GRAPH_DATA** — relevant records exist, but required canonical facts are missing/incomplete.
+- **PARTIALLY_SUPPORTED** — only part of the requested scope can be proven safely.
+- **UNSUPPORTED** — required contracts or registered relationships do not exist.
 
-| Query | Readiness | Why |
-|-------|-----------|-----|
-| `findCustomersNeedingFollowUp` | **SUPPORTED** | authoritative open opportunity/task prove the need (the fixture task→customer link is INFERRED, so surfaced only under `includeInferred`, kept labelled) |
-| `findUnansweredQuotations` | **SUPPORTED** | `quotation.status` + `createdAt` exist; an eligible-status quotation aged past `asOf − N` is flagged |
-| `findRecurringServiceIssues` | **INSUFFICIENT_GRAPH_DATA** | no edge ties a `serviceTicket` to the `customerPrinter`/`printerModel`, so tickets can't be grouped to detect recurrence |
-| `findDelayedEnrollments` | **INSUFFICIENT_GRAPH_DATA** | enrollment envelope carries only `paymentStatus` — no progress / due-date; delay never inferred from age |
-| `assessPrinterModelSupportImpact` | **INSUFFICIENT_GRAPH_DATA** | `USES` is oriented printer→model, so `calculateImpact(model)` has no outbound edges to propagate |
-| `findSupersededEvidence` | **SUPPORTED** | `SUPERSEDES` + lifecycle metadata label current vs historical |
-| `findRecommendationConflicts` | **SUPPORTED** | detection works; spine ships no `CONTRADICTS` edge → 0 findings (no inference permitted) |
-| `findTasksFromApprovedRecommendations` | **INSUFFICIENT_GRAPH_DATA** | no approved `APPROVED_BY` hop carrying a named-human approver; `GENERATED_TASK` originates at `agentRun`, not the recommendation |
-| `buildFullEvidencePath` | **SUPPORTED** | bounded permission-filtered provenance-labelled path |
+Structural readiness is evaluated against the ENTITY/EDGE **registries** — never against whether a given
+fixture happens to contain an edge. A query still returns an honest instance-level readiness when a
+required fact is missing — it does **not** guess (delayed enrollment is never inferred from age; recurrence
+never groups by free-text; conflicts need a registered relationship, never AI inference).
 
-Each `INSUFFICIENT_GRAPH_DATA` query is proven `SUPPORTED` in tests on a **synthetic augmented fixture**
-that adds exactly the missing edge/fact — demonstrating the query logic is correct and the blocker is
-data, not code.
+## Structural readiness (all 9, post-enrichment)
+
+| Query | Structural | Instance-level `INSUFFICIENT` when… |
+|-------|-----------|--------------------------------------|
+| `findCustomersNeedingFollowUp` | **SUPPORTED** | — |
+| `findUnansweredQuotations` | **SUPPORTED** | — |
+| `findRecurringServiceIssues` | **SUPPORTED** (Phase 9) | tickets exist but lack `customerPrinterId`/`faultCategory` |
+| `findDelayedEnrollments` | **SUPPORTED** (Phase 9) | enrollments exist but carry no stage `due`/status facts |
+| `assessPrinterModelSupportImpact` | **SUPPORTED** (Phase 9) | — (empty impact is an honest empty answer) |
+| `findSupersededEvidence` | **SUPPORTED** | — |
+| `findRecommendationConflicts` | **SUPPORTED** | — |
+| `findTasksFromApprovedRecommendations` | **SUPPORTED** (Phase 9) | no approved-HUMAN approval hop present |
+| `buildFullEvidencePath` | **SUPPORTED** | — |
+
+The four Phase-9 queries are proven SUPPORTED against a graph **derived from canonical records** carrying
+the new fields (not hand-built synthetic edges). The Phase-9 canonical/derivation changes are in
+[CANONICAL_ENRICHMENT](BUSINESS_GRAPH_CANONICAL_ENRICHMENT.md); the original gap analysis (retained for
+history) follows.
 
 ## Missing graph facts discovered (per query)
 

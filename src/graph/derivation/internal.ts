@@ -201,10 +201,60 @@ export function computeOwnerRef(
   record: CanonicalRecord,
   organizationId: string,
 ): GraphEntityRef | null {
-  const ownerId = readStringField(record, "ownerId");
+  // `ownerId` is the primary owner. Phase 9: an approval/decision record carries
+  // its human decider in `decidedById` (never an `ownerId`) — fall back to it so
+  // the approving HUMAN is a resolvable owner ref (the actor-humanity check reuses
+  // this typed user ref; it is NEVER an id-prefix sniff).
+  const ownerId = readStringField(record, "ownerId") ?? readStringField(record, "decidedById");
   if (ownerId === null || isArrayPositionId(ownerId)) return null;
   const candidate: GraphEntityRef = { organizationId, entityType: "user", entityId: ownerId };
   return graphEntityRefSchema.safeParse(candidate).success ? candidate : null;
+}
+
+// ---------------------------------------------------------------------------
+// enrollment stage-progress projection (Phase 9 — Q4)
+// ---------------------------------------------------------------------------
+
+/** Terminal (completed) StageProgress status — an OPEN stage is anything else. */
+const COMPLETED_STAGE_STATUSES: ReadonlySet<string> = new Set<string>(["אושר"]);
+
+/**
+ * Project a SAFE, clock-free delay summary from an enrollment's embedded
+ * `stages` (StageProgress[]) onto the node's metadataSummary. StageProgress stays
+ * embedded — it is NEVER promoted to a graph node. Only stable scalar facts are
+ * projected: whether any dated stage fact exists, the count of OPEN (non-completed)
+ * stages, and the EARLIEST open-stage `due` (compared to an injected asOf by the
+ * query — delay is never inferred here). Returns {} for a non-enrollment record or
+ * one without stage/due facts (which then stays INSUFFICIENT_GRAPH_DATA).
+ */
+export function computeEnrollmentStageSummary(
+  record: CanonicalRecord,
+): Record<string, GraphMetadataValue> {
+  const stages = readField(record, "stages");
+  if (!Array.isArray(stages)) return {};
+  let openStageCount = 0;
+  let earliestOpenStageDue: string | null = null;
+  let anyDueFact = false;
+  for (const stage of stages) {
+    if (stage === null || typeof stage !== "object") continue;
+    const s = stage as Record<string, unknown>;
+    const status = typeof s["status"] === "string" ? (s["status"] as string) : null;
+    const due = typeof s["due"] === "string" && s["due"].trim() !== "" ? (s["due"] as string) : null;
+    if (due !== null) anyDueFact = true;
+    const isOpen = status === null || !COMPLETED_STAGE_STATUSES.has(status);
+    if (!isOpen) continue;
+    openStageCount += 1;
+    if (due !== null && (earliestOpenStageDue === null || due < earliestOpenStageDue)) {
+      earliestOpenStageDue = due;
+    }
+  }
+  // no dated stage fact ⇒ project nothing (delay is unknowable, never age-inferred).
+  if (!anyDueFact) return {};
+  return {
+    enrollmentStageFactsPresent: true,
+    enrollmentOpenStageCount: openStageCount,
+    enrollmentEarliestOpenStageDue: earliestOpenStageDue,
+  };
 }
 
 // ---------------------------------------------------------------------------

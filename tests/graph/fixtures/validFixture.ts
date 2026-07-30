@@ -45,7 +45,7 @@ export function buildValidContext(
 ): GraphDerivationContext {
   return {
     organizationId: VALID_ORG,
-    registryVersion: "core-v1",
+    registryVersion: "core-v2",
     sourceSnapshotVersion: "valid-canonical-2026-07-01",
     allowOrgInheritance: true,
     ...over,

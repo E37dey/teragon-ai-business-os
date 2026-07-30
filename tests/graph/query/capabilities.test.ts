@@ -6,6 +6,7 @@ import {
   BUSINESS_QUERY_CAPABILITIES,
   BUSINESS_QUERY_NAMES,
   DEFAULT_THRESHOLD_DAYS,
+  evaluateStructuralReadiness,
   resolvePolicy,
   subtractCalendarDays,
 } from "@/graph";
@@ -20,22 +21,36 @@ describe("capability registry", () => {
     }
   });
 
-  it("documents structured missingFacts for every query that is not fully spine-supported", () => {
-    const gapped = BUSINESS_QUERY_NAMES.filter(
-      (n) => BUSINESS_QUERY_CAPABILITIES[n].baselineReadiness !== "SUPPORTED",
-    );
-    // the three genuinely-blocked queries each carry documented gaps
-    expect(gapped).toEqual(
-      expect.arrayContaining([
-        "findRecurringServiceIssues",
-        "findDelayedEnrollments",
-        "assessPrinterModelSupportImpact",
-        "findTasksFromApprovedRecommendations",
-      ]),
-    );
-    for (const n of gapped) {
-      expect(BUSINESS_QUERY_CAPABILITIES[n].missingFacts.length).toBeGreaterThan(0);
+  it("after Phase 9 EVERY query is structurally SUPPORTED with no remaining contract gaps", () => {
+    // the four formerly-blocked queries are now lifted to structural SUPPORTED via
+    // minimal additive canonical contracts + derivation + inbound traversal.
+    for (const n of BUSINESS_QUERY_NAMES) {
+      expect(BUSINESS_QUERY_CAPABILITIES[n].baselineReadiness).toBe("SUPPORTED");
     }
+    // the four lifted queries carry NO remaining contract gap (missingFacts []).
+    for (const n of [
+      "findRecurringServiceIssues",
+      "findDelayedEnrollments",
+      "assessPrinterModelSupportImpact",
+      "findTasksFromApprovedRecommendations",
+    ] as const) {
+      expect(BUSINESS_QUERY_CAPABILITIES[n].missingFacts).toHaveLength(0);
+    }
+  });
+
+  it("structural readiness is evaluated against the CONTRACTS/registry (not fixtures)", () => {
+    // every required entity is a graph-eligible node type and every required
+    // relationship is a registered edge ⇒ structurally SUPPORTED for all 9.
+    for (const n of BUSINESS_QUERY_NAMES) {
+      expect(evaluateStructuralReadiness(BUSINESS_QUERY_CAPABILITIES[n])).toBe("SUPPORTED");
+    }
+    // a capability requiring an UNregistered relationship is UNSUPPORTED — proving
+    // the check reads the registry, not whether a fixture happens to hold an edge.
+    const bogus = {
+      ...BUSINESS_QUERY_CAPABILITIES.findRecurringServiceIssues,
+      requiredRelationships: ["__NOT_A_REGISTERED_RELATIONSHIP__"] as unknown as (typeof BUSINESS_QUERY_CAPABILITIES.findRecurringServiceIssues)["requiredRelationships"],
+    };
+    expect(evaluateStructuralReadiness(bogus)).toBe("UNSUPPORTED");
   });
 });
 
