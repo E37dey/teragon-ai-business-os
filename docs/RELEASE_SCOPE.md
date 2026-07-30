@@ -71,8 +71,13 @@ graph query surface, no graph UI — the app behaves as the `38cfbaa` baseline p
    authenticated-production.
 2. **Business Graph is internal and unreleased-for-use** — present as reviewed, tested, disabled code.
 3. **Local-demo data model** — browser-local IndexedDB, synthetic seed, `AI_REMOTE_ENABLED=false` (Mode A).
-4. **Pre-existing LOW E2E flake** in `e2e/submission/w7g-submission.spec.ts` under heavy concurrent load
-   (product behavior correct; a Gate-2 test-only stabilization is planned).
+4. **Pre-existing LOW E2E flake** in `e2e/submission/w7g-submission.spec.ts` — **resolved** in Gate 2
+   (`48fe1ee`, test-only stabilization).
+5. **Supported viewport: 1024px and above (desktop + tablet).** This is a desktop/tablet **internal
+   enterprise** interface. **390px mobile layouts currently overflow horizontally on every route** — a
+   documented **known limitation**; a mobile redesign is **deferred** (no broad mobile work in this
+   release). The app is **not** described as fully mobile-responsive. Verified: zero horizontal overflow at
+   ≥1024px across all routes in Light and Dark.
 
 ## Build configuration (from the repo's actual `netlify.toml` — not invented)
 
