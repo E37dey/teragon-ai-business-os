@@ -10,19 +10,23 @@ import { __resetRepositoriesForTests } from "@/repositories";
 import { implementationStores } from "@/repositories/implementationStores";
 import { ensureImplementationProgramme } from "@/domain/adoption/bootstrap";
 import ImplementationPage from "@/modules/implementation/ImplementationPage";
-import { makeClock } from "./helpers";
+import { makeClock, TODAY } from "./helpers";
 
 /** Renders the published rail content — stands in for OsShell's rail slot. */
 function RailOutlet(): ReactElement {
   return <aside data-testid="test-rail-outlet">{useRailContent()}</aside>;
 }
 
-function ui(): ReactElement {
+// Fixed deterministic "today" for status derivation — the seed anchor's week
+// (SEED_ANCHOR 2026-07-22; earliest milestone due 2026-07-29) is in the future
+// relative to TODAY (2026-07-23), so the demo's honest state is "no overdue
+// milestone" regardless of the real wall clock.
+function ui(asOf: string = TODAY): ReactElement {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
     <QueryClientProvider client={qc}>
       <RailProvider>
-        <ImplementationPage />
+        <ImplementationPage asOf={asOf} />
         <RailOutlet />
       </RailProvider>
     </QueryClientProvider>
@@ -80,6 +84,26 @@ describe("/implementation — page selectors", () => {
     expect(screen.getByTestId("rail-next-decision").textContent).toContain("G1");
     expect(screen.getByTestId("rail-next-action").textContent).toContain("פיילוט");
     expect(screen.getByTestId("rail-submission-deliverables").textContent).toContain("Stage Gates");
+  });
+
+  it("overdue-owner rail is driven by the injected asOf, not the wall clock", async () => {
+    // Before the earliest milestone due date (2026-07-29) → nothing overdue.
+    const { unmount } = render(ui("2026-07-28"));
+    await waitFor(() =>
+      expect(screen.getByTestId("rail-overdue-owner").textContent).toContain(
+        "אין אבן דרך באיחור",
+      ),
+    );
+    unmount();
+    cleanup();
+    // Well past every seeded milestone → an owner-in-arrears is shown honestly.
+    render(ui("2027-01-01"));
+    await waitFor(() =>
+      expect(screen.getByTestId("rail-overdue-owner").textContent).not.toContain(
+        "אין אבן דרך באיחור",
+      ),
+    );
+    expect(screen.getByTestId("rail-overdue-owner").textContent).toContain("—");
   });
 
   it("stage card opens the drawer with סקירה/תוצרים/ראיות/סיכונים/החלטות/היסטוריה", async () => {
