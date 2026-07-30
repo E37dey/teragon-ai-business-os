@@ -155,25 +155,35 @@ export function GovernanceAuditorRail({
           אין ממצאים פתוחים בבדיקות המבקר.
         </div>
       ) : (
-        <ul style={{ margin: 0, paddingInlineStart: 16, display: "grid", gap: 6 }}>
-          {findings.map((f) => (
-            <li key={f.id} data-testid={`finding-${f.kind}`} style={{ fontSize: "var(--os-text-2xs, 11px)" }}>
-              <span
-                style={{
-                  color:
-                    f.severityHe === "חמור" ? "var(--danger-text)" : "var(--warning-text)",
-                  fontWeight: 600,
-                }}
-              >
-                {f.severityHe}
-              </span>{" "}
-              · <strong>{f.titleHe}</strong> — {f.detailHe}{" "}
-              <span className="os-ltr" style={{ color: "var(--os-muted)" }}>
-                {f.refs.join(" · ")}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <details data-testid="governance-auditor-details" className="os-more-metrics">
+          <summary>{findings.length} ממצאים פתוחים בבדיקות המבקר</summary>
+          <ul
+            style={{
+              margin: 0,
+              padding: "0 var(--os-space-5) var(--os-space-4)",
+              display: "grid",
+              gap: 6,
+            }}
+          >
+            {findings.map((f) => (
+              <li key={f.id} data-testid={`finding-${f.kind}`} style={{ fontSize: "var(--os-text-2xs, 11px)" }}>
+                <span
+                  style={{
+                    color:
+                      f.severityHe === "חמור" ? "var(--danger-text)" : "var(--warning-text)",
+                    fontWeight: 600,
+                  }}
+                >
+                  {f.severityHe}
+                </span>{" "}
+                · <strong>{f.titleHe}</strong> — {f.detailHe}{" "}
+                <span className="os-ltr" style={{ color: "var(--os-muted)" }}>
+                  {f.refs.join(" · ")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
     </div>
   );
@@ -785,17 +795,10 @@ export default function GovernancePage(): ReactElement {
           subtitle="4 קטגוריות הפעולה — נגזרות מ-AUTONOMOUS_OPERATIONS, מ-12 פעולות האישור ומהאיסורים הקשיחים בהגדרות הקפואות"
           icon="network"
         />
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-            gap: "var(--os-space-3)",
-            marginBlockStart: "var(--os-space-3)",
-          }}
-        >
+        <div className="gov-boundaries-grid" style={{ marginBlockStart: "var(--os-space-4)" }}>
           {boundaries.map((cat) => (
             <Panel key={cat.key} variant="raised" style={{ padding: "var(--os-space-4)" }}>
-              <div style={{ fontWeight: 600, fontSize: "var(--os-text-sm, 13px)" }}>{cat.titleHe}</div>
+              <div style={{ fontWeight: 500, fontSize: "var(--os-text-sm, 13px)" }}>{cat.titleHe}</div>
               <div style={{ color: "var(--os-muted)", fontSize: "var(--os-text-2xs, 11px)" }}>
                 {cat.descriptionHe}
               </div>

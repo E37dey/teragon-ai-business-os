@@ -1578,6 +1578,24 @@
   color: var(--text-primary);
 }
 
+/* VC: "גבולות אדם-AI" — calm, responsive column layout (caps at ~2 cols on
+   tablet, stacks on phone) so the four categories never compete or overflow. */
+.gov-boundaries-grid {
+  display: grid;
+  gap: var(--os-space-4);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 1280px) {
+  .gov-boundaries-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .gov-boundaries-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* VC-B: inactive Copilot = compact quiet button (violet reserved for ACTIVE) */
 .os-copilot--compact {
   flex-direction: row;
