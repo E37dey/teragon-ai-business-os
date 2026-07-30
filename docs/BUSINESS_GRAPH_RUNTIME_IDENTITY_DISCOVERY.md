@@ -44,14 +44,14 @@ recommendation).
 
 ## Phase 11 update — a real (headless) authentication boundary now exists
 
-Phase 11 adds a headless internal-operator authentication foundation
-([OPERATOR_AUTH](BUSINESS_GRAPH_OPERATOR_AUTH.md)) that produces a genuine `TrustedAuthenticatedSession`
-from a verified operator credential against a real **active** canonical user — the honest replacement for
-`UnavailableTrustedSessionSource`. It is **OFF by default** and **decoupled from graph access** (an
-authenticated operator still gets `FEATURE_DISABLED`/`ROLLOUT_NOT_APPROVED` until those guards are
-deliberately enabled). So a trustworthy identity is now *obtainable* for controlled internal rollout, while
-the discovery's core conclusion still holds for the ordinary app: it has no ambient authenticated user, and
-nothing trusts `u-tzachi` or the localStorage role.
+Phase 11 (commit `3c78640`) adds a headless internal-operator authentication
+**contract/prototype** ([OPERATOR_AUTH](BUSINESS_GRAPH_OPERATOR_AUTH.md)) that models the
+`TrustedAuthenticatedSession` shape from a credential + active-user check. **The self-audit corrected its
+framing: it is a LOCAL / client-side prototype, not a trusted server-side authentication boundary** —
+production trust still does not exist. It is OFF by default and decoupled from graph access. The trusted
+server-side boundary (Netlify Functions + memory-hard KDF + HttpOnly cookie + durable server sessions) is
+the pending **Phase 11.1** correction. The discovery's core conclusion therefore still holds: the app has
+no trustworthy ambient authenticated user, and nothing trusts `u-tzachi` or the localStorage role.
 
 See: [RUNTIME_AUTHORIZATION_MAP](BUSINESS_GRAPH_RUNTIME_AUTHORIZATION_MAP.md) ·
 [RUNTIME_COMPOSITION](BUSINESS_GRAPH_RUNTIME_COMPOSITION.md) ·

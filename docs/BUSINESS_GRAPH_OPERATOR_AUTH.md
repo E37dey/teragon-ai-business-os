@@ -1,10 +1,19 @@
 # TERAGON Business Graph — Headless Operator Authentication (Phase 11)
 
-A real, headless, internal-operator **authentication** foundation that produces the exact
-`TrustedAuthenticatedSession` the Phase-10 runtime resolver expects — **without a login UI, OFF by
-default, and decoupled from graph access**. Source: `src/graph/auth/**`. It is the honest replacement for
-`UnavailableTrustedSessionSource`: a credential-gated, active-user-checked session, never a fabricated
-persona.
+> **STATUS (corrected in the Phase-11 self-audit): commit `3c78640` is a LOCAL / CLIENT-SIDE
+> authentication *contract and prototype*, NOT a trusted server-side authentication boundary.** Credential
+> verification, session issuance, and session storage in this commit run in browser-reachable code and use
+> a fast SHA-256 verifier — they are unit-test scaffolding for the session *contract*, not a production
+> trust authority. A trusted boundary requires server-side verification (Netlify Functions), a memory-hard
+> KDF, an HttpOnly cookie, and durable server session storage — that is the pending **Phase 11.1**
+> correction and is **not** part of this commit. Nothing here is a runtime trust authority: all guards
+> (operator-auth, facade, rollout, indexing) are OFF and the binding is held.
+
+A headless, internal-operator **authentication contract/prototype** that produces the exact
+`TrustedAuthenticatedSession` shape the Phase-10 runtime resolver expects — **without a login UI, OFF by
+default, and decoupled from graph access**. Source: `src/graph/auth/**`. As a local prototype it models a
+credential-gated, active-user-checked session (never a fabricated persona); it is **not** yet the trusted
+server-verified replacement for `UnavailableTrustedSessionSource`.
 
 ## Why this exists
 

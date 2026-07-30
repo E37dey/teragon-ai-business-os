@@ -1,5 +1,10 @@
 # TERAGON Business Graph — Phase 11 Test Report (Operator Authentication)
 
+> **STATUS (corrected in the Phase-11 self-audit):** commit `3c78640` is a **local/client-side
+> authentication contract & prototype**, not a trusted server-side authentication boundary. The tests below
+> prove the session *contract*; they do not establish production authentication trust (which requires the
+> server-side Phase-11.1 correction). All guards remain OFF and the runtime binding is held.
+
 **Scope:** `src/graph/auth/**`, `tests/graph/auth/**`, one barrel export block in `src/graph/index.ts`.
 Phase-10 runtime contracts + the governance `sha256Hex` imported read-only; nothing else modified. No
 UI/route/nav, no `window` global, no import-time work. Operator-auth, facade, indexing, and rollout guards
