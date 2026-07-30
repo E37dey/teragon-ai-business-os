@@ -8,6 +8,8 @@ import {
 } from "@/graph";
 import {
   ALLOW_ALL,
+  FIXED_EXEC,
+  FIXED_NOW,
   ctxFor,
   denyNodeIds,
   deriveValidSnapshot,
@@ -18,14 +20,16 @@ import {
   synthSnapshot,
 } from "./helpers";
 
-const FIXED_NOW = () => 0;
 let snap: GraphIndexSnapshot;
 beforeAll(async () => {
   snap = await deriveValidSnapshot();
 });
 
 function svcFor(s: GraphIndexSnapshot) {
-  return new BusinessGraphTraversalService(healthyStore(s), { now: FIXED_NOW });
+  return new BusinessGraphTraversalService(healthyStore(s), {
+    now: FIXED_NOW,
+    executionIdProvider: FIXED_EXEC,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -63,7 +67,7 @@ describe("unauthorized start node is indistinguishable from an absent one", () =
     // present but forbidden
     const svcForbidden = new BusinessGraphTraversalService(
       healthyStore(snap),
-      { now: FIXED_NOW },
+      { now: FIXED_NOW, executionIdProvider: FIXED_EXEC },
     );
     const forbidden = await svcForbidden.getNode(
       { operation: "getNode", startNodeId: forbiddenId },
@@ -73,7 +77,7 @@ describe("unauthorized start node is indistinguishable from an absent one", () =
     const empty = synthSnapshot([synthNode("customer", "other")], []);
     // rebind the absent snapshot's org + id so only node presence differs
     const absentSnap: GraphIndexSnapshot = { ...empty, snapshotId: snap.snapshotId, registryVersion: snap.registryVersion };
-    const svcAbsent = new BusinessGraphTraversalService(healthyStore(absentSnap), { now: FIXED_NOW });
+    const svcAbsent = new BusinessGraphTraversalService(healthyStore(absentSnap), { now: FIXED_NOW, executionIdProvider: FIXED_EXEC });
     const absent = await svcAbsent.getNode(
       { operation: "getNode", startNodeId: forbiddenId },
       ctxFor(),
@@ -104,12 +108,12 @@ describe("hidden intermediate nodes do not leak (shape/title/count)", () => {
   const withoutHidden = synthSnapshot([a, b, z], [synthEdge("USES", a, b)]);
 
   it("neighbors of A are identical whether the hidden branch is forbidden or simply absent", async () => {
-    const hiddenForbidden = new BusinessGraphTraversalService(healthyStore(withHidden), { now: FIXED_NOW });
+    const hiddenForbidden = new BusinessGraphTraversalService(healthyStore(withHidden), { now: FIXED_NOW, executionIdProvider: FIXED_EXEC });
     const r1 = await hiddenForbidden.getNeighbors(
       { operation: "getNeighbors", startNodeId: a.id },
       ctxFor({ permissions: denyNodeIds(new Set([h.id])) }),
     );
-    const noHidden = new BusinessGraphTraversalService(healthyStore(withoutHidden), { now: FIXED_NOW });
+    const noHidden = new BusinessGraphTraversalService(healthyStore(withoutHidden), { now: FIXED_NOW, executionIdProvider: FIXED_EXEC });
     const r2 = await noHidden.getNeighbors({ operation: "getNeighbors", startNodeId: a.id }, ctxFor());
 
     expect(r1.data?.neighbors.map((n) => n.node.id)).toEqual([b.id]);
@@ -117,7 +121,7 @@ describe("hidden intermediate nodes do not leak (shape/title/count)", () => {
   });
 
   it("no path is returned when the only route runs THROUGH a hidden node", async () => {
-    const svc = new BusinessGraphTraversalService(healthyStore(withHidden), { now: FIXED_NOW });
+    const svc = new BusinessGraphTraversalService(healthyStore(withHidden), { now: FIXED_NOW, executionIdProvider: FIXED_EXEC });
     const r = await svc.findPath(
       { operation: "findPath", startNodeId: a.id, targetNodeId: z.id },
       ctxFor({ permissions: denyNodeIds(new Set([h.id])) }),
@@ -137,7 +141,7 @@ describe("sensitivity enforced at every hop", () => {
   const s = synthSnapshot([a, secret], [synthEdge("MENTIONED_IN", a, secret)]);
 
   it("a below-clearance neighbor is omitted; sufficient clearance reveals it", async () => {
-    const svc = new BusinessGraphTraversalService(healthyStore(s), { now: FIXED_NOW });
+    const svc = new BusinessGraphTraversalService(healthyStore(s), { now: FIXED_NOW, executionIdProvider: FIXED_EXEC });
     const low = await svc.getNeighbors({ operation: "getNeighbors", startNodeId: a.id }, ctxFor({ viewerClearance: "פנימי" }));
     expect(low.data?.neighbors).toEqual([]);
     const high = await svc.getNeighbors({ operation: "getNeighbors", startNodeId: a.id }, ctxFor({ viewerClearance: "מוגבל" }));
@@ -145,7 +149,7 @@ describe("sensitivity enforced at every hop", () => {
   });
 
   it("a below-clearance START node is refused (indistinguishable)", async () => {
-    const svc = new BusinessGraphTraversalService(healthyStore(s), { now: FIXED_NOW });
+    const svc = new BusinessGraphTraversalService(healthyStore(s), { now: FIXED_NOW, executionIdProvider: FIXED_EXEC });
     const r = await svc.getNode({ operation: "getNode", startNodeId: secret.id }, ctxFor({ viewerClearance: "פנימי" }));
     expect(r.ok).toBe(false);
     expect(r.refusalReason).toBe("NODE_NOT_FOUND");
@@ -161,7 +165,7 @@ describe("cycles terminate (visited-set)", () => {
     const a = synthNode("memoryRecord", "a");
     const b = synthNode("memoryRecord", "b");
     const s = synthSnapshot([a, b], [synthEdge("RELATED_TO", a, b), synthEdge("RELATED_TO", b, a)]);
-    const svc = new BusinessGraphTraversalService(healthyStore(s), { now: FIXED_NOW });
+    const svc = new BusinessGraphTraversalService(healthyStore(s), { now: FIXED_NOW, executionIdProvider: FIXED_EXEC });
     const r = await svc.calculateImpact({ operation: "calculateImpact", startNodeId: a.id }, ctxFor());
     expect(r.ok).toBe(true);
     const ids = [...r.data!.direct, ...r.data!.indirect].map((n) => n.node.id);
@@ -180,7 +184,7 @@ describe("limit enforcement + truncation", () => {
   const s = synthSnapshot(chain, edges);
 
   it("maxDepth reduces reachable depth and marks truncated.byDepth", async () => {
-    const svc = new BusinessGraphTraversalService(healthyStore(s), { now: FIXED_NOW });
+    const svc = new BusinessGraphTraversalService(healthyStore(s), { now: FIXED_NOW, executionIdProvider: FIXED_EXEC });
     const r = await svc.calculateImpact(
       { operation: "calculateImpact", startNodeId: chain[0]!.id, limits: { maxDepth: 2 } },
       ctxFor(),
@@ -195,7 +199,7 @@ describe("limit enforcement + truncation", () => {
     const star = synthNode("customer", "hub");
     const leaves = Array.from({ length: 4 }, (_, i) => synthNode("product", `p${i}`));
     const s2 = synthSnapshot([star, ...leaves], leaves.map((l) => synthEdge("USES", star, l)));
-    const svc = new BusinessGraphTraversalService(healthyStore(s2), { now: FIXED_NOW });
+    const svc = new BusinessGraphTraversalService(healthyStore(s2), { now: FIXED_NOW, executionIdProvider: FIXED_EXEC });
     const r = await svc.getNeighbors(
       { operation: "getNeighbors", startNodeId: star.id, limits: { maxNodes: 1 } },
       ctxFor(),
@@ -205,7 +209,7 @@ describe("limit enforcement + truncation", () => {
   });
 
   it("a caller cannot raise maxDepth above the internal cap (applied is clamped)", async () => {
-    const svc = new BusinessGraphTraversalService(healthyStore(s), { now: FIXED_NOW });
+    const svc = new BusinessGraphTraversalService(healthyStore(s), { now: FIXED_NOW, executionIdProvider: FIXED_EXEC });
     const r = await svc.calculateImpact(
       { operation: "calculateImpact", startNodeId: chain[0]!.id, limits: { maxDepth: 9999 } },
       ctxFor(),
@@ -235,14 +239,14 @@ describe("findPath — shortest permitted paths, deterministic", () => {
   ]);
 
   it("returns only the shortest (length-2) paths, not the length-3 decoy", async () => {
-    const svc = new BusinessGraphTraversalService(healthyStore(s), { now: FIXED_NOW });
+    const svc = new BusinessGraphTraversalService(healthyStore(s), { now: FIXED_NOW, executionIdProvider: FIXED_EXEC });
     const r = await svc.findPath({ operation: "findPath", startNodeId: a.id, targetNodeId: d.id }, ctxFor());
     expect(r.data!.paths.length).toBe(2);
     for (const p of r.data!.paths) expect(p.length).toBe(2);
   });
 
   it("is byte-reproducible across repeated queries", async () => {
-    const svc = new BusinessGraphTraversalService(healthyStore(s), { now: FIXED_NOW });
+    const svc = new BusinessGraphTraversalService(healthyStore(s), { now: FIXED_NOW, executionIdProvider: FIXED_EXEC });
     const r1 = await svc.findPath({ operation: "findPath", startNodeId: a.id, targetNodeId: d.id }, ctxFor());
     const r2 = await svc.findPath({ operation: "findPath", startNodeId: a.id, targetNodeId: d.id }, ctxFor());
     expect(JSON.stringify(r1)).toBe(JSON.stringify(r2));
@@ -270,13 +274,13 @@ describe("authoritative-only default; inferred/unverified require an explicit mo
     (r.data?.neighbors ?? []).map((n) => n.node.id).sort();
 
   it("default returns only the authoritative neighbor", async () => {
-    const svc = new BusinessGraphTraversalService(healthyStore(s), { now: FIXED_NOW });
+    const svc = new BusinessGraphTraversalService(healthyStore(s), { now: FIXED_NOW, executionIdProvider: FIXED_EXEC });
     const r = await svc.getNeighbors({ operation: "getNeighbors", startNodeId: a.id }, ctxFor());
     expect(ids(r)).toEqual([bAuth.id]);
   });
 
   it("includeInferred adds the inferred neighbor — kept labelled as INFERRED", async () => {
-    const svc = new BusinessGraphTraversalService(healthyStore(s), { now: FIXED_NOW });
+    const svc = new BusinessGraphTraversalService(healthyStore(s), { now: FIXED_NOW, executionIdProvider: FIXED_EXEC });
     const r = await svc.getNeighbors({ operation: "getNeighbors", startNodeId: a.id }, ctxFor({ includeInferred: true }));
     expect(ids(r)).toEqual([bAuth.id, cInf.id].sort());
     const inf = r.data!.neighbors.find((n) => n.node.id === cInf.id)!;
@@ -284,7 +288,7 @@ describe("authoritative-only default; inferred/unverified require an explicit mo
   });
 
   it("includeUnverified adds the proposed neighbor but NEVER the rejected one", async () => {
-    const svc = new BusinessGraphTraversalService(healthyStore(s), { now: FIXED_NOW });
+    const svc = new BusinessGraphTraversalService(healthyStore(s), { now: FIXED_NOW, executionIdProvider: FIXED_EXEC });
     const r = await svc.getNeighbors(
       { operation: "getNeighbors", startNodeId: a.id },
       ctxFor({ includeInferred: true, includeUnverified: true }),
@@ -408,16 +412,18 @@ describe("getTimeline — graph-visible lifecycle + relationship events", () => 
 // ---------------------------------------------------------------------------
 
 describe("every query emits a safe, deterministic audit record", () => {
-  it("carries safe metadata, a deterministic queryId, and the applied limits", async () => {
+  it("carries safe metadata, a deterministic requestFingerprint, and the applied limits", async () => {
     const svc = svcFor(snap);
     const r1 = await svc.getNode({ operation: "getNode", startNodeId: nid("customer", "cu-1") }, ctxFor());
     const r2 = await svc.getNode({ operation: "getNode", startNodeId: nid("customer", "cu-1") }, ctxFor());
-    expect(r1.audit.queryId).toMatch(/^gq-[0-9a-f]{64}$/u);
-    expect(r1.audit.queryId).toBe(r2.audit.queryId); // deterministic (no clock/random)
+    expect(r1.audit.requestFingerprint).toMatch(/^[0-9a-f]{64}$/u);
+    expect(r1.audit.requestFingerprint).toBe(r2.audit.requestFingerprint); // deterministic (no clock/random)
+    expect(r1.audit.executionId).toBe("exec-fixed"); // injected provider (default is a random UUID)
     expect(r1.audit.operation).toBe("getNode");
     expect(r1.audit.organizationId).toBe("org-canonical");
     expect(r1.audit.appliedLimits.maxDepth).toBe(6);
     expect(r1.audit.searchTextHash).toBeNull();
+    expect(r1.audit.staleAccessAuthorized).toBe(false);
   });
 
   it("a full result is byte-reproducible with a fixed clock", async () => {

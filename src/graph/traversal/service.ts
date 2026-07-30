@@ -16,8 +16,13 @@ import type {
   GraphIndexStore,
 } from "../store/contracts";
 import { compareEdges, comparePaths, compareStrings } from "./ordering";
-import { isEdgePermitted, isNodeAccessible } from "./security";
-import { deriveQueryId, durationBucket, protectSearchText } from "./audit";
+import { isEdgeAccessible, isNodeAccessible } from "./security";
+import {
+  deriveRequestFingerprint,
+  durationBucket,
+  newExecutionId,
+  protectSearchText,
+} from "./audit";
 import { resolveLimits } from "./limits";
 import {
   graphQueryContextScalarsSchema,
@@ -55,8 +60,33 @@ import {
 export type TraversalStore = Pick<GraphIndexStore, "getActiveSnapshot" | "getHealth">;
 
 export interface TraversalServiceOptions {
-  /** monotonic millisecond source for the duration bucket (injectable for determinism) */
-  now?: () => number;
+  /**
+   * Monotonic millisecond source for the duration bucket. REQUIRED and injected —
+   * there is NO hidden `Date.now()` fallback in the traversal layer.
+   */
+  now: () => number;
+  /**
+   * The wall-clock "as of" ISO clock used for edge lifecycle validity when a
+   * request omits `ctx.asOf`. Injected (no hidden `Date.now()`); when neither this
+   * nor `ctx.asOf` is present, temporal lifecycle gating is skipped.
+   */
+  asOf?: () => string;
+  /**
+   * Unique execution-id provider. Defaults to Web Crypto `randomUUID` (allowed —
+   * not `Math.random`/`Date`); tests inject a deterministic counter. NEVER a key.
+   */
+  executionIdProvider?: () => string;
+}
+
+/**
+ * The resolved per-query edge policy threaded through the traversal engine so
+ * EVERY edge is judged by the same centralized `isEdgeAccessible` gate.
+ */
+interface EdgePolicy {
+  limits: GraphTraversalQueryLimits;
+  asOf: string | null;
+  staleAccessAuthorized: boolean;
+  allowHistorical: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -139,6 +169,8 @@ interface PreparedCommon {
   searchTextClass: string | null;
   startNodeId: string | null;
   targetNodeId: string | null;
+  /** true only when a STALE/DEGRADED snapshot was served under an authorized grant */
+  staleAccessAuthorized: boolean;
 }
 
 interface PreparedOk extends PreparedCommon {
@@ -189,10 +221,32 @@ function healthGate(state: GraphIndexHealthState): "REFUSE" | "DENY_STALE" | "OK
 export class BusinessGraphTraversalService {
   private readonly store: TraversalStore;
   private readonly now: () => number;
+  private readonly asOfClock: (() => string) | undefined;
+  private readonly executionIdProvider: () => string;
 
-  constructor(store: TraversalStore, options: TraversalServiceOptions = {}) {
+  constructor(store: TraversalStore, options: TraversalServiceOptions) {
     this.store = store;
-    this.now = options.now ?? (() => Date.now());
+    // NO hidden Date.now(): the millisecond source is injected by the caller.
+    this.now = options.now;
+    this.asOfClock = options.asOf;
+    this.executionIdProvider = options.executionIdProvider ?? newExecutionId;
+  }
+
+  /** Resolve the "as of" instant: explicit request value, else injected clock, else null. */
+  private resolveAsOf(ctx: GraphQueryContext): string | null {
+    if (ctx.asOf !== undefined) return ctx.asOf;
+    if (this.asOfClock !== undefined) return this.asOfClock();
+    return null;
+  }
+
+  /** Build the per-query edge policy from a prepared OK outcome. */
+  private policyFor(prep: PreparedOk, ctx: GraphQueryContext, allowHistorical: boolean): EdgePolicy {
+    return {
+      limits: prep.appliedLimits,
+      asOf: this.resolveAsOf(ctx),
+      staleAccessAuthorized: prep.staleAccessAuthorized,
+      allowHistorical,
+    };
   }
 
   // -------------------------------------------------------------------------
@@ -228,7 +282,8 @@ export class BusinessGraphTraversalService {
 
     const limits = prep.appliedLimits;
     const truncated = emptyTruncation();
-    const expansions = this.expand(startNode.id, index, ctx, limits, "incident");
+    const policy = this.policyFor(prep, ctx, false);
+    const expansions = this.expand(startNode.id, index, ctx, policy, "incident");
     const neighbors: GraphNeighborView[] = [];
     let edgeBudget = limits.maxEdges;
     for (const ex of expansions) {
@@ -271,7 +326,7 @@ export class BusinessGraphTraversalService {
     const targetOk = target !== undefined && isNodeAccessible(target, ctx);
 
     const { paths, truncated } = targetOk && targetId
-      ? this.shortestPaths(startNode.id, targetId, index, ctx, prep.appliedLimits)
+      ? this.shortestPaths(startNode.id, targetId, index, ctx, this.policyFor(prep, ctx, false))
       : { paths: [] as GraphPath[], truncated: emptyTruncation() };
 
     const uniqueNodes = new Set<string>();
@@ -305,7 +360,7 @@ export class BusinessGraphTraversalService {
       startNode.id,
       index,
       ctx,
-      prep.appliedLimits,
+      this.policyFor(prep, ctx, false),
       "outbound",
       relFilter,
     );
@@ -351,7 +406,7 @@ export class BusinessGraphTraversalService {
       startNode.id,
       index,
       ctx,
-      prep.appliedLimits,
+      this.policyFor(prep, ctx, false),
       "outbound",
     );
 
@@ -392,7 +447,9 @@ export class BusinessGraphTraversalService {
     const startNode = this.accessibleStart(index, prep.startNodeId, ctx);
     if (startNode === null) return this.emitOkRefuse(prep, ctx, "findConflicts", started);
 
-    const limits = prep.appliedLimits;
+    // lineage/historical mode: SUPERSEDED endpoints + edges are valid for conflict
+    // reporting; every edge still passes the single centralized access gate.
+    const policy = this.policyFor(prep, ctx, true);
     const incident = [
       ...(index.outByNode.get(startNode.id) ?? []),
       ...(index.inByNode.get(startNode.id) ?? []),
@@ -404,24 +461,17 @@ export class BusinessGraphTraversalService {
       seen.add(edge.id);
       // registered CONTRADICTS/SUPERSEDES relationships ONLY — no inference.
       if (!CONFLICT_RELATIONSHIPS.has(edge.relationshipType)) continue;
-      // a rejected edge is a denial, never a conflict signal.
-      if (edge.authority === "REJECTED") continue;
-      if (
-        limits.allowedRelationshipTypes &&
-        !limits.allowedRelationshipTypes.includes(edge.relationshipType)
-      ) {
-        continue;
-      }
       rows.push(edge);
     }
     rows.sort(compareEdges);
 
     const conflicts: GraphConflict[] = [];
     for (const edge of rows) {
-      const otherId = edge.source === startNode.id ? edge.target : edge.source;
-      const other = index.nodeById.get(otherId);
-      // historical (superseded) endpoints are valid for lineage/conflict reporting.
-      if (!other || !isNodeAccessible(other, ctx, { allowHistorical: true })) continue;
+      const source = index.nodeById.get(edge.source);
+      const target = index.nodeById.get(edge.target);
+      if (!source || !target) continue;
+      if (!isEdgeAccessible(edge, source, target, ctx, policy)) continue;
+      const other = edge.source === startNode.id ? target : source;
       conflicts.push({
         kind: edge.relationshipType === "CONTRADICTS" ? "CONTRADICTS" : "SUPERSEDES",
         relationshipType: edge.relationshipType,
@@ -500,6 +550,7 @@ export class BusinessGraphTraversalService {
     if (startNode === null) return this.emitOkRefuse(prep, ctx, "getTimeline", started);
 
     const limits = prep.appliedLimits;
+    const policy = this.policyFor(prep, ctx, true);
     const events: GraphTimelineEvent[] = [];
     events.push({
       at: startNode.createdAt,
@@ -526,17 +577,12 @@ export class BusinessGraphTraversalService {
       if (seen.has(edge.id)) continue;
       seen.add(edge.id);
       if (edgeBudget <= 0) break;
-      if (edge.authority === "REJECTED") continue;
-      if (
-        limits.allowedRelationshipTypes &&
-        !limits.allowedRelationshipTypes.includes(edge.relationshipType)
-      ) {
-        continue;
-      }
-      const otherId = edge.source === startNode.id ? edge.target : edge.source;
-      const other = index.nodeById.get(otherId);
-      // only expose events touching nodes the viewer may see (allow historical).
-      if (!other || !isNodeAccessible(other, ctx, { allowHistorical: true })) continue;
+      // only expose events for edges that pass the single centralized access gate
+      // (both endpoints visible, authority/lifecycle/approval/stale honored).
+      const source = index.nodeById.get(edge.source);
+      const target = index.nodeById.get(edge.target);
+      if (!source || !target) continue;
+      if (!isEdgeAccessible(edge, source, target, ctx, policy)) continue;
       edgeBudget -= 1;
       events.push({
         at: edge.createdAt,
@@ -596,6 +642,7 @@ export class BusinessGraphTraversalService {
       searchTextClass: search.classification,
       startNodeId: null,
       targetNodeId: null,
+      staleAccessAuthorized: false,
     };
 
     // (1) validate the context scalars + oracle presence + org agreement.
@@ -605,6 +652,7 @@ export class BusinessGraphTraversalService {
       viewerClearance: ctx.viewerClearance,
       ...(ctx.revealReason !== undefined ? { revealReason: ctx.revealReason } : {}),
       ...(ctx.allowStale !== undefined ? { allowStale: ctx.allowStale } : {}),
+      ...(ctx.asOf !== undefined ? { asOf: ctx.asOf } : {}),
       ...(ctx.includeInferred !== undefined ? { includeInferred: ctx.includeInferred } : {}),
       ...(ctx.includeUnverified !== undefined ? { includeUnverified: ctx.includeUnverified } : {}),
       ...(ctx.correlationId !== undefined ? { correlationId: ctx.correlationId } : {}),
@@ -612,7 +660,8 @@ export class BusinessGraphTraversalService {
     const ctxOk = graphQueryContextScalarsSchema.safeParse(scalars).success;
     const oracleOk =
       typeof ctx.permissions?.canReadEntity === "function" &&
-      typeof ctx.permissions?.agentDomainAllowed === "function";
+      typeof ctx.permissions?.agentDomainAllowed === "function" &&
+      typeof ctx.permissions?.canUseStaleGraph === "function";
     if (!ctxOk || !oracleOk) {
       return { kind: "refuse", ...common, health: "MISSING", snapshotId: null, registryVersion: null, stale: false, reason: "INVALID_CONTEXT" };
     }
@@ -626,8 +675,17 @@ export class BusinessGraphTraversalService {
     if (gate === "REFUSE") {
       return { kind: "refuse", ...common, health: health.state, snapshotId: health.activeSnapshotId, registryVersion: null, stale: false, reason: "GRAPH_UNAVAILABLE" };
     }
-    if (gate === "DENY_STALE" && ctx.allowStale !== true) {
-      return { kind: "refuse", ...common, health: health.state, snapshotId: health.activeSnapshotId, registryVersion: null, stale: false, reason: "STALE_NOT_AUTHORIZED" };
+    // STALE/DEGRADED: `allowStale` is only a REQUEST. Serving stale data requires
+    // ALL of — the request set allowStale, the actor is an internal HUMAN/SYSTEM
+    // (never an AGENT), and the oracle explicitly grants it. Any miss ⇒ deny.
+    if (gate === "DENY_STALE") {
+      const staleAuthorized =
+        ctx.allowStale === true &&
+        ctx.viewer.actor.kind !== "AGENT" &&
+        ctx.permissions.canUseStaleGraph(ctx.viewer, health.state);
+      if (!staleAuthorized) {
+        return { kind: "refuse", ...common, health: health.state, snapshotId: health.activeSnapshotId, registryVersion: null, stale: false, reason: "STALE_NOT_AUTHORIZED" };
+      }
     }
 
     // (3) validate the request shape + required node params.
@@ -664,6 +722,7 @@ export class BusinessGraphTraversalService {
       snapshot,
       health: health.state,
       stale: gate === "DENY_STALE",
+      staleAccessAuthorized: gate === "DENY_STALE",
     };
   }
 
@@ -692,7 +751,7 @@ export class BusinessGraphTraversalService {
     nid: string,
     index: GraphIndexView,
     ctx: GraphQueryContext,
-    limits: GraphTraversalQueryLimits,
+    policy: EdgePolicy,
     mode: "outbound" | "incident",
     relFilter?: (edge: BusinessGraphEdge) => boolean,
   ): Expansion[] {
@@ -708,14 +767,20 @@ export class BusinessGraphTraversalService {
         raw.push({ edge, otherId: edge.source, direction: "outbound" });
       }
     }
+    const limits = policy.limits;
     const out: Expansion[] = [];
     for (const ex of raw) {
       if (relFilter && !relFilter(ex.edge)) continue;
-      if (!isEdgePermitted(ex.edge, ctx, limits)) continue;
-      const target = index.nodeById.get(ex.otherId);
-      // NEVER traverse THROUGH an inaccessible node — it is not a valid path node.
-      if (target === undefined || !isNodeAccessible(target, ctx)) continue;
-      if (limits.allowedEntityTypes && !limits.allowedEntityTypes.includes(target.entityType)) continue;
+      // EVERY edge is judged by the single centralized gate — node visibility
+      // alone never authorizes an edge, and a hidden edge is skipped like an
+      // absent one (no leak via path shape/count).
+      const sourceNode = index.nodeById.get(ex.edge.source);
+      const targetNode = index.nodeById.get(ex.edge.target);
+      if (sourceNode === undefined || targetNode === undefined) continue;
+      if (!isEdgeAccessible(ex.edge, sourceNode, targetNode, ctx, policy)) continue;
+      // caller entity-type allow-list on the node we traverse TO.
+      const other = index.nodeById.get(ex.otherId)!;
+      if (limits.allowedEntityTypes && !limits.allowedEntityTypes.includes(other.entityType)) continue;
       out.push(ex);
     }
     out.sort((a, b) => compareEdges(a.edge, b.edge));
@@ -726,10 +791,11 @@ export class BusinessGraphTraversalService {
     startId: string,
     index: GraphIndexView,
     ctx: GraphQueryContext,
-    limits: GraphTraversalQueryLimits,
+    policy: EdgePolicy,
     mode: "outbound" | "incident",
     relFilter?: (edge: BusinessGraphEdge) => boolean,
   ): { reached: Map<string, { distance: number; path: GraphPath }>; truncated: GraphTruncationState } {
+    const limits = policy.limits;
     const truncated = emptyTruncation();
     const reached = new Map<string, { distance: number; path: GraphPath }>();
     reached.set(startId, { distance: 0, path: emptyPath(startId) });
@@ -742,7 +808,7 @@ export class BusinessGraphTraversalService {
       depth += 1;
       const next: FrontierNode[] = [];
       for (const f of frontier) {
-        for (const ex of this.expand(f.id, index, ctx, limits, mode, relFilter)) {
+        for (const ex of this.expand(f.id, index, ctx, policy, mode, relFilter)) {
           if (edgeBudget <= 0) {
             truncated.byEdges = truncated.truncated = true;
             stop = true;
@@ -775,8 +841,9 @@ export class BusinessGraphTraversalService {
     targetId: string,
     index: GraphIndexView,
     ctx: GraphQueryContext,
-    limits: GraphTraversalQueryLimits,
+    policy: EdgePolicy,
   ): { paths: GraphPath[]; truncated: GraphTruncationState } {
+    const limits = policy.limits;
     const truncated = emptyTruncation();
     if (startId === targetId) {
       return { paths: [emptyPath(startId)], truncated };
@@ -793,7 +860,7 @@ export class BusinessGraphTraversalService {
       const next: FrontierNode[] = [];
       const reachedThisLevel = new Set<string>();
       for (const f of frontier) {
-        for (const ex of this.expand(f.id, index, ctx, limits, "outbound")) {
+        for (const ex of this.expand(f.id, index, ctx, policy, "outbound")) {
           if (edgeBudget <= 0) {
             truncated.byEdges = truncated.truncated = true;
             stop = true;
@@ -844,6 +911,7 @@ export class BusinessGraphTraversalService {
       searchTextClass: prep.searchTextClass,
       startNodeId: prep.startNodeId,
       targetNodeId: prep.targetNodeId,
+      staleAccessAuthorized: prep.staleAccessAuthorized,
       health: prep.health,
       snapshotId: prep.snapshot.snapshotId,
       registryVersion: null,
@@ -875,22 +943,22 @@ export class BusinessGraphTraversalService {
       includeUnverified: ctx.includeUnverified === true,
     };
 
-    const queryId = await deriveQueryId({
+    // execution identity (unique per run) is SEPARATE from request identity
+    // (deterministic fingerprint over the safe normalized query). Neither is a key.
+    const executionId = this.executionIdProvider();
+    const requestFingerprint = await deriveRequestFingerprint({
       operation,
       organizationId: ctx.organizationId,
-      actorRef: ctx.viewer.actor,
-      snapshotId,
       startNodeId: prep.startNodeId,
       targetNodeId: prep.targetNodeId,
-      searchTextHash: prep.searchTextHash,
       appliedLimits: prep.appliedLimits,
       filters,
-      stale: prep.stale,
-      health: prep.health,
+      searchTextHash: prep.searchTextHash,
     });
 
     const audit = {
-      queryId,
+      executionId,
+      requestFingerprint,
       actorRef: ctx.viewer.actor,
       organizationId: ctx.organizationId,
       operation,
@@ -902,6 +970,7 @@ export class BusinessGraphTraversalService {
       truncated,
       health: prep.health,
       safeDenialReason: refusalReason,
+      staleAccessAuthorized: prep.staleAccessAuthorized,
       durationBucket: durationBucket(this.now() - started),
       searchTextHash: prep.searchTextHash,
       searchTextClass: prep.searchTextClass,

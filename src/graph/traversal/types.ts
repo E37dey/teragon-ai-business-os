@@ -237,12 +237,20 @@ export interface GraphQueryResultCounts {
 }
 
 /**
- * The safe, auditable record of one traversal. `queryId` is DETERMINISTIC —
- * derived (SHA-256) from the query identity, never wall-clock/random. Raw search
- * text is NEVER stored: only a `searchTextHash` + a coarse `searchTextClass`.
+ * The safe, auditable record of one traversal. Execution identity and request
+ * identity are DISTINCT:
+ *   • `executionId` is UNIQUE per execution (injected provider; default
+ *     crypto.randomUUID) — it names THIS run and is NEVER used as a key;
+ *   • `requestFingerprint` is DETERMINISTIC (SHA-256) over the SAFE normalized
+ *     request identity — it names the QUERY, correlates repeats, and is likewise
+ *     never a database key.
+ * Raw search text is NEVER stored: only a `searchTextHash` + a coarse
+ * `searchTextClass`. `staleAccessAuthorized` records (as a safe boolean) whether a
+ * STALE/DEGRADED snapshot was served under an explicit stale-access grant.
  */
 export interface GraphQueryAuditRecord {
-  queryId: string;
+  executionId: string;
+  requestFingerprint: string;
   actorRef: ActorRef;
   organizationId: string;
   operation: GraphTraversalOperation;
@@ -254,6 +262,7 @@ export interface GraphQueryAuditRecord {
   truncated: GraphTruncationState;
   health: GraphIndexHealthState;
   safeDenialReason: string | null;
+  staleAccessAuthorized: boolean;
   durationBucket: string;
   searchTextHash: string | null;
   searchTextClass: string | null;
@@ -282,6 +291,13 @@ export interface GraphPermissionOracle {
     entityType: GraphEntityType,
     node: BusinessGraphNode,
   ): boolean;
+  /**
+   * May this viewer traverse a STALE/DEGRADED snapshot? Consulted ONLY when the
+   * health gate is STALE/DEGRADED, the request set `allowStale`, and the actor is
+   * an internal HUMAN/SYSTEM. Deny-by-default: `false` refuses the stale graph
+   * (setting `allowStale` is only a REQUEST, never a grant).
+   */
+  canUseStaleGraph(viewer: GraphViewerContext, health: GraphIndexHealthState): boolean;
 }
 
 export interface GraphQueryContext {
@@ -294,6 +310,13 @@ export interface GraphQueryContext {
   revealReason?: string;
   /** explicitly authorized to receive a STALE/DEGRADED result (marked stale) */
   allowStale?: boolean;
+  /**
+   * The wall-clock "as of" instant (ISO) an edge's lifecycle validity is judged
+   * against (validFrom/validUntil). When absent, the service's injected clock
+   * supplies it — there is NO hidden `Date.now()`; when neither is present,
+   * temporal lifecycle gating is not applied (Phase-6 behavior preserved).
+   */
+  asOf?: string;
   /** permit INFERRED-provenance edges (kept visibly labelled) */
   includeInferred?: boolean;
   /** permit UNVERIFIED/PROPOSED-authority edges (kept visibly labelled) */
@@ -310,6 +333,7 @@ export const graphQueryContextScalarsSchema = z
     viewerClearance: z.enum(["ציבורי", "פנימי", "רגיש", "מוגבל"]),
     revealReason: z.string().min(1).optional(),
     allowStale: z.boolean().optional(),
+    asOf: z.string().min(1).optional(),
     includeInferred: z.boolean().optional(),
     includeUnverified: z.boolean().optional(),
     correlationId: z.string().min(1).optional(),

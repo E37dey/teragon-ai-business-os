@@ -3,6 +3,7 @@
 // a controllable stub store (arbitrary health + org-scoped snapshot), synthetic
 // snapshot builders for edge-mode / hidden-node cases, and permission oracles.
 import {
+  BusinessGraphTraversalService,
   buildNodeId,
   rebuildOrganizationGraph,
   toGraphEdgeId,
@@ -16,6 +17,7 @@ import {
   type GraphQueryContext,
   type GraphRelationshipType,
   type GraphSensitivity,
+  type TraversalServiceOptions,
   type TraversalStore,
 } from "@/graph";
 import { VALID_CONTEXT, VALID_ORG, buildValidRecords } from "../fixtures/validFixture";
@@ -83,6 +85,31 @@ export function healthyStore(snap: GraphIndexSnapshot): StubStore {
   return new StubStore(snap, makeHealth("HEALTHY", snap.snapshotId, snap.organizationId));
 }
 
+// ---------------------------------------------------------------------------
+// deterministic service construction (fixed clock + fixed executionId)
+// ---------------------------------------------------------------------------
+
+/** A fixed monotonic clock (ms) — deterministic duration bucket. */
+export const FIXED_NOW = (): number => 0;
+/** A fixed execution-id provider — deterministic executionId for byte-identity tests. */
+export const FIXED_EXEC = (): string => "exec-fixed";
+
+/** Service options with a fixed clock + a fixed executionId provider (unless overridden). */
+export function detOptions(over: Partial<TraversalServiceOptions> = {}): TraversalServiceOptions {
+  return { now: FIXED_NOW, executionIdProvider: FIXED_EXEC, ...over };
+}
+
+/** A HEALTHY, fully-deterministic service over `snap`. */
+export function detService(snap: GraphIndexSnapshot): BusinessGraphTraversalService {
+  return new BusinessGraphTraversalService(healthyStore(snap), detOptions());
+}
+
+/** A counter execution-id provider (exec-1, exec-2, …) — distinct per call. */
+export function counterExec(): () => string {
+  let n = 0;
+  return () => `exec-${(n += 1)}`;
+}
+
 /** A stub in an arbitrary health state serving `snap`. */
 export function storeWithHealth(snap: GraphIndexSnapshot, state: GraphIndexHealthState): StubStore {
   return new StubStore(snap, makeHealth(state, snap.snapshotId, snap.organizationId));
@@ -95,12 +122,14 @@ export function storeWithHealth(snap: GraphIndexSnapshot, state: GraphIndexHealt
 export const ALLOW_ALL: GraphPermissionOracle = {
   canReadEntity: () => true,
   agentDomainAllowed: () => true,
+  canUseStaleGraph: () => true,
 };
 
 export function denyEntityTypes(types: ReadonlySet<GraphEntityType>): GraphPermissionOracle {
   return {
     canReadEntity: (_v, t) => !types.has(t),
     agentDomainAllowed: () => true,
+    canUseStaleGraph: () => true,
   };
 }
 
@@ -108,6 +137,7 @@ export function denyNodeIds(ids: ReadonlySet<string>): GraphPermissionOracle {
   return {
     canReadEntity: (_v, _t, node) => !ids.has(node.id),
     agentDomainAllowed: () => true,
+    canUseStaleGraph: () => true,
   };
 }
 
@@ -115,8 +145,16 @@ export function agentBanDomains(banned: ReadonlySet<GraphEntityType>): GraphPerm
   return {
     canReadEntity: () => true,
     agentDomainAllowed: (_v, t) => !banned.has(t),
+    canUseStaleGraph: () => true,
   };
 }
+
+/** An oracle that permits everything EXCEPT stale-graph traversal (deny-by-default). */
+export const DENY_STALE: GraphPermissionOracle = {
+  canReadEntity: () => true,
+  agentDomainAllowed: () => true,
+  canUseStaleGraph: () => false,
+};
 
 // ---------------------------------------------------------------------------
 // query context

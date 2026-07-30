@@ -4,6 +4,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { BusinessGraphTraversalService, type GraphIndexSnapshot } from "@/graph";
 import {
+  DENY_STALE,
   ctxFor,
   deriveValidSnapshot,
   healthyStore,
@@ -44,13 +45,36 @@ describe("deny-by-default staleness", () => {
       expect(r.refusalReason).toBe("STALE_NOT_AUTHORIZED");
     });
 
-    it(`${state} WITH allowStale → result served but MARKED stale`, async () => {
+    it(`${state} WITH allowStale (internal HUMAN + oracle grants) → served, MARKED stale, audit records authorization`, async () => {
       const svc = new BusinessGraphTraversalService(storeWithHealth(snap, state), { now: FIXED_NOW });
       const r = await svc.getNode(req(), ctxFor({ allowStale: true }));
       expect(r.ok).toBe(true);
       expect(r.data).not.toBeNull();
       expect(r.stale).toBe(true);
       expect(r.health).toBe(state);
+      // the audit trail records the stale-access authorization (safe boolean).
+      expect(r.audit.staleAccessAuthorized).toBe(true);
+    });
+
+    it(`${state} WITH allowStale but the oracle DENIES stale → refusal STALE_NOT_AUTHORIZED`, async () => {
+      const svc = new BusinessGraphTraversalService(storeWithHealth(snap, state), { now: FIXED_NOW });
+      const r = await svc.getNode(req(), ctxFor({ allowStale: true, permissions: DENY_STALE }));
+      expect(r.ok).toBe(false);
+      expect(r.data).toBeNull();
+      expect(r.refusalReason).toBe("STALE_NOT_AUTHORIZED");
+      expect(r.audit.staleAccessAuthorized).toBe(false);
+    });
+
+    it(`${state} WITH allowStale but the actor is an AGENT → NEVER granted (refusal)`, async () => {
+      const svc = new BusinessGraphTraversalService(storeWithHealth(snap, state), { now: FIXED_NOW });
+      const agentCtx = ctxFor({
+        allowStale: true,
+        viewer: { organizationId: "org-canonical", actor: { kind: "AGENT", agentId: "ag-7" } },
+      });
+      const r = await svc.getNode(req(), agentCtx);
+      expect(r.ok).toBe(false);
+      expect(r.refusalReason).toBe("STALE_NOT_AUTHORIZED");
+      expect(r.audit.staleAccessAuthorized).toBe(false);
     });
   }
 });

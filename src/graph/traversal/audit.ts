@@ -1,10 +1,12 @@
-// TERAGON Business Graph — safe query audit (Phase 6).
-// A traversal emits an audit record of SAFE METADATA ONLY. `queryId` is
-// deterministic (SHA-256 over the query identity — never a clock/random). Raw
-// search text is NEVER logged: only a stable hash + a coarse classification, so
-// a sensitive search string cannot leak through the audit trail.
+// TERAGON Business Graph — safe query audit (Phase 6 + 6.1).
+// A traversal emits an audit record of SAFE METADATA ONLY. Execution identity and
+// request identity are SEPARATE (Phase 6.1): `executionId` is unique per run (an
+// injected provider; default crypto.randomUUID) and names THIS execution, while
+// `requestFingerprint` is deterministic (SHA-256 over the safe normalized request
+// identity) and names the QUERY — correlating repeats without being a key. Raw
+// search text is NEVER logged: only a stable hash + a coarse classification, so a
+// sensitive search string cannot leak through the audit trail.
 import { canonicalJSON, sha256Hex, type Canonicalizable } from "../store/hash";
-import type { ActorRef } from "../contracts/actor";
 import type {
   GraphQueryFilters,
   GraphTraversalOperation,
@@ -39,26 +41,39 @@ export async function protectSearchText(
   return { hash, classification };
 }
 
-export interface QueryIdInput {
+/**
+ * The SAFE, normalized request identity that the deterministic fingerprint is
+ * computed over. It carries ONLY request-shaping values — operation, org, the
+ * start/target node ids, the resolved applied limits, the filter flags, and the
+ * search-text HASH (never the raw text). It deliberately EXCLUDES execution
+ * context (actor, snapshotId, stale, health) and result-derived fields (counts,
+ * duration): those name the EXECUTION, not the request.
+ */
+export interface RequestFingerprintInput {
   operation: GraphTraversalOperation;
   organizationId: string;
-  actorRef: ActorRef;
-  snapshotId: string | null;
   startNodeId: string | null;
   targetNodeId: string | null;
-  searchTextHash: string | null;
   appliedLimits: GraphTraversalQueryLimits;
   filters: GraphQueryFilters;
-  stale: boolean;
-  health: string;
+  searchTextHash: string | null;
 }
 
 /**
- * Derive the deterministic query id. Identical query identity ⇒ identical id, on
- * any machine, at any time (no wall-clock, no randomness). Result-derived fields
- * (counts, duration) are deliberately EXCLUDED so the id names the QUERY.
+ * Derive the deterministic request fingerprint. Identical request identity ⇒
+ * identical fingerprint, on any machine, at any time (no wall-clock, no
+ * randomness). It is a CORRELATION value only — never a database primary key.
  */
-export async function deriveQueryId(input: QueryIdInput): Promise<string> {
-  const digest = await sha256Hex(canonicalJSON(input as unknown as Canonicalizable));
-  return `gq-${digest}`;
+export async function deriveRequestFingerprint(input: RequestFingerprintInput): Promise<string> {
+  return sha256Hex(canonicalJSON(input as unknown as Canonicalizable));
+}
+
+/**
+ * The default execution-id provider: a fresh Web Crypto UUID per call (allowed —
+ * it is NOT `Math.random`/`Date.now`). Injected into the service so tests can
+ * substitute a deterministic counter. The value names ONE execution and is never
+ * used as a key.
+ */
+export function newExecutionId(): string {
+  return globalThis.crypto.randomUUID();
 }

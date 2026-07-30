@@ -26,12 +26,20 @@ export {
   isNodeAccessible,
   classifyEdge,
   isEdgePermitted,
+  isEdgeAccessible,
+  relationshipRequiresApproval,
+  APPROVAL_REQUIRED_RELATIONSHIPS,
 } from "./security";
-export type { NodeAccessOptions, EdgeTraversalClass } from "./security";
+export type { NodeAccessOptions, EdgeTraversalClass, EdgeAccessOptions } from "./security";
 
 // --- audit ---
-export { durationBucket, protectSearchText, deriveQueryId } from "./audit";
-export type { QueryIdInput } from "./audit";
+export {
+  durationBucket,
+  protectSearchText,
+  deriveRequestFingerprint,
+  newExecutionId,
+} from "./audit";
+export type { RequestFingerprintInput } from "./audit";
 
 // --- types ---
 export {
