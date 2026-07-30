@@ -50,6 +50,17 @@ reference, organization, readiness, health, result count, truncation, safe error
 execution ids. It **never** records raw search text, protected bodies, or sensitive request fields, and it
 never merges separate executions into one record.
 
+## Runtime guards (Phase 10)
+
+Beyond the facade feature flag, runtime access adds two more independent guards, all defaulting closed: a
+**trusted-identity** requirement (no real auth exists → `IDENTITY_UNAVAILABLE`; never a fabricated admin)
+and an **internal rollout approval** (`BUSINESS_GRAPH_RUNTIME_ROLLOUT_APPROVED = false`, dev never
+approves). The [runtime access policy](BUSINESS_GRAPH_RUNTIME_ACCESS_POLICY.md) requires feature + rollout +
+identity + mapped capability + same-org + supported health before `ENABLED`. Audit gains a fail-closed
+policy for sensitive queries (see [RUNTIME_AUDIT](BUSINESS_GRAPH_RUNTIME_AUDIT.md)), and no query ever runs
+with permissions from an earlier session ([SESSION_LIFECYCLE](BUSINESS_GRAPH_SESSION_LIFECYCLE.md)).
+
 See [APPLICATION_FACADE](BUSINESS_GRAPH_APPLICATION_FACADE.md) ·
 [FACADE_READINESS](BUSINESS_GRAPH_FACADE_READINESS.md) ·
-[SECURITY_CONTRACTS](BUSINESS_GRAPH_SECURITY_CONTRACTS.md).
+[SECURITY_CONTRACTS](BUSINESS_GRAPH_SECURITY_CONTRACTS.md) ·
+[RUNTIME_ACCESS_POLICY](BUSINESS_GRAPH_RUNTIME_ACCESS_POLICY.md).

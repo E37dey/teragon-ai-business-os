@@ -63,5 +63,15 @@ Every facade query runs, in order:
    authority, approval state, truncation, snapshotId, policyVersion.
 8. **correlated audit completion** — see AUDIT below.
 
+## Runtime composition (Phase 10)
+
+The facade is constructed for a **real authenticated human viewer** only through the Phase-10
+[runtime composition](BUSINESS_GRAPH_RUNTIME_COMPOSITION.md) (`RuntimeBusinessGraphComposition` /
+`RuntimeBusinessGraphLifecycle`), which supplies the trusted identity resolver, the role→graph permission
+mapping, and the audit adapter, and gates access behind the
+[runtime access policy](BUSINESS_GRAPH_RUNTIME_ACCESS_POLICY.md) (rollout default **not approved**).
+Product modules never construct the facade or its services directly, and it is never attached to `window`.
+
 See: [IDENTITY_ADAPTER](BUSINESS_GRAPH_IDENTITY_ADAPTER.md) · [FACADE_SECURITY](BUSINESS_GRAPH_FACADE_SECURITY.md)
-· [FACADE_READINESS](BUSINESS_GRAPH_FACADE_READINESS.md) · [PHASE8_TEST_REPORT](BUSINESS_GRAPH_PHASE8_TEST_REPORT.md).
+· [FACADE_READINESS](BUSINESS_GRAPH_FACADE_READINESS.md) · [PHASE8_TEST_REPORT](BUSINESS_GRAPH_PHASE8_TEST_REPORT.md)
+· [RUNTIME_COMPOSITION](BUSINESS_GRAPH_RUNTIME_COMPOSITION.md).

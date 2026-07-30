@@ -45,5 +45,16 @@ authentication (single demo CEO), so rather than fabricate an admin, the honest 
 **deny** until a real identity source is wired. Tests inject a deterministic resolver to exercise the
 enabled path.
 
+## Phase 10 — runtime resolver
+
+Phase 10 adds `RuntimeBusinessGraphIdentityResolver`, which resolves a trusted `GraphViewerContext` **only**
+from an injected `TrustedSessionSource` + `ActiveUserLookup` (active user = `status "פעיל"`), maps the
+canonical role via the [runtime authorization map](BUSINESS_GRAPH_RUNTIME_AUTHORIZATION_MAP.md), and denies
+AGENT/SYSTEM (HUMAN-only this phase). Because the app still has **no real authentication**, the production
+composition binds it to an `UnavailableTrustedSessionSource` → every resolve yields `IDENTITY_UNAVAILABLE`;
+it never trusts `u-tzachi`, the localStorage role, or a display name. See
+[RUNTIME_IDENTITY_DISCOVERY](BUSINESS_GRAPH_RUNTIME_IDENTITY_DISCOVERY.md) and
+[RUNTIME_COMPOSITION](BUSINESS_GRAPH_RUNTIME_COMPOSITION.md).
+
 See [APPLICATION_FACADE](BUSINESS_GRAPH_APPLICATION_FACADE.md) and
 [FACADE_SECURITY](BUSINESS_GRAPH_FACADE_SECURITY.md).
