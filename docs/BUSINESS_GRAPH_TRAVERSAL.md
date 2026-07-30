@@ -33,9 +33,16 @@ Inspect `getHealth(organizationId)`:
 
 - `CORRUPT` / `MISSING` / `REBUILD_REQUIRED` → **refuse** — the snapshot is never read, `data: null`,
   reason `GRAPH_UNAVAILABLE`.
-- `STALE` / `DEGRADED` → **deny by default**; only a caller with `allowStale: true` receives a result
-  **marked `stale: true`**.
+- `STALE` / `DEGRADED` → **deny by default**; stale data is served only under the Phase-6.1
+  **stale authorization** (below), and then the result is **marked `stale: true`**.
 - `HEALTHY` → normal traversal.
+
+### Stale authorization (Phase 6.1)
+
+`allowStale: true` is only a *request*. STALE/DEGRADED data is traversed **only** when ALL hold:
+`allowStale` is set · the actor is `HUMAN` or `SYSTEM` (an **`AGENT` is refused even with the flag**) ·
+the oracle `canUseStaleGraph(viewer, health)` grants it. The result stays `stale: true` and the audit
+records `staleAccessAuthorized`. Any miss → the same refusal path as a healthy denial.
 
 Every `GraphTraversalResult` carries `snapshotId`, `organizationId`, `health`, `stale`, `registryVersion`,
 `limitsApplied`, and `truncated`. **A stale result is never returned as current.**
@@ -55,6 +62,19 @@ timing. **An unauthorized start node returns the exact same `NODE_NOT_FOUND` ref
 byte-identical (proven by a `JSON.stringify`-equality test) — so the graph's existence cannot be probed.
 Nodes are envelope-only by contract: **no protected payload body is ever returned** (at most a gated
 reference).
+
+### Centralized edge security — `isEdgeAccessible` (Phase 6.1)
+
+A visible node pair does **not** authorize their connecting edge. Every edge in the BFS/`expand()`, plus
+`findConflicts` and `getTimeline`, routes through one deny-by-default predicate
+`isEdgeAccessible(edge, sourceNode, targetNode, ctx)` requiring ALL of: edge org === ctx org === viewer
+org (cross-org edge always denied) · **both** endpoints `isNodeAccessible` · relationship-type allow-list
+· edge sensitivity within clearance · **temporal validity at an injected `asOf`** (a future-valid
+`validFrom > asOf`, or an expired `validUntil ≤ asOf`, is denied) · `staleState` policy (BROKEN/UNRESOLVED
+denied; SUPERSEDED historical-only; STALE only when stale-authorized) · authority/provenance mode
+(`REJECTED` never; INFERRED needs `includeInferred`; UNVERIFIED/PROPOSED need `includeUnverified`) ·
+approval eligibility. `asOf` comes from `ctx.asOf` or an injected clock — **no hidden `Date.now`**. A
+hidden edge is indistinguishable from an absent one (no leak via path counts or result shape).
 
 ## Limits — hard internal maxima, caller may only reduce
 
@@ -96,11 +116,22 @@ stays **visibly labelled** — every `GraphPathStep`/evidence item carries its `
 
 ## Audit (every traversal)
 
-Emits a `GraphQueryAuditRecord` of **safe metadata only**: deterministic `queryId` (`gq-<sha256>` over the
-query identity — **no clock, no random**), `actorRef`, `organizationId`, `operation`, `snapshotId`,
-requested + applied limits, filters, result counts, `truncated`, `health`, `safeDenialReason`, coarse
-`durationBucket`. **Raw search text is never stored** — only a SHA-256 `searchTextHash` + a length-coarse
-`searchTextClass`. No node bodies or sensitive field values appear.
+Emits a `GraphQueryAuditRecord` of **safe metadata only**. Execution identity and request identity are
+**separated** (Phase 6.1): `executionId` is **unique per execution** (injected provider, default Web
+Crypto `randomUUID`, never a key) and `requestFingerprint` is a **deterministic** SHA-256 over the safe
+normalized query identity (operation, org, start/target node ids, applied limits, filters, and the
+search-text *hash*). Identical queries therefore get **distinct `executionId`** but the **same
+`requestFingerprint`**, and produce **separate** records. Plus `actorRef`, `organizationId`, `operation`,
+`snapshotId`, requested + applied limits, filters, result counts, `truncated`, `health`,
+`staleAccessAuthorized`, `safeDenialReason`, coarse `durationBucket`. **Raw search text is never stored** —
+only a SHA-256 `searchTextHash` + a length-coarse `searchTextClass`. No node bodies or sensitive field
+values appear.
+
+## Built on top of this layer
+
+The Phase 7 internal [business query pack](BUSINESS_GRAPH_BUSINESS_QUERIES.md) composes this traversal
+service exclusively (no re-implemented BFS, no store reads, no protected bodies) to answer typed Teragon
+business questions with evidence paths.
 
 ## Example results (valid fixture, org `org-canonical`)
 

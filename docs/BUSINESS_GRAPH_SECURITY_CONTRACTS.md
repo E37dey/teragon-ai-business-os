@@ -50,6 +50,31 @@ yet. (Design rationale in [SECURITY_MODEL](BUSINESS_GRAPH_SECURITY_MODEL.md).)
 8. **Hard agent walls** (to enforce in the traversal phase via `canAgent`): all 7 agents are barred from
    `approvals/auditEvents/users/roles`, plus per-agent bans (e.g. Hunter↛serviceTickets, Flow↛customers).
 
+## Traversal & query enforcement (Phases 6 / 6.1 / 7)
+
+The enforcement the Phase-1 contracts only *shaped* now exists in the read-only layers:
+
+9. **Per-hop node security** — `isNodeAccessible` gates the start node and every traversed node (org +
+   clearance + entity permission + agent domain + lifecycle). Connection never grants visibility; an
+   inaccessible node is dropped before the BFS frontier, and an unauthorized start node is
+   byte-identical to an absent one.
+10. **Per-edge security** — `isEdgeAccessible` (Phase 6.1) independently gates every edge: edge/viewer/
+    snapshot org agreement (cross-org always denied), both endpoints accessible, relationship allow-list,
+    edge sensitivity within clearance, temporal validity at an injected `asOf` (future/expired denied),
+    `staleState` policy, authority/provenance mode (REJECTED never; INFERRED/UNVERIFIED/PROPOSED gated),
+    and approval eligibility. **A visible node pair never auto-authorizes their edge.**
+11. **Stale is authorization, not a flag** — STALE/DEGRADED served only with `allowStale` + HUMAN/SYSTEM
+    actor + oracle `canUseStaleGraph`; an AGENT is refused even with the flag; the result is stale-marked
+    and the authorization is audited.
+12. **Split audit identity** — `executionId` (unique per execution) vs `requestFingerprint` (deterministic
+    SHA-256 of the safe normalized query); raw search text never enters either (hash/class only).
+13. **No aggregate leaks (Phase 7)** — business queries assemble findings only from traversal-filtered
+    results and derive all counts from those findings, so a hidden entity never affects a total. Business
+    queries go through the traversal service exclusively, never open a protected body, invent no
+    confidence, and audit both the business query and its underlying traversal ops.
+
+See [TRAVERSAL](BUSINESS_GRAPH_TRAVERSAL.md) and [BUSINESS_QUERIES](BUSINESS_GRAPH_BUSINESS_QUERIES.md).
+
 ## Honesty caveat (carried from Phase 1)
 
 The app has **no real authentication** (single CEO identity, demo mode). These contracts are governance
