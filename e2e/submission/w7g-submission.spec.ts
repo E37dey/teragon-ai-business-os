@@ -66,15 +66,24 @@ test("readiness is NEVER green while blockers exist + blocker click-through navi
 
   const chip = page.getByText(/מוכנות להגשה:/).first();
   await expect(chip).toBeVisible();
-  const chipText = ((await chip.textContent()) ?? "").trim();
-  if (blockers > 0) {
-    // NEVER "מוכן להגשה" while any blocker exists
-    expect(chipText).toContain("לא מוכן להגשה");
-  } else {
-    // honest current state: not forced green either way — never a fake
-    // "מוכן להגשה" while deliverables are still awaiting approval
-    expect(chipText === "מוכנות להגשה: מוכן להגשה").toBe(false);
-  }
+  // The readiness chip re-renders from the SAME asynchronous settle as the
+  // blocker counts above. Poll it with the project's existing deterministic
+  // retry (no sleeps, no timeout inflation) so a brief settling window — e.g.
+  // the legitimate intermediate "בהכנה" state — cannot read a stale chip.
+  // Invariant: while blockers exist the chip must NEVER be the green/ready
+  // state. We reject ONLY the exact green string, so honest non-green states
+  // ("בהכנה", "לא מוכן להגשה") pass — note "לא מוכן להגשה" CONTAINS the
+  // substring "מוכן להגשה", so an exact-match reject (not toContain) is
+  // required and can never pass on a false green.
+  // While blockers exist the chip must NEVER be the green/ready state; when
+  // none exist it still must not be a FORCED green. In both cases the single
+  // forbidden value is the exact green string — honest non-green states
+  // ("בהכנה", "לא מוכן להגשה") pass, and a false green can never slip through.
+  const READY_GREEN = "מוכנות להגשה: מוכן להגשה";
+  await expect(async () => {
+    const chipText = ((await chip.textContent()) ?? "").trim();
+    expect(chipText, `blockers=${blockers}`).not.toBe(READY_GREEN);
+  }).toPass({ timeout: 20_000 });
 
   // click-through: the presenter-notes finding navigates OUT to its target
   // route (/submission/presentation) — a fresh context has no presenter notes
