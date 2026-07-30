@@ -28,6 +28,13 @@ Because the production session source always returns `null`, every production re
 inert until a real authentication boundary is wired. Tests inject an in-memory
 `sessionSourceFrom([...])` + `userLookupFrom([activeUser(...)])`.
 
+**Phase 11:** `createOperatorRuntimeComposition` (see [OPERATOR_AUTH](BUSINESS_GRAPH_OPERATOR_AUTH.md))
+provides that real boundary — it binds an `OperatorTrustedSessionSource` + a real `ActiveUserLookup` in
+place of the Unavailable/Empty defaults, while deliberately **omitting** the facade/rollout overrides so
+those guards stay OFF. An authenticated operator therefore still receives `FEATURE_DISABLED` /
+`ROLLOUT_NOT_APPROVED` from the access policy — authentication makes a trustworthy session obtainable but
+does not, by itself, open graph access.
+
 ## Lifecycle rules
 
 - **Lazy** — constructing the composition/lifecycle invokes the store-provider factory **0** times

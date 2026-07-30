@@ -42,6 +42,17 @@ production path stays closed until a real authentication boundary exists. This m
 forcing function for real authentication before any UI or agent may consume graph results (see the Phase 11
 recommendation).
 
+## Phase 11 update — a real (headless) authentication boundary now exists
+
+Phase 11 adds a headless internal-operator authentication foundation
+([OPERATOR_AUTH](BUSINESS_GRAPH_OPERATOR_AUTH.md)) that produces a genuine `TrustedAuthenticatedSession`
+from a verified operator credential against a real **active** canonical user — the honest replacement for
+`UnavailableTrustedSessionSource`. It is **OFF by default** and **decoupled from graph access** (an
+authenticated operator still gets `FEATURE_DISABLED`/`ROLLOUT_NOT_APPROVED` until those guards are
+deliberately enabled). So a trustworthy identity is now *obtainable* for controlled internal rollout, while
+the discovery's core conclusion still holds for the ordinary app: it has no ambient authenticated user, and
+nothing trusts `u-tzachi` or the localStorage role.
+
 See: [RUNTIME_AUTHORIZATION_MAP](BUSINESS_GRAPH_RUNTIME_AUTHORIZATION_MAP.md) ·
 [RUNTIME_COMPOSITION](BUSINESS_GRAPH_RUNTIME_COMPOSITION.md) ·
 [RUNTIME_ACCESS_POLICY](BUSINESS_GRAPH_RUNTIME_ACCESS_POLICY.md).

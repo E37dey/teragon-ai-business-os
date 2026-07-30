@@ -523,3 +523,42 @@ export type {
   RuntimeStatusExecution,
   AcquireOptions,
 } from "./runtime";
+
+// --- auth (Phase 11 — headless internal-operator AUTHENTICATION foundation:
+//     a REAL trusted-session boundary for the Phase-10 resolver; default OFF,
+//     UNWIRED, no UI/route/nav. Auth availability does NOT enable graph access) ---
+export {
+  BUSINESS_GRAPH_OPERATOR_AUTH_ENABLED,
+  resolveOperatorAuthEnabled,
+  createOperatorAuthPolicy,
+  OPERATOR_AUTH_DEFAULTS,
+  OPERATOR_AUTH_ENV_KEYS,
+  parseOperatorAuthConfig,
+  constantTimeEqual,
+  verifyOperatorSecret,
+  createWebCryptoRandomSource,
+  OperatorSessionStore,
+  safeSessionHandle,
+  OperatorAuthenticator,
+  isAuthenticated,
+  OperatorTrustedSessionSource,
+  createOperatorActiveUserLookup,
+  createOperatorRuntimeComposition,
+} from "./auth";
+export type {
+  OperatorAuthPolicy,
+  OperatorAuthConfig,
+  OperatorCredentialVerifier,
+  OperatorRandomSource,
+  OperatorSessionIdentity,
+  LiveOperatorSession,
+  OperatorSessionAtRest,
+  OperatorSessionStoreOptions,
+  OperatorAuthDenialReason,
+  OperatorAuthResult,
+  OperatorAuthenticatorDeps,
+  OperatorTrustedSessionSourceDeps,
+  OperatorUserRecordSource,
+  OperatorRuntimeComposition,
+  OperatorRuntimeCompositionOptions,
+} from "./auth";
