@@ -80,6 +80,30 @@ afterAll(async () => {
   if (ctx) await teardown(ctx);
 });
 
+// --- diagnostics probe (temporary): surfaces WHY authenticated writes are
+// resolving, so a CI run pinpoints auth-context vs org-injection issues. Logs
+// only org ids + booleans + safe error messages — never tokens/keys. ---------
+describe("0. diagnostics probe", () => {
+  it("logs the authenticated admin's resolved RLS context + a probe write", async () => {
+    bump();
+    const u = ctx.adminA;
+    const org = await u.raw.rpc("auth_org_id");
+    const active = await u.raw.rpc("is_active");
+    const cap = await u.raw.rpc("has_capability", { cap: "service.update" });
+    // eslint-disable-next-line no-console
+    console.log(
+      `[probe] adminA orgId=${u.orgId} role=${u.roleId}` +
+        ` auth_org_id=${JSON.stringify(org.data)} orgErr=${org.error?.message ?? ""}` +
+        ` is_active=${JSON.stringify(active.data)} actErr=${active.error?.message ?? ""}` +
+        ` has_capability(service.update)=${JSON.stringify(cap.data)} capErr=${cap.error?.message ?? ""}`,
+    );
+    const cust = await repo<BaseEntity>(u, "customers").create(makeCustomer(`cu-probe-${ctx.suffix}`));
+    // eslint-disable-next-line no-console
+    console.log(`[probe] customer.create result=${JSON.stringify(cust)}`);
+    expect(true).toBe(true);
+  });
+});
+
 // ===========================================================================
 // provider contract — the suite explicitly forces SUPABASE; LOCAL default holds
 // ===========================================================================
@@ -146,12 +170,19 @@ describe("1. identity & organization", () => {
 
   it("rejects a browser-supplied role — self role-escalation is structurally blocked", async () => {
     bump();
-    const { adminA, admin } = ctx;
-    // authenticated user tries to promote itself to CEO via the anon session.
-    await adminA.raw.from("profiles").update({ role_id: "crole-ceo" }).eq("id", adminA.userId).select();
+    // Use an ACTIVE NON-ADMIN (viewerA has no user.manage). Self role-escalation
+    // must be structurally impossible for such a user: the column-guarded
+    // profiles_self_update policy pins role_id to its stored value (WITH CHECK),
+    // and the admin-update policy does not apply (it requires user.manage). An
+    // admin (crole-sysadmin) is deliberately NOT used here — admins legitimately
+    // hold user.manage and MAY change roles (see the 04/05 RLS SQL proofs), so
+    // they are the wrong fixture for a "self-escalation-blocked" assertion.
+    const { viewerA, admin } = ctx;
+    // authenticated non-admin tries to promote itself to CEO via the anon session.
+    await viewerA.raw.from("profiles").update({ role_id: "crole-ceo" }).eq("id", viewerA.userId).select();
     // invariant inspection: the stored role is unchanged (column-guarded policy).
-    const after = await admin.from("profiles").select("role_id").eq("id", adminA.userId).single();
-    expect(after.data?.role_id).toBe("crole-sysadmin");
+    const after = await admin.from("profiles").select("role_id").eq("id", viewerA.userId).single();
+    expect(after.data?.role_id).toBe("crole-viewer");
   });
 });
 
