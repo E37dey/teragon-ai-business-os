@@ -11,3 +11,9 @@ playwright-report
 test-results
 *.tsbuildinfo
 .claude/
+
+# Supabase local/ephemeral state (config.toml + migrations + tests ARE tracked)
+supabase/.temp/
+supabase/.branches/
+supabase/.env
+.supabase/
