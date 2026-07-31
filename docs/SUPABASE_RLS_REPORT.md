@@ -71,3 +71,6 @@ Deny-by-default; tenant isolation from authenticated membership (never client in
 browser code; role-escalation blocked; `audit_events` immutable; bootstrap service-only; no destructive SQL.
 **These policies are authored and statically reviewed; live enforcement is proven in Gate S5** by running
 `supabase/tests/**` against the local Postgres — until then, RLS is verified by construction, not execution.
+**S5.1:** the 8 tests run in CI via `.github/workflows/supabase-live-validation.yml` (ephemeral local
+Postgres); current status **S5 BLOCKED — CI INFRASTRUCTURE** (repo not yet published) — see
+`SUPABASE_CI_VALIDATION_REPORT.md`.

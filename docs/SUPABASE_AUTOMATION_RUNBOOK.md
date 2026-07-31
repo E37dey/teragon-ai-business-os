@@ -45,6 +45,11 @@ Requires the Docker daemon + a host with enough free RAM for the ~10-container S
 See `SUPABASE_LOCAL_VALIDATION_REPORT.md` for the current **S5 PARTIAL** status (daemon starts, but this
 RAM-starved host left only 0.3 GB free → the stack cannot run safely) and the exact resume commands.
 
+**S5.1 — CI validation:** the live database validation runs in GitHub Actions on an ephemeral local Postgres
+(`.github/workflows/supabase-live-validation.yml`) — no remote project, no remote credentials. Current
+status **S5 BLOCKED — CI INFRASTRUCTURE** (the project has no published GitHub repo yet). See
+`SUPABASE_CI_VALIDATION_REPORT.md` for the resume path (authorize publication → push → `gh workflow run`).
+
 ## Remote staging (Gate S7) — gated
 
 Runs only when all of `SUPABASE_ACCESS_TOKEN`, `SUPABASE_ORG_ID`, `SUPABASE_DB_PASSWORD`,

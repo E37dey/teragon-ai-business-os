@@ -6,6 +6,14 @@
 migrations + RLS + repository integration tests did NOT run** — the host cannot start the Supabase local
 stack safely. No fake results, no remote database, no weakened RLS.
 
+> **S5.1 update — moved to CI.** Per instruction, live validation is relocated from this RAM-constrained
+> host to an isolated GitHub Actions ephemeral-Postgres workflow
+> (`.github/workflows/supabase-live-validation.yml`; commit `8525383`). Current status there is **S5 BLOCKED
+> — CI INFRASTRUCTURE**: the project has **no published GitHub repository** to run Actions on (gh is authed
+> as `E37dey`, but no remote exists, and publishing the whole codebase needs explicit authorization). See
+> `SUPABASE_CI_VALIDATION_REPORT.md`. The local-host Docker attempt below stands as the recorded reason for
+> moving to CI.
+
 ## Docker attempt (single, bounded — as required)
 
 1. **Memory/disk pre-check:** free RAM was 1.35 GB (during the build agents), 2.88 GB after they finished;
