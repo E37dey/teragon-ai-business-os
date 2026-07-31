@@ -246,8 +246,13 @@ create policy memberships_delete on public.memberships
 -- then gated by the policies above. (Supabase grants USAGE on schema public by
 -- default; repeated here idempotently.)
 -- ============================================================================
-grant usage on schema public to anon, authenticated;
+grant usage on schema public to anon, authenticated, service_role;
 grant select, insert, update, delete on all tables in schema public to authenticated;
 -- anon gets SELECT only (so unauthenticated reads resolve to 0 rows via RLS
 -- rather than a bare privilege error); it holds no write privilege at all.
 grant select on all tables in schema public to anon;
+-- service_role is the privileged server/back-end role (it also bypasses RLS in
+-- Supabase). It must hold full table access so server-side code and the
+-- service-only bootstrap path can read/write directly — RLS is the isolation
+-- boundary for anon/authenticated, not a substitute for these grants.
+grant select, insert, update, delete on all tables in schema public to service_role;
