@@ -16,6 +16,7 @@
     "format:check": "prettier --check .",
     "typecheck:tests": "tsc --noEmit -p tsconfig.tests.json",
     "scan:secrets": "node scripts/scan-bundle-secrets.mjs",
+    "platform:credentials": "node scripts/platform/bootstrap-credentials.mjs",
     "platform:plan": "node scripts/platform/plan.mjs",
     "platform:local": "node scripts/platform/validate-local.mjs",
     "platform:staging": "node scripts/platform/staging.mjs",

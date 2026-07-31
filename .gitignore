@@ -6,6 +6,11 @@ dist-ssr
 .env.*
 !.env.example
 !.env.deploy.example
+!.env.staging.local.example
+# S6.1 automated credential bootstrap output — NEVER commit (also matched by
+# *.local and .env.* above; listed explicitly as a hard guard).
+.env.staging.local
+.teragon-staging-recovery.*
 .netlify
 playwright-report
 test-results
