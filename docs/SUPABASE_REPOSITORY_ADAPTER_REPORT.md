@@ -55,5 +55,4 @@ typecheck:tests 0, build pass, secret CLEAN.
 
 **Live integration against the real schema/RLS (running the adapters against local Postgres) is Gate S5** —
 see the local-validation report. **S5.1:** relocated to CI
-(`.github/workflows/supabase-live-validation.yml`); current status **S5 BLOCKED — CI INFRASTRUCTURE**
-(repo not yet published) — see `SUPABASE_CI_VALIDATION_REPORT.md`.
+(`.github/workflows/supabase-live-validation.yml`); current status **S5 PASS** (run `30609542600`) — see `SUPABASE_CI_VALIDATION_REPORT.md`.
