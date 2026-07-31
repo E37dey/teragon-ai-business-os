@@ -1,5 +1,6 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from "vite";
+import { configDefaults } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
 import { execSync } from "node:child_process";
@@ -45,6 +46,10 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
+    // Live Supabase integration tests are a SEPARATE discovery path (their own
+    // config + `npm run test:supabase:live`). They must never appear in the
+    // default suite — so the default gate reports 0 skipped, never a skip.
+    exclude: [...configDefaults.exclude, "tests/supabase/live/**"],
     globals: false,
   },
 });

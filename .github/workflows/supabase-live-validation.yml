@@ -82,8 +82,8 @@ jobs:
             echo "supabase CLI:   $(npx --no-install supabase --version 2>&1)"
           } | tee ci-artifacts/diagnostics.txt
 
-      - name: Start local database (ephemeral, no remote)
-        run: npx supabase db start 2>&1 | tee ci-artifacts/db-start.log
+      - name: Start local Supabase stack (ephemeral, no remote — full stack for Auth/REST)
+        run: npx supabase start 2>&1 | tee ci-artifacts/db-start.log
 
       - name: Database lint
         run: npx supabase db lint 2>&1 | tee ci-artifacts/db-lint.log
@@ -128,15 +128,60 @@ jobs:
           test -s ci-artifacts/database.types.ts
           echo "generated types: $(wc -l < ci-artifacts/database.types.ts) lines" | tee ci-artifacts/gen-types.txt
 
-      - name: Repository adapter contract tests (mock) + integration harness (live)
+      - name: Repository adapter contract tests (mock)
+        run: npx vitest run tests/persistence 2>&1 | tee ci-artifacts/persistence-tests.log
+
+      - name: Export live Supabase env (MASKED — never printed/uploaded)
         run: |
           set -euo pipefail
-          npx vitest run tests/persistence 2>&1 | tee ci-artifacts/persistence-tests.log
-          if [ -d tests/supabase ]; then
-            SUPABASE_LOCAL_DB_URL="$LOCAL_DB_URL" npx vitest run tests/supabase 2>&1 | tee ci-artifacts/supabase-integration.log
-          else
-            echo "no tests/supabase live-integration suite present (RLS + schema psql tests are the live coverage)" | tee ci-artifacts/supabase-integration.log
-          fi
+          npx supabase status -o env > /tmp/sbenv 2>/dev/null
+          API_URL=$(grep -E '^(API_URL|SUPABASE_URL)=' /tmp/sbenv | head -1 | cut -d'"' -f2)
+          ANON=$(grep -E '^(ANON_KEY|SUPABASE_ANON_KEY)=' /tmp/sbenv | head -1 | cut -d'"' -f2)
+          SR=$(grep -E '^(SERVICE_ROLE_KEY|SUPABASE_SERVICE_ROLE_KEY)=' /tmp/sbenv | head -1 | cut -d'"' -f2)
+          # Mask secret values in ALL subsequent logs, then pass via GITHUB_ENV (not echoed).
+          echo "::add-mask::$ANON"
+          echo "::add-mask::$SR"
+          {
+            echo "SUPABASE_URL=$API_URL"
+            echo "SUPABASE_ANON_KEY=$ANON"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SR"
+            echo "PERSISTENCE_PROVIDER=SUPABASE"
+            echo "SUPABASE_LIVE_TESTS=1"
+          } >> "$GITHUB_ENV"
+          rm -f /tmp/sbenv
+          test -n "$API_URL" || { echo "FAIL: no local Supabase URL from supabase status"; exit 1; }
+          test -n "$ANON" -a -n "$SR" || { echo "FAIL: missing local Supabase keys"; exit 1; }
+          echo "live Supabase env exported (url set; keys masked; SUPABASE_LIVE_TESTS=1)"
+
+      - name: Assert LOCAL_INDEXEDDB remains the application default
+        run: |
+          set -euo pipefail
+          grep -qE 'DEFAULT_PERSISTENCE_PROVIDER[^=]*=\s*"LOCAL_INDEXEDDB"' src/persistence/provider.ts \
+            || { echo "FAIL: LOCAL_INDEXEDDB is not the default provider"; exit 1; }
+          echo "OK: LOCAL_INDEXEDDB is the default provider (SUPABASE selected only in test composition)"
+
+      - name: Live repository-adapter tests (dedicated config; SUPABASE_LIVE_TESTS=1; real adapters vs live Supabase)
+        run: |
+          set -euo pipefail
+          # keys arrive via the masked GITHUB_ENV from the previous step; not printed here.
+          test "${SUPABASE_LIVE_TESTS:-}" = "1" || { echo "FAIL: SUPABASE_LIVE_TESTS is not 1"; exit 1; }
+          npm run test:supabase:live 2>&1 | tee ci-artifacts/supabase-integration.log
+          test -f ci-artifacts/live-report.json || { echo "FAIL: no live-report.json produced (suite did not run)"; exit 1; }
+          node -e '
+            const r = require("./ci-artifacts/live-report.json");
+            const files   = r.numTotalTestSuites ?? 0;
+            const passed  = r.numPassedTests ?? 0;
+            const failed  = r.numFailedTests ?? 0;
+            const skipped = r.numPendingTests ?? 0;
+            const executed = passed + failed;
+            const line = `live-adapter: files=${files} executed=${executed} passed=${passed} failed=${failed} skipped=${skipped}`;
+            require("fs").writeFileSync("ci-artifacts/live-adapter-counts.txt", line + "\n");
+            console.log(line);
+            if (files   < 1) { console.error("FAIL: 0 live test files discovered"); process.exit(1); }
+            if (executed< 1) { console.error("FAIL: 0 live tests executed (must not silently skip)"); process.exit(1); }
+            if (failed  > 0) { console.error("FAIL: " + failed + " live tests failed"); process.exit(1); }
+            if (skipped > 0) { console.error("FAIL: " + skipped + " live tests skipped (must be 0)"); process.exit(1); }
+          '
 
       - name: S5 validation summary
         if: always()
@@ -169,5 +214,7 @@ jobs:
             ci-artifacts/gen-types.txt
             ci-artifacts/persistence-tests.log
             ci-artifacts/supabase-integration.log
+            ci-artifacts/live-adapter-counts.txt
+            ci-artifacts/live-report.json
             ci-artifacts/s5-summary.txt
           if-no-files-found: warn
