@@ -17,6 +17,8 @@ import type { CollectionKey } from "@/repositories/collections";
 import { createSupabaseRepository } from "@/persistence/supabase/index";
 import { SupabaseRepository } from "@/persistence/supabase/SupabaseRepository";
 import { callRpc } from "@/persistence/supabase/rpc";
+import { getMapping } from "@/persistence/supabase/registry";
+import { rowToEntityCandidate } from "@/persistence/supabase/mapping";
 import type { PersistenceRepository } from "@/persistence/boundary";
 import { DEFAULT_PERSISTENCE_PROVIDER, resolvePersistenceProvider } from "@/persistence/provider";
 import type { SafeErrorCode } from "@/persistence/result";
@@ -110,6 +112,17 @@ describe("0. diagnostics probe", () => {
     const upd = await cRepo.updateSafe(pid, { city: "תל אביב" });
     // eslint-disable-next-line no-console
     console.log(`[probe] update ok=${upd.ok} code=${upd.ok ? "" : upd.error.code} msg=${upd.ok ? "" : upd.error.message}`);
+    // updateSafe runs the DB update THEN parseRow; a validation error means the
+    // DB row is already updated but fails zod. Re-fetch it via service_role and
+    // replicate the exact parse to reveal WHICH field/issue rejects it.
+    const post = await ctx.admin.from("customers").select("*").eq("id", pid).maybeSingle();
+    const mapping = getMapping("customers");
+    const cand = mapping ? rowToEntityCandidate(mapping, (post.data ?? {}) as Record<string, unknown>) : null;
+    const parsed = mapping && cand ? mapping.schema.safeParse(cand) : null;
+    // eslint-disable-next-line no-console
+    console.log(`[probe] raw post-update row=${JSON.stringify(post.data)}`);
+    // eslint-disable-next-line no-console
+    console.log(`[probe] reparse success=${parsed?.success} issues=${parsed && !parsed.success ? JSON.stringify(parsed.error.issues) : ""}`);
     expect(true).toBe(true);
   });
 });
