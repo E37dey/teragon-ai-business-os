@@ -67,7 +67,7 @@ create domain ticket_priority as text
 create table organizations (
   id          text primary key,
   name        text not null,
-  type        customer_type,
+  type        customer_type default 'ארגון',
   phone       text not null default '',
   email       text not null default '',
   city        text not null default '',

@@ -69,6 +69,11 @@ begin
   if not exists (select 1 from public.organizations where id = 'org-boot-test') then
     raise exception 'FAIL: bootstrap should have created the org';
   end if;
+  -- Regression: a bare-org insert (no explicit type) must satisfy the NOT NULL
+  -- customer_type domain via the organizations.type default.
+  if (select type from public.organizations where id = 'org-boot-test') is null then
+    raise exception 'FAIL: bootstrapped org must have a non-null type (default)';
+  end if;
 
   -- Idempotent second call: no error, same profile, single membership row.
   select (public.bootstrap_admin('00000000-0000-0000-0000-0000000000e1', 'org-boot-test')).id into v2;
