@@ -17,8 +17,6 @@ import type { CollectionKey } from "@/repositories/collections";
 import { createSupabaseRepository } from "@/persistence/supabase/index";
 import { SupabaseRepository } from "@/persistence/supabase/SupabaseRepository";
 import { callRpc } from "@/persistence/supabase/rpc";
-import { getMapping } from "@/persistence/supabase/registry";
-import { rowToEntityCandidate } from "@/persistence/supabase/mapping";
 import type { PersistenceRepository } from "@/persistence/boundary";
 import { DEFAULT_PERSISTENCE_PROVIDER, resolvePersistenceProvider } from "@/persistence/provider";
 import type { SafeErrorCode } from "@/persistence/result";
@@ -80,51 +78,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (ctx) await teardown(ctx);
-});
-
-// --- diagnostics probe (temporary): surfaces WHY authenticated writes are
-// resolving, so a CI run pinpoints auth-context vs org-injection issues. Logs
-// only org ids + booleans + safe error messages — never tokens/keys. ---------
-describe("0. diagnostics probe", () => {
-  it("logs the authenticated admin's resolved RLS context + a probe write", async () => {
-    bump();
-    const u = ctx.adminA;
-    const org = await u.raw.rpc("auth_org_id");
-    const active = await u.raw.rpc("is_active");
-    const capU = await u.raw.rpc("has_capability", { cap: "customer.update" });
-    const capC = await u.raw.rpc("has_capability", { cap: "customer.create" });
-    // eslint-disable-next-line no-console
-    console.log(
-      `[probe] adminA orgId=${u.orgId} role=${u.roleId}` +
-        ` auth_org_id=${JSON.stringify(org.data)} orgErr=${org.error?.message ?? ""}` +
-        ` is_active=${JSON.stringify(active.data)} actErr=${active.error?.message ?? ""}` +
-        ` cap(customer.create)=${JSON.stringify(capC.data)} cap(customer.update)=${JSON.stringify(capU.data)}`,
-    );
-    const pid = `cu-probe-${ctx.suffix}`;
-    const cRepo = repo<ReturnType<typeof makeCustomer>>(u, "customers");
-    const created = await cRepo.createSafe(makeCustomer(pid, { name: "probe" }));
-    // eslint-disable-next-line no-console
-    console.log(`[probe] create ok=${created.ok} code=${created.ok ? "" : created.error.code} msg=${created.ok ? "" : created.error.message}`);
-    // service_role inspection: does the row exist, and what tenant is stored?
-    const row = await ctx.admin.from("customers").select("id,organization_id").eq("id", pid).maybeSingle();
-    // eslint-disable-next-line no-console
-    console.log(`[probe] stored row id=${row.data?.id ?? "MISSING"} organization_id=${row.data?.organization_id ?? "null"} selErr=${row.error?.message ?? ""}`);
-    const upd = await cRepo.updateSafe(pid, { city: "תל אביב" });
-    // eslint-disable-next-line no-console
-    console.log(`[probe] update ok=${upd.ok} code=${upd.ok ? "" : upd.error.code} msg=${upd.ok ? "" : upd.error.message}`);
-    // updateSafe runs the DB update THEN parseRow; a validation error means the
-    // DB row is already updated but fails zod. Re-fetch it via service_role and
-    // replicate the exact parse to reveal WHICH field/issue rejects it.
-    const post = await ctx.admin.from("customers").select("*").eq("id", pid).maybeSingle();
-    const mapping = getMapping("customers");
-    const cand = mapping ? rowToEntityCandidate(mapping, (post.data ?? {}) as Record<string, unknown>) : null;
-    const parsed = mapping && cand ? mapping.schema.safeParse(cand) : null;
-    // eslint-disable-next-line no-console
-    console.log(`[probe] raw post-update row=${JSON.stringify(post.data)}`);
-    // eslint-disable-next-line no-console
-    console.log(`[probe] reparse success=${parsed?.success} issues=${parsed && !parsed.success ? JSON.stringify(parsed.error.issues) : ""}`);
-    expect(true).toBe(true);
-  });
 });
 
 // ===========================================================================

@@ -77,14 +77,31 @@ export function entityToRow<T extends BaseEntity>(
 }
 
 /**
+ * Postgres `timestamptz` renders id/created_at/updated_at with MICROSECOND
+ * precision (e.g. "2026-07-31T08:07:32.327157+00:00"), and a DB `updated_at`
+ * trigger stamps `now()` on every UPDATE. The domain's canonical `isoDate`
+ * contract is the JS `toISOString()` form (≤millisecond precision), so a raw
+ * DB timestamp fails validation and would reject the row (observed: every
+ * adapter UPDATE returned a `validation` error). Normalize it back to the
+ * domain form here — the row→entity boundary whose job is exactly this
+ * translation. Non-string / unparseable values pass through untouched so
+ * genuinely malformed data is still rejected downstream by the schema.
+ */
+function toDomainTimestamp(value: unknown): unknown {
+  if (typeof value !== "string" || value === "") return value;
+  const ms = Date.parse(value);
+  return Number.isNaN(ms) ? value : new Date(ms).toISOString();
+}
+
+/**
  * Row → entity candidate (pre-validation plain object). The caller then parses
  * it through `mapping.schema` so a malformed row is REJECTED, never trusted.
  */
 export function rowToEntityCandidate<T extends BaseEntity>(mapping: DomainMapping<T>, row: DbRow): unknown {
   const entity: Record<string, unknown> = {
     id: row.id,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    createdAt: toDomainTimestamp(row.created_at),
+    updatedAt: toDomainTimestamp(row.updated_at),
   };
   for (const { prop, col } of mapping.fields) {
     entity[prop] = row[col];

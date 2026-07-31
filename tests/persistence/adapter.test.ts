@@ -55,6 +55,21 @@ describe("SupabaseRepository — row↔entity mapping + validation", () => {
     expect(r.data?.createdAt).toBe(ISO);
   });
 
+  it("normalizes Postgres microsecond timestamps to the domain millisecond-ISO form", async () => {
+    // Regression: Postgres `timestamptz` renders 6 fractional digits and a
+    // `+00:00` offset — the exact shape an `updated_at` trigger stamps on every
+    // UPDATE. The domain `isoDate` accepts only ≤3 fractional digits, so an
+    // unnormalized row failed validation and made EVERY live adapter UPDATE
+    // return code=validation. The row→entity boundary must present it in
+    // canonical `toISOString()` (millisecond) form.
+    const pgMicros = "2026-07-31T08:07:32.327157+00:00";
+    mock.seed("customers", [customerRow("cu-ts", { updated_at: pgMicros })]);
+    const r = await repo("customers", mock).getSafe("cu-ts");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.data?.updatedAt).toBe("2026-07-31T08:07:32.327Z");
+  });
+
   it("rejects a row that fails zod validation (never trusts a bad row)", async () => {
     mock.seed("customers", [customerRow("cu-1", { revenue: -50 })]); // revenue < 0 invalid
     const r = await repo("customers", mock).getSafe("cu-1");
