@@ -76,3 +76,38 @@ stack). No service-role key in build artifacts (privileged-key bundle scan). Onl
 **Stopped after S5.** No S6 credentials, remote Supabase staging, Netlify deployment, Release Candidate,
 production deployment, or merge. `LOCAL_INDEXEDDB` remains the runtime default; all Business Graph / Auth /
 AI flags remain OFF; the release branch `feature/teragon-business-graph` is frozen at `7240410`.
+
+## S5.2 — Live repository-adapter validation (real adapter vs live Supabase) — PASS
+
+Authoritative run **`30615740566`** @ `412541c` (both jobs green):
+`live-adapter: files=10 executed=25 passed=25 failed=0 skipped=0`.
+
+**Architecture (no skips).** Live tests are a **separate discovery path**: the default Vitest config
+excludes `tests/supabase/live/**` (normal gate = **2216 passed, 0 skipped**), and a dedicated
+`npm run test:supabase:live` (own `vitest.supabase-live.config.ts`) runs them under a fail-hard guard
+(`SUPABASE_LIVE_TESTS=1` + full local env required; `setup.ts` throws otherwise — never `describe.skip`).
+The CI `live-database` job runs **both** the full normal suite and the live command, then a machine-readable
+gate on `ci-artifacts/live-report.json` fails unless `files ≥ 1 · executed ≥ 1 · failed = 0 · skipped = 0`.
+
+**RLS-realistic credentials.** service_role is used ONLY to mint ephemeral auth users / bootstrap / teardown /
+invariant inspection. Every ordinary CRUD/RPC drives the REAL `src/persistence/supabase` adapter over the
+anon (publishable) key + a REAL `signInWithPassword` JWT session. Fixtures: active admin org A, active admin
+org B, an inactive user, a non-admin viewer. No JWT/refresh-token/service-role key/password is ever printed.
+
+**Coverage (25 live tests):** identity + inactive-denial + no client-side role override · CRM CRUD +
+cross-org denial + deterministic pagination · products/service + invalid-FK reject + idempotent no-dup ·
+training + embedded StageProgress zod round-trip + cross-org · tasks/approvals + named-human approval +
+pending/rejected excluded + atomic RPC rollback · knowledge/memory/governance CRUD + permission-gated fields
++ immutable audit · failure behavior (no local fallback / typed zod error / org-mismatch denial / idempotency).
+
+**Real failures found and root-caused (not worked around):**
+1. *Self-escalation test used an admin fixture* (test-setup) — admins may legitimately change roles; switched
+   the assertion to the active non-admin viewer so it truly proves the `profiles_self_update` column-guard.
+2. *Every adapter UPDATE returned `code=validation`* (schema/adapter boundary) — Postgres `timestamptz`
+   renders **microsecond** precision (`.327157+00:00`) and an `updated_at` trigger stamps `now()` on each
+   UPDATE, but the domain `isoDate` accepts only ≤3 fractional digits. Create passed only because the app
+   supplied a clean millisecond timestamp. **Fix:** normalize `created_at`/`updated_at` to the domain's
+   canonical `toISOString()` form in `rowToEntityCandidate` (the row→entity boundary) — the strict domain
+   schema is unchanged (no RLS/validation weakening), and a regression test in the **default** suite
+   (`tests/persistence/adapter.test.ts`) pins a 6-digit microsecond timestamp → `.327Z`. Diagnosed via a
+   temporary CI probe (org ids + booleans + safe error codes only), now removed.

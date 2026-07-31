@@ -55,4 +55,18 @@ typecheck:tests 0, build pass, secret CLEAN.
 
 **Live integration against the real schema/RLS (running the adapters against local Postgres) is Gate S5** —
 see the local-validation report. **S5.1:** relocated to CI
-(`.github/workflows/supabase-live-validation.yml`); current status **S5 PASS** (run `30609542600`) — see `SUPABASE_CI_VALIDATION_REPORT.md`.
+(`.github/workflows/supabase-live-validation.yml`); **S5 migrations/RLS PASS** (run `30609542600`).
+
+## S5.2 — Live adapter validation — PASS (run `30615740566` @ `412541c`)
+
+The real adapter was exercised against a live ephemeral Supabase stack (Postgres + GoTrue + PostgREST) over
+the anon key + real authenticated JWT sessions (service_role only for user-mint/bootstrap/teardown):
+**`files=10 executed=25 passed=25 failed=0 skipped=0`**, via the dedicated separate-discovery command
+`npm run test:supabase:live`. Two real defects were found and root-caused (a test-setup fixture and a
+schema/adapter **microsecond-timestamp** boundary bug — see `SUPABASE_CI_VALIDATION_REPORT.md` §S5.2).
+
+**Boundary hardening added here:** `rowToEntityCandidate` normalizes DB-native `timestamptz`
+(microsecond, `+00:00`) `created_at`/`updated_at` into the domain's canonical `toISOString()` form, so any
+DB-generated timestamp (e.g. an `updated_at` trigger) satisfies the strict domain `isoDate` contract without
+weakening it. Regression: `tests/persistence/adapter.test.ts` (default suite, no live DB required).
+**Full Vitest now 2216 passed, 0 skipped**; oxlint 0, tsc 0, typecheck:tests 0.
