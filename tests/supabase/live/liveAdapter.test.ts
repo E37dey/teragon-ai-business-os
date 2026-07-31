@@ -89,17 +89,27 @@ describe("0. diagnostics probe", () => {
     const u = ctx.adminA;
     const org = await u.raw.rpc("auth_org_id");
     const active = await u.raw.rpc("is_active");
-    const cap = await u.raw.rpc("has_capability", { cap: "service.update" });
+    const capU = await u.raw.rpc("has_capability", { cap: "customer.update" });
+    const capC = await u.raw.rpc("has_capability", { cap: "customer.create" });
     // eslint-disable-next-line no-console
     console.log(
       `[probe] adminA orgId=${u.orgId} role=${u.roleId}` +
         ` auth_org_id=${JSON.stringify(org.data)} orgErr=${org.error?.message ?? ""}` +
         ` is_active=${JSON.stringify(active.data)} actErr=${active.error?.message ?? ""}` +
-        ` has_capability(service.update)=${JSON.stringify(cap.data)} capErr=${cap.error?.message ?? ""}`,
+        ` cap(customer.create)=${JSON.stringify(capC.data)} cap(customer.update)=${JSON.stringify(capU.data)}`,
     );
-    const cust = await repo<BaseEntity>(u, "customers").create(makeCustomer(`cu-probe-${ctx.suffix}`));
+    const pid = `cu-probe-${ctx.suffix}`;
+    const cRepo = repo<ReturnType<typeof makeCustomer>>(u, "customers");
+    const created = await cRepo.createSafe(makeCustomer(pid, { name: "probe" }));
     // eslint-disable-next-line no-console
-    console.log(`[probe] customer.create result=${JSON.stringify(cust)}`);
+    console.log(`[probe] create ok=${created.ok} code=${created.ok ? "" : created.error.code} msg=${created.ok ? "" : created.error.message}`);
+    // service_role inspection: does the row exist, and what tenant is stored?
+    const row = await ctx.admin.from("customers").select("id,organization_id").eq("id", pid).maybeSingle();
+    // eslint-disable-next-line no-console
+    console.log(`[probe] stored row id=${row.data?.id ?? "MISSING"} organization_id=${row.data?.organization_id ?? "null"} selErr=${row.error?.message ?? ""}`);
+    const upd = await cRepo.updateSafe(pid, { city: "תל אביב" });
+    // eslint-disable-next-line no-console
+    console.log(`[probe] update ok=${upd.ok} code=${upd.ok ? "" : upd.error.code} msg=${upd.ok ? "" : upd.error.message}`);
     expect(true).toBe(true);
   });
 });
