@@ -21,7 +21,6 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import process from "node:process";
 
 const QUERY_ARGS = ["db", "query", "--linked", "--agent", "yes", "-o", "json"];
 

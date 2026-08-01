@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { bootstrapAdmin, maskEmail, CANONICAL_ADMIN_ROLE } from "../../scripts/platform/bootstrap-admin.mjs";
+import { bootstrapAdmin, maskEmail, CANONICAL_ADMIN_ROLE, classifyAdminError } from "../../scripts/platform/bootstrap-admin.mjs";
 import { createCredentialProvider } from "../../scripts/platform/shared/credentials.mjs";
 import { fakeSupabase, memoryStage } from "./fakes";
 
@@ -72,5 +72,64 @@ describe("bootstrap-admin apply — Admin API + RPC, idempotent, self-verifying"
     const result = await bootstrapAdmin({ mode: "apply", credentials: provider({ ...CONFIRMED, TERAGON_ADMIN_EMAIL_CONFIRMED: "false" }), supabase, stage: tracker, validation: { ok: false } });
     expect(result.ok).toBe(false);
     expect(supabase.called("createUser")).toBe(false);
+  });
+});
+
+// --- S7.2.1: fail-closed Admin-API error handling + safe categories ----------
+describe("bootstrap-admin — fail-closed on Admin API failure (no exception escapes)", () => {
+  function throwingSupabaseAt(method: string, err: unknown) {
+    const base = fakeSupabase();
+    return { ...base, [method]: async () => { throw err; } };
+  }
+
+  it("catches an Admin-API HTML/non-JSON failure and records a SAFE failed stage", async () => {
+    const { tracker } = memoryStage();
+    const supabase = throwingSupabaseAt("findUserByEmail", new Error("Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON"));
+    const result = await bootstrapAdmin({ mode: "apply", credentials: provider(CONFIRMED), supabase, stage: tracker, validation: { ok: true } });
+    expect(result.ok).toBe(false);
+    // safe category only — never the HTML body
+    expect(result.reason).not.toMatch(/<!DOCTYPE|<html/i);
+    expect(result.reason).toMatch(/non-json|gateway/i);
+    // did NOT proceed / did NOT mark ADMIN_BOOTSTRAPPED
+    expect(tracker.completed("ADMIN_BOOTSTRAPPED")).toBe(false);
+    expect(tracker.read().state).toBe("FAILED");
+  });
+
+  it("a createUser failure prevents the RPC and seed (fails closed, resume point preserved)", async () => {
+    const { tracker } = memoryStage();
+    const err = Object.assign(new Error("Database error finding users"), { status: 500 });
+    const supabase = throwingSupabaseAt("createUser", err);
+    const result = await bootstrapAdmin({ mode: "apply", credentials: provider(CONFIRMED), supabase, stage: tracker, validation: { ok: true } });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/500|auth service/i);
+    expect(supabase.called("bootstrapAdminRpc")).toBe(false);
+    expect(tracker.completed("ADMIN_BOOTSTRAPPED")).toBe(false);
+  });
+});
+
+describe("classifyAdminError — safe categories, no leakage", () => {
+  it("categorizes HTML, 500, 403, 401, network without leaking bodies", () => {
+    expect(classifyAdminError(new Error("Unexpected token '<', \"<!DOCTYPE\""))).toMatch(/non-json|gateway/i);
+    expect(classifyAdminError(Object.assign(new Error("Database error finding users"), { status: 500 }))).toMatch(/500|auth service/i);
+    expect(classifyAdminError(Object.assign(new Error("forbidden"), { status: 403 }))).toMatch(/403|WAF/i);
+    expect(classifyAdminError(Object.assign(new Error("unauthorized"), { status: 401 }))).toMatch(/401/);
+    expect(classifyAdminError(new Error("AuthRetryableFetchError"))).toMatch(/network|retry/i);
+  });
+
+  it("never returns the raw HTML body / DOCTYPE", () => {
+    const cat = classifyAdminError(new Error("<!DOCTYPE html><html>secret-page</html>"));
+    expect(cat).not.toContain("secret-page");
+    expect(cat).not.toContain("DOCTYPE");
+  });
+});
+
+describe("Admin adapter uses supported init path (no manual Bearer header)", () => {
+  it("supabase adapter never manually sets an Authorization/Bearer header", () => {
+    const src = readFileSync(resolve(process.cwd(), "scripts/platform/shared/adapters/supabase.mjs"), "utf8");
+    expect(/authorization\s*:/i.test(src)).toBe(false);
+    expect(/Bearer/i.test(src)).toBe(false);
+    // uses the supported client config
+    expect(src).toContain("detectSessionInUrl");
+    expect(src).toContain("SUPABASE_AUTH_ADMIN_KEY");
   });
 });

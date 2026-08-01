@@ -49,11 +49,15 @@ export function createSupabaseAdapter(deps) {
   async function serviceClient() {
     if (deps.serviceClientFactory) return deps.serviceClientFactory();
     const url = cred("SUPABASE_URL");
-    // Normalized server key resolves from SECRET (modern) or SERVICE_ROLE (legacy).
-    const key = cred("SUPABASE_SERVER_KEY");
-    if (!url || !key) throw new Error("service-role client requires SUPABASE_URL + SUPABASE_SERVER_KEY");
+    // S7.2.1: the Auth Admin client uses SUPABASE_AUTH_ADMIN_KEY (chosen per the
+    // key-compatibility matrix — modern SECRET by default), falling back to the
+    // normalized SUPABASE_SERVER_KEY. The key is supplied via the SUPPORTED init
+    // path only (createClient sets it as the apikey) — we never hand-craft an
+    // auth header — and the client is server-only.
+    const key = cred("SUPABASE_AUTH_ADMIN_KEY") ?? cred("SUPABASE_SERVER_KEY");
+    if (!url || !key) throw new Error("service-role client requires SUPABASE_URL + an Auth Admin key");
     const { createClient } = await import("@supabase/supabase-js");
-    return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
   }
 
   return {

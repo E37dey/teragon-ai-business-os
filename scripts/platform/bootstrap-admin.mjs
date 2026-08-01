@@ -73,41 +73,64 @@ export async function bootstrapAdmin({ mode, credentials, supabase, stage, valid
 
   stage.enter("ADMIN_BOOTSTRAPPED", "resolving admin identity (verify-before-create)");
 
-  // 1. idempotent: reuse an existing auth user rather than duplicating.
+  // S7.2.1: fail-closed. Any Admin-API / RPC exception is caught here — it can
+  // NEVER escape the stage tracker (which previously crashed the run). On failure
+  // we record a SAFE category only (no HTML/body/headers/tokens/keys/password),
+  // do NOT run the RPC/seed/later stages, and leave RLS_VALIDATED intact.
   let mutated = false;
-  const existing = await supabase.findUserByEmail(email);
-  let userId = existing?.userId ?? null;
-  if (!userId) {
-    const created = await supabase.createUser({ email, password });
-    userId = created.userId;
-    mutated = true;
-    log.ok(`created admin auth user ${maskEmail(email)} (password never logged).`);
-  } else {
-    log.ok(`admin auth user ${maskEmail(email)} already exists — reusing (no duplicate).`);
+  try {
+    // 1. idempotent: reuse an existing auth user rather than duplicating.
+    const existing = await supabase.findUserByEmail(email);
+    let userId = existing?.userId ?? null;
+    if (!userId) {
+      const created = await supabase.createUser({ email, password });
+      userId = created.userId;
+      mutated = true;
+      log.ok(`created admin auth user ${maskEmail(email)} (password never logged).`);
+    } else {
+      log.ok(`admin auth user ${maskEmail(email)} already exists — reusing (no duplicate).`);
+    }
+
+    // 2. canonical RPC (idempotent create-if-absent).
+    await supabase.bootstrapAdminRpc({ userId, orgId, orgName, name: "Teragon Admin", email });
+
+    // 3. verify active profile + canonical role + membership.
+    const profile = await supabase.getProfile(userId);
+    const membership = await supabase.getMembership(userId, orgId);
+    const problems = [];
+    if (!profile) problems.push("profile missing after bootstrap");
+    else {
+      if (profile.active !== true) problems.push("profile not active");
+      if (profile.role_id !== CANONICAL_ADMIN_ROLE) problems.push(`role is ${profile.role_id}, expected ${CANONICAL_ADMIN_ROLE}`);
+      if (profile.organization_id !== orgId) problems.push(`profile org ${profile.organization_id} != ${orgId}`);
+    }
+    if (!membership || membership.active !== true) problems.push("active membership missing");
+
+    if (problems.length) {
+      stage.fail(`admin verification failed: ${problems.join("; ")}`);
+      return { ok: false, mutated, reason: problems.join("; ") };
+    }
+
+    stage.markComplete("ADMIN_BOOTSTRAPPED", { admin: { emailDomain: email.split("@")[1] ?? null, bootstrapped: true } }, mutated ? "created" : "reused");
+    return { ok: true, mutated, userIdKnown: true, role: CANONICAL_ADMIN_ROLE };
+  } catch (err) {
+    const category = classifyAdminError(err);
+    stage.fail(`admin bootstrap failed (Admin API): ${category}`);
+    return { ok: false, mutated, reason: `admin bootstrap failed: ${category}` };
   }
+}
 
-  // 2. canonical RPC (idempotent create-if-absent).
-  await supabase.bootstrapAdminRpc({ userId, orgId, orgName, name: "Teragon Admin", email });
-
-  // 3. verify active profile + canonical role + membership.
-  const profile = await supabase.getProfile(userId);
-  const membership = await supabase.getMembership(userId, orgId);
-  const problems = [];
-  if (!profile) problems.push("profile missing after bootstrap");
-  else {
-    if (profile.active !== true) problems.push("profile not active");
-    if (profile.role_id !== CANONICAL_ADMIN_ROLE) problems.push(`role is ${profile.role_id}, expected ${CANONICAL_ADMIN_ROLE}`);
-    if (profile.organization_id !== orgId) problems.push(`profile org ${profile.organization_id} != ${orgId}`);
-  }
-  if (!membership || membership.active !== true) problems.push("active membership missing");
-
-  if (problems.length) {
-    stage.fail(`admin verification failed: ${problems.join("; ")}`);
-    return { ok: false, mutated, reason: problems.join("; ") };
-  }
-
-  stage.markComplete("ADMIN_BOOTSTRAPPED", { admin: { emailDomain: email.split("@")[1] ?? null, bootstrapped: true } }, mutated ? "created" : "reused");
-  return { ok: true, mutated, userIdKnown: true, role: CANONICAL_ADMIN_ROLE };
+/** SAFE error category for an Admin-API failure — never HTML/body/token/key. */
+export function classifyAdminError(err) {
+  const status = err?.status ?? err?.statusCode ?? err?.code;
+  const msg = String(err?.message ?? "").toLowerCase();
+  if (msg.includes("<") || msg.includes("doctype") || msg.includes("not valid json") || msg.includes("unexpected token"))
+    return "non-json/HTML response (gateway rejected the key)";
+  if (String(status) === "500" || msg.includes("database error")) return "auth service 500 (auth-schema/connectivity)";
+  if (String(status) === "403" || msg.includes("forbidden")) return "403 (gateway/WAF blocked the key)";
+  if (String(status) === "401" || msg.includes("unauthor")) return "401 (unauthorized)";
+  if (msg.includes("fetch") || msg.includes("network") || msg.includes("retryable")) return "network/retryable fetch error";
+  return "admin api error";
 }
 
 // --- thin entrypoint ---------------------------------------------------------
