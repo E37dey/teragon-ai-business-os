@@ -119,7 +119,11 @@ export function createSupabaseAdapter(deps) {
       return parseJson(out, []);
     },
     async dbPush() {
-      await run("supabase", ["db", "push", "--linked"], { SUPABASE_DB_PASSWORD: cred("SUPABASE_DB_PASSWORD") ?? "" });
+      // --yes: the orchestrator captures stdio, so the push must be
+      // non-interactive. We deliberately do NOT pass --include-seed (config
+      // seed) — only the committed migrations 001..014 are applied. The DB
+      // password is supplied via env (never a logged argv flag).
+      await run("supabase", ["db", "push", "--linked", "--yes"], { SUPABASE_DB_PASSWORD: cred("SUPABASE_DB_PASSWORD") ?? "" });
     },
     // --- Admin API (service role) -------------------------------------------
     async findUserByEmail(email) {
