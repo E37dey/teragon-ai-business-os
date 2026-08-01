@@ -17,6 +17,19 @@ export function applyStagingEnabled(env = process.env) {
 }
 
 /**
+ * S7.1 stop boundary. When S7_STOP_AFTER names a completed stage (e.g.
+ * "RLS_VALIDATED"), the apply run stops SUCCESSFULLY after that stage completes
+ * and does NOT execute any later stage. Unset ⇒ normal full-apply behavior.
+ * Returns the trimmed stage name or null.
+ * @param {Record<string,string|undefined>} [env]
+ * @returns {string|null}
+ */
+export function stopAfterStage(env = process.env) {
+  const v = (env["S7_STOP_AFTER"] ?? "").trim();
+  return v === "" ? null : v;
+}
+
+/**
  * Resolve the requested mode from argv + env. A script/orchestrator run with
  * "apply" as an argument requests apply; anything else (including "plan" or no
  * arg) is plan. Whether apply is PERMITTED is a separate check

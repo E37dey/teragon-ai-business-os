@@ -129,6 +129,50 @@ export function throwingSupabase() {
   };
 }
 
+/** A schema-introspection row that matches the S7.1 CI baseline expectations. */
+export const GOOD_SCHEMA_ROW = {
+  public_tables: 47,
+  namespaces: 3,
+  migrations: 14,
+  functions_present: [
+    "auth_org_id",
+    "auth_role_id",
+    "bootstrap_admin",
+    "close_service_ticket",
+    "current_profile",
+    "has_capability",
+    "is_active",
+    "is_org_member",
+    "is_service_role",
+  ],
+  indexes: 120,
+  fk_constraints: 60,
+  check_constraints: 40,
+  rls_disabled_tables: [],
+  nullable_orgid_tenant_tables: [],
+  storage_buckets: 2,
+  rls_policies: 90,
+};
+
+/** A fake db adapter (supabase db query --linked) with programmable results. */
+export function fakeDb(opts: { schemaRow?: Record<string, unknown>; scriptResults?: Record<string, { ok: boolean; error?: string }>; queryThrows?: boolean } = {}) {
+  const calls: Call[] = [];
+  return {
+    calls,
+    called: (m: string) => calls.some((c) => c.method === m),
+    async query(sql: string) {
+      calls.push({ method: "query", args: [sql.slice(0, 20)] });
+      if (opts.queryThrows) throw new Error("sql execution failed");
+      return [opts.schemaRow ?? GOOD_SCHEMA_ROW];
+    },
+    async runScriptFile(path: string) {
+      const name = path.split(/[\\/]/).pop() as string;
+      calls.push({ method: "runScriptFile", args: [name] });
+      return opts.scriptResults?.[name] ?? { ok: true };
+    },
+  };
+}
+
 /** A fake Netlify adapter with programmable env + call recording. */
 export function fakeNetlify(opts: { site?: { id: string; name: string }; env?: Record<string, unknown>; deploy?: Record<string, unknown> } = {}) {
   const calls: Call[] = [];

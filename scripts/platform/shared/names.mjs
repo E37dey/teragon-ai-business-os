@@ -162,6 +162,15 @@ export const COMMAND_CREDENTIALS = {
     supabaseAuth: true,
     names: ["SUPABASE_DB_PASSWORD", "SUPABASE_PROJECT_REF"],
   },
+  // S7.1 — remote schema + RLS validation stages. They talk to the LINKED
+  // project via the Management-API SQL endpoint, so they need Supabase
+  // authorization (env-token OR cli-session) and nothing else.
+  "schema-verify": {
+    supabaseAuth: true,
+  },
+  "rls-validate": {
+    supabaseAuth: true,
+  },
   "bootstrap-admin": {
     serviceClient: true,
     names: ["TERAGON_ADMIN_EMAIL", "TERAGON_ADMIN_PASSWORD"],

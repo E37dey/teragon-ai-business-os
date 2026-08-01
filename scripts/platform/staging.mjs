@@ -16,11 +16,14 @@ import { log } from "./shared/log.mjs";
 import { createCredentialProvider, describeValidation } from "./shared/credentials.mjs";
 import { createSupabaseAdapter } from "./shared/adapters/supabase.mjs";
 import { createNetlifyAdapter } from "./shared/adapters/netlify.mjs";
+import { createDbAdapter } from "./shared/adapters/db.mjs";
 import { createStageTracker, mask } from "./shared/stage.mjs";
 import { discoverAndInjectConnection } from "./shared/connection.mjs";
-import { resolveMode, assertApplyAllowed, isEntrypoint } from "./shared/runtime.mjs";
+import { resolveMode, assertApplyAllowed, isEntrypoint, stopAfterStage } from "./shared/runtime.mjs";
 import { provisionStaging, selectStagingProject, DEFAULT_STAGING_NAME } from "./provision-staging.mjs";
 import { migrateStaging } from "./migrate.mjs";
+import { verifySchema } from "./schema-verify.mjs";
+import { validateRls } from "./rls-validate.mjs";
 import { bootstrapAdmin } from "./bootstrap-admin.mjs";
 import { configureNetlify } from "./configure-netlify.mjs";
 import { deployPreview } from "./deploy-preview.mjs";
@@ -30,6 +33,8 @@ import { verifyPreview } from "./verify-preview.mjs";
 const STEPS = [
   { command: "provision-staging", state: "PROJECT_READY", run: provisionStaging },
   { command: "migrate", state: "MIGRATIONS_APPLIED", run: migrateStaging },
+  { command: "schema-verify", state: "SCHEMA_VERIFIED", run: verifySchema },
+  { command: "rls-validate", state: "RLS_VALIDATED", run: validateRls },
   { command: "bootstrap-admin", state: "ADMIN_BOOTSTRAPPED", run: bootstrapAdmin },
   { command: "configure-netlify", state: "NETLIFY_CONFIGURED", run: configureNetlify },
   { command: "deploy-preview", state: "PREVIEW_DEPLOYED", run: deployPreview },
@@ -87,8 +92,14 @@ async function runPlan(credentials, stage) {
  *      the connection context BEFORE advancing to migrate.
  * @returns {Promise<{ok:boolean, failedStep?:string, reason?:string}>}
  */
-export async function runApply(credentials, adapters, stage, extraDeps = {}) {
+export async function runApply(credentials, adapters, stage, opts = {}) {
+  const { stopAfter = null, ...extraDeps } = opts;
   log.step("STAGING APPLY — APPLY_STAGING=true. Stop-on-first-failure, idempotent resume.");
+  if (stopAfter) log.info(`stop boundary: S7_STOP_AFTER=${stopAfter} — later stages will NOT run.`);
+
+  // Successfully stop after `stopAfter` completes (run OR already-done).
+  const stopHere = (step) => Boolean(stopAfter) && step.state === stopAfter;
+
   for (const step of STEPS) {
     const alreadyDone = Boolean(step.state) && stage.completed(step.state);
 
@@ -116,11 +127,13 @@ export async function runApply(credentials, adapters, stage, extraDeps = {}) {
         }
         log.ok(`[provision-staging] done (${result.action}).`);
       }
+      if (stopHere(step)) return stopped(stopAfter);
       continue;
     }
 
     if (alreadyDone) {
       log.ok(`[${step.command}] already completed (${step.state}) — skipping (idempotent resume).`);
+      if (stopHere(step)) return stopped(stopAfter);
       continue;
     }
     const validation = await credentials.validate(step.command);
@@ -131,9 +144,16 @@ export async function runApply(credentials, adapters, stage, extraDeps = {}) {
       return { ok: false, failedStep: step.command, reason: result.reason ?? (result.problems ?? []).join("; ") };
     }
     log.ok(`[${step.command}] done.`);
+    if (stopHere(step)) return stopped(stopAfter);
   }
   log.step("STAGING APPLY complete.");
   return { ok: true };
+}
+
+/** Successful early stop at the S7_STOP_AFTER boundary. */
+function stopped(stopAfter) {
+  log.step(`STAGING APPLY stopped SUCCESSFULLY at the S7_STOP_AFTER=${stopAfter} boundary — later stages not run.`);
+  return { ok: true, stoppedAt: stopAfter };
 }
 
 /**
@@ -226,9 +246,12 @@ async function main() {
   const adapters = {
     supabase: createSupabaseAdapter({ credentials: credentials.get }),
     netlify: createNetlifyAdapter({ credentials: credentials.get }),
+    db: createDbAdapter(),
   };
-  const verdict = await runApply(credentials, adapters, stage);
+  const stopAfter = stopAfterStage();
+  const verdict = await runApply(credentials, adapters, stage, { stopAfter });
   credentials.clearRuntime(); // privileged runtime values never outlive the run
+  if (verdict.stoppedAt) log.ok(`stopped at ${verdict.stoppedAt} (as requested by S7_STOP_AFTER).`);
   process.exit(verdict.ok ? 0 : 2);
 }
 

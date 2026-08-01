@@ -6,7 +6,7 @@ import { runApply, rebuildConnectionOnResume } from "../../scripts/platform/stag
 import { mask } from "../../scripts/platform/shared/stage.mjs";
 import { createCredentialProvider } from "../../scripts/platform/shared/credentials.mjs";
 import { computeManifest } from "../../scripts/platform/shared/migrations.mjs";
-import { fakeSupabase, fakeNetlify, memoryStage } from "./fakes";
+import { fakeSupabase, fakeNetlify, fakeDb, memoryStage } from "./fakes";
 
 const REF = "bjvirkmagwpqroakazjj";
 const ORG = "vthlolcsedczobrxiacs";
@@ -166,7 +166,7 @@ describe("runApply resume — full simulated chain (fakes only)", () => {
     const cmd = vi.fn(async () => 0);
     const git = { clean: true, branch: "feature/teragon-supabase-platform", commit: "abc123" };
 
-    const verdict = await runApply(p, { supabase, netlify }, tracker, { cmd, git });
+    const verdict = await runApply(p, { supabase, netlify, db: fakeDb() }, tracker, { cmd, git });
     expect(verdict.ok).toBe(true);
     // provision skipped → zero createProject; keys fetched exactly once.
     expect(supabase.calls.filter((c) => c.method === "createProject")).toHaveLength(0);
@@ -189,7 +189,7 @@ describe("runApply resume — full simulated chain (fakes only)", () => {
     const supabase = fakeSupabase({ health: healthyStaging(), apiKeys: [{ type: "default", api_key: "opaque" }] });
     const netlify = fakeNetlify();
     const { tracker } = resumeStage();
-    const verdict = await runApply(p, { supabase, netlify }, tracker);
+    const verdict = await runApply(p, { supabase, netlify, db: fakeDb() }, tracker);
     expect(verdict.ok).toBe(false);
     expect(verdict.failedStep).toBe("provision-staging");
     expect(supabase.called("dbPush")).toBe(false);
