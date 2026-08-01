@@ -11,6 +11,7 @@ import process from "node:process";
 import { requireCredentials, MissingCredentialsError } from "./env.mjs";
 import { registerSecretNames, log } from "./log.mjs";
 import { deployProductionEnabled } from "./context.mjs";
+import { createCredentialProvider } from "./credentials.mjs";
 
 /**
  * @param {{script: string, needs: readonly string[], requireProductionGate?: boolean}} opts
@@ -26,8 +27,13 @@ export function guardOrExit({ script, needs, requireProductionGate = false }) {
     process.exit(3);
   }
 
-  // Register secret values for redaction BEFORE any further logging.
+  // Register secret values for redaction BEFORE any further logging — both the
+  // process.env-sourced names AND any secret VALUES that live only in the
+  // gitignored .env.staging.local (via the unified credential provider). This is
+  // the same value-blind scrubber every S7.0 script uses; fail-closed below is
+  // unchanged (still keyed on the explicit env NAMES).
   registerSecretNames(needs);
+  createCredentialProvider().registerSecrets();
 
   try {
     const present = requireCredentials(needs);

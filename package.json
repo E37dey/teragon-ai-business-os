@@ -19,7 +19,9 @@
     "platform:credentials": "node scripts/platform/bootstrap-credentials.mjs",
     "platform:plan": "node scripts/platform/plan.mjs",
     "platform:local": "node scripts/platform/validate-local.mjs",
-    "platform:staging": "node scripts/platform/staging.mjs",
+    "platform:staging": "node scripts/platform/staging.mjs plan",
+    "platform:staging:plan": "node scripts/platform/staging.mjs plan",
+    "platform:staging:apply": "node scripts/platform/staging.mjs apply",
     "platform:verify": "node scripts/platform/verify-preview.mjs",
     "platform:production": "node scripts/platform/deploy-production.mjs",
     "platform:rollback": "node scripts/platform/rollback.mjs"

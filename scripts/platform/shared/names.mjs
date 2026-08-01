@@ -46,4 +46,73 @@ export const OPTIONAL_DEPLOY_ENV_NAMES = new Set([
   "SUPABASE_PROJECT_REF",
   "SUPABASE_REGION",
   "DEPLOY_PRODUCTION",
+  // S7.0 additions — server-only project connection values resolved AFTER
+  // provisioning (never VITE_-prefixed) and the explicit confirmation gates.
+  "SUPABASE_URL",
+  "SUPABASE_ANON_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "TERAGON_ADMIN_EMAIL_CONFIRMED",
+  "SUPABASE_ACCESS_TOKEN",
 ]);
+
+/**
+ * S7.0 secret VALUE names — the subset whose VALUES must be scrubbed from every
+ * log line no matter where they were sourced (process.env OR the gitignored
+ * .env.staging.local). NAMES only; values are resolved by the credential
+ * provider and registered with the logger, never printed.
+ */
+export const SECRET_VALUE_NAMES = [
+  "SUPABASE_ACCESS_TOKEN",
+  "SUPABASE_DB_PASSWORD",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "SUPABASE_ANON_KEY",
+  "TERAGON_ADMIN_PASSWORD",
+  "NETLIFY_AUTH_TOKEN",
+];
+
+/**
+ * S7.0 unified per-command credential specification. The single source of truth
+ * the credential provider validates against. Each entry declares:
+ *   • supabaseAuth — the command needs Supabase Management-API authorization,
+ *     satisfied by SUPABASE_ACCESS_TOKEN (env-token) OR an authenticated CLI
+ *     session (cli-session). This is expressed as an authorization REQUIREMENT,
+ *     never as a bare SUPABASE_ACCESS_TOKEN name, so a logged-in operator with
+ *     no token still passes fail-closed.
+ *   • names — plain env/staging NAMES that must be present (values never read
+ *     for validation — presence only).
+ *   • serviceClient — the command talks to the project via the service-role
+ *     Admin API and therefore needs SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY.
+ *   • confirmGate — an explicit NAME that must equal "true" or the command
+ *     refuses (used to hold bootstrap-admin until the email is human-confirmed).
+ *   • netlifyAuth — the command needs a Netlify token (NETLIFY_AUTH_TOKEN).
+ * NAMES ONLY — safe to print.
+ */
+export const COMMAND_CREDENTIALS = {
+  "provision-staging": {
+    supabaseAuth: true,
+    names: ["SUPABASE_ORG_ID", "SUPABASE_DB_PASSWORD"],
+    optional: ["SUPABASE_PROJECT_REF", "SUPABASE_REGION"],
+  },
+  migrate: {
+    supabaseAuth: true,
+    names: ["SUPABASE_DB_PASSWORD", "SUPABASE_PROJECT_REF"],
+  },
+  "bootstrap-admin": {
+    serviceClient: true,
+    names: ["TERAGON_ADMIN_EMAIL", "TERAGON_ADMIN_PASSWORD"],
+    confirmGate: "TERAGON_ADMIN_EMAIL_CONFIRMED",
+  },
+  "configure-netlify": {
+    netlifyAuth: true,
+    serviceClient: true,
+    names: ["NETLIFY_SITE_ID", "SUPABASE_URL", "SUPABASE_ANON_KEY"],
+  },
+  "deploy-preview": {
+    netlifyAuth: true,
+    names: ["NETLIFY_SITE_ID"],
+  },
+  "verify-preview": {
+    netlifyAuth: true,
+    names: ["NETLIFY_SITE_ID"],
+  },
+};

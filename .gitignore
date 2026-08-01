@@ -11,6 +11,8 @@ dist-ssr
 # *.local and .env.* above; listed explicitly as a hard guard).
 .env.staging.local
 .teragon-staging-recovery.*
+# S7.0 staging stage tracker — safe masked metadata only, still never committed.
+.teragon-staging-state.json
 .netlify
 playwright-report
 test-results

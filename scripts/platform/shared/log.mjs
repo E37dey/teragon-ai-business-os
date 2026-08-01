@@ -27,6 +27,20 @@ export function registerSecretNames(names) {
   for (const v of collectSecretValues(names)) secretValues.add(v);
 }
 
+/**
+ * Register secret VALUES directly (already resolved by a caller — e.g. values
+ * parsed out of the gitignored .env.staging.local, which never live in
+ * process.env). Same contract as registerSecretNames: the values are only ever
+ * added to the scrub registry, never printed. Short values (<=6 chars) are
+ * skipped to avoid over-scrubbing common words like "true"/"false".
+ * @param {Iterable<string|undefined|null>} values
+ */
+export function registerSecretValues(values) {
+  for (const v of values) {
+    if (typeof v === "string" && v.trim().length > 6) secretValues.add(v.trim());
+  }
+}
+
 // Auto-register the full deploy credential set on module load.
 registerSecretNames(ALL_DEPLOY_ENV_NAMES);
 
