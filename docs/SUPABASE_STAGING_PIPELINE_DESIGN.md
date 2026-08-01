@@ -150,6 +150,52 @@ resume. A resumed apply (stored ref, no stored privileged key, live session)
 re-verifies the project and re-fetches key metadata; it never creates a second
 project because a runtime key is absent.
 
+## S7.1 / S7.1.2 — remote schema + RLS validation
+
+After migrate, two remote stages run against the LINKED project via the Supabase
+CLI Management-API SQL endpoint (`supabase db query --linked`, which runs as the
+privileged `postgres` role):
+
+- **schema-verify** (`schema-verify.mjs`) — one read-only introspection query
+  compared to the CI baseline: 47 public tables, 14 migrations, 3 namespaces,
+  RLS enabled on every protected table, 9 functions incl. `bootstrap_admin`,
+  FK/CHECK/index/policy presence, 0 nullable tenant `organization_id`
+  (`organizations`/`roles` exempt), 2 storage buckets. Fails closed on drift;
+  never auto-repairs; records safe totals only.
+- **rls-validate** (`rls-validate.mjs`) — the 8 canonical isolation checks
+  (`supabase/tests/0*.sql`) executed live (temp data, per-script rollback).
+
+### Introspection result-shape contract (S7.1.2)
+
+The Management-API `db query -o json` envelope does NOT return uniform JS types.
+The introspection query and the normalizer (`schema-normalize.mjs`) form a strict
+contract:
+
+| Field | SQL expr | JS types accepted | Normalizer | Comparison |
+| --- | --- | --- | --- | --- |
+| `public_tables` | `count(*)::int` | number \| numeric string | `parseIntegerField` | `=== 47` |
+| `namespaces` | `count(*)::int` | number \| numeric string | `parseIntegerField` | `>= 3` |
+| `migrations` | `count(*)::int` | number \| numeric string | `parseIntegerField` | `=== 14` |
+| `indexes` | `count(*)::int` | number \| numeric string | `parseIntegerField` | `> 0` |
+| `fk_constraints` | `count(*)::int` | number \| numeric string | `parseIntegerField` | `> 0` |
+| `check_constraints` | `count(*)::int` | number \| numeric string | `parseIntegerField` | `> 0` |
+| `rls_policies` | `count(*)::int` | number \| numeric string | `parseIntegerField` | `> 0` |
+| `storage_buckets` | `count(*)::int` | number \| numeric string | `parseIntegerField` | `=== 2` |
+| `functions_present` | `to_jsonb(array_agg(distinct …))` | JSON array \| JSON-array string \| PG-literal string | `parseStringArrayField` | required 9 ⊆ present |
+| `rls_disabled_tables` | `to_jsonb(array_agg(distinct …))` | same | `parseStringArrayField` | length `=== 0` |
+| `nullable_orgid_tenant_tables` | `to_jsonb(array_agg(distinct …))` | same | `parseStringArrayField` | length `=== 0` |
+
+**Two error categories are kept distinct:** an `INTROSPECTION_PARSE_FAILURE`
+(missing field / unknown representation / malformed array — from the normalizer)
+is NEVER reported as `SCHEMA_DRIFT`. This prevents the S7.1 defect where Postgres
+array-literal strings (`{a,b}`) were coerced to `[]` and surfaced as a false
+"missing functions" drift. The SQL now emits JSON arrays via
+`coalesce(to_jsonb(array_agg(distinct v order by v)), '[]'::jsonb)`; the
+normalizer still accepts the legacy PG-literal shape for robustness. The
+introspection query is executed from a temp `.sql` file (never inline argv) — see
+`adapters/db.mjs`. No raw SQL response, value, or credential ever enters logs or
+errors.
+
 ## Human inputs still required before an operator can apply
 
 - `SUPABASE_PROJECT_REF` — only if reusing an existing project (else created).

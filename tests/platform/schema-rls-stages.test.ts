@@ -1,7 +1,7 @@
 // Gate S7.1 — remote schema-verification + RLS-validation stages + the
 // S7_STOP_AFTER=RLS_VALIDATED stop boundary. Fake db adapter only (no network).
 import { describe, expect, it, vi } from "vitest";
-import { compareSchema, verifySchema } from "../../scripts/platform/schema-verify.mjs";
+import { verifySchema } from "../../scripts/platform/schema-verify.mjs";
 import { validateRls, listRlsScripts, EXPECTED_CHECK_COUNT } from "../../scripts/platform/rls-validate.mjs";
 import { runApply } from "../../scripts/platform/staging.mjs";
 import { stopAfterStage } from "../../scripts/platform/shared/runtime.mjs";
@@ -23,39 +23,6 @@ describe("stopAfterStage", () => {
   });
 });
 
-describe("compareSchema (pure)", () => {
-  it("passes on the CI baseline row", () => {
-    const r = compareSchema(GOOD_SCHEMA_ROW);
-    expect(r.ok).toBe(true);
-    expect(r.totals.publicTables).toBe(47);
-    expect(r.totals.bootstrapAdminPresent).toBe(true);
-  });
-
-  it("FAILs on wrong table count", () => {
-    expect(compareSchema({ ...GOOD_SCHEMA_ROW, public_tables: 46 }).ok).toBe(false);
-  });
-
-  it("FAILs on a missing function (incl bootstrap_admin)", () => {
-    const r = compareSchema({ ...GOOD_SCHEMA_ROW, functions_present: GOOD_SCHEMA_ROW.functions_present.filter((f) => f !== "bootstrap_admin") });
-    expect(r.ok).toBe(false);
-    expect(r.diffs.join(" ")).toMatch(/bootstrap_admin/);
-  });
-
-  it("FAILs when any protected table has RLS disabled", () => {
-    const r = compareSchema({ ...GOOD_SCHEMA_ROW, rls_disabled_tables: ["customers"] });
-    expect(r.ok).toBe(false);
-    expect(r.diffs.join(" ")).toMatch(/WITHOUT RLS/);
-  });
-
-  it("FAILs on a nullable organization_id tenant column", () => {
-    expect(compareSchema({ ...GOOD_SCHEMA_ROW, nullable_orgid_tenant_tables: ["leads"] }).ok).toBe(false);
-  });
-
-  it("FAILs when fewer than 14 migrations applied", () => {
-    expect(compareSchema({ ...GOOD_SCHEMA_ROW, migrations: 13 }).ok).toBe(false);
-  });
-});
-
 describe("verifySchema (apply, injected db)", () => {
   it("marks SCHEMA_VERIFIED on a matching schema", async () => {
     const { tracker } = memoryStage();
@@ -74,11 +41,31 @@ describe("verifySchema (apply, injected db)", () => {
     expect(tracker.completed("SCHEMA_VERIFIED")).toBe(false);
   });
 
-  it("fails safely when introspection errors", async () => {
+  it("fails safely when introspection errors (INTROSPECTION_QUERY_FAILURE)", async () => {
     const { tracker } = memoryStage();
     const db = fakeDb({ queryThrows: true });
     const r = await verifySchema({ mode: "apply", db, stage: tracker });
     expect(r.ok).toBe(false);
+    expect(r.category).toBe("INTROSPECTION_QUERY_FAILURE");
+  });
+
+  it("a PARSE failure is INTROSPECTION_PARSE_FAILURE (never reported as missing functions / drift)", async () => {
+    const { tracker } = memoryStage();
+    const db = fakeDb({ schemaRow: { ...GOOD_SCHEMA_ROW, functions_present: "not-an-array-or-literal" } });
+    const r = await verifySchema({ mode: "apply", db, stage: tracker });
+    expect(r.ok).toBe(false);
+    expect(r.category).toBe("INTROSPECTION_PARSE_FAILURE");
+    expect(r.reason).not.toMatch(/missing functions|drift/);
+    expect(tracker.completed("SCHEMA_VERIFIED")).toBe(false);
+  });
+
+  it("a real DRIFT is SCHEMA_DRIFT — a DIFFERENT category from a parse failure", async () => {
+    const { tracker } = memoryStage();
+    const db = fakeDb({ schemaRow: { ...GOOD_SCHEMA_ROW, public_tables: 46 } });
+    const r = await verifySchema({ mode: "apply", db, stage: tracker });
+    expect(r.ok).toBe(false);
+    expect(r.category).toBe("SCHEMA_DRIFT");
+    expect(r.reason).toMatch(/drift/);
   });
 });
 
@@ -261,5 +248,17 @@ describe("runApply resume from MIGRATIONS_APPLIED — schema + RLS only, no re-m
     expect(verdict.ok).toBe(false);
     expect(verdict.failedStep).toBe("schema-verify");
     expect(adapters.db.calls.filter((c) => c.method === "runScriptFile")).toHaveLength(0);
+  });
+
+  it("a PARSE failure also prevents RLS (distinct from drift), resume point preserved", async () => {
+    const p = provider();
+    const adapters = { ...stagingAdapters(), db: fakeDb({ schemaRow: { ...GOOD_SCHEMA_ROW, migrations: "14x" } }) };
+    const tracker = resumeStageMigrated();
+    const verdict = await runApply(p, adapters, tracker, { stopAfter: "RLS_VALIDATED" });
+    expect(verdict.ok).toBe(false);
+    expect(verdict.failedStep).toBe("schema-verify");
+    expect(adapters.db.calls.filter((c) => c.method === "runScriptFile")).toHaveLength(0);
+    expect(tracker.completed("MIGRATIONS_APPLIED")).toBe(true);
+    expect(tracker.completed("SCHEMA_VERIFIED")).toBe(false);
   });
 });

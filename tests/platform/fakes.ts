@@ -129,29 +129,23 @@ export function throwingSupabase() {
   };
 }
 
-/** A schema-introspection row that matches the S7.1 CI baseline expectations. */
+// A schema-introspection row in the REAL live CLI/API shape (S7.1.2): integer
+// counts arrive as numbers; array columns historically arrive as Postgres
+// array-LITERAL strings ("{a,b}") — the shape that broke S7.1 live. Locked to
+// the observed live totals (47/3/14/200/96/468/185/2, 9 functions, 0 disabled).
 export const GOOD_SCHEMA_ROW = {
   public_tables: 47,
   namespaces: 3,
   migrations: 14,
-  functions_present: [
-    "auth_org_id",
-    "auth_role_id",
-    "bootstrap_admin",
-    "close_service_ticket",
-    "current_profile",
-    "has_capability",
-    "is_active",
-    "is_org_member",
-    "is_service_role",
-  ],
-  indexes: 120,
-  fk_constraints: 60,
-  check_constraints: 40,
-  rls_disabled_tables: [],
-  nullable_orgid_tenant_tables: [],
+  functions_present:
+    "{auth_org_id,auth_role_id,bootstrap_admin,close_service_ticket,current_profile,has_capability,is_active,is_org_member,is_service_role}",
+  indexes: 200,
+  fk_constraints: 96,
+  check_constraints: 468,
+  rls_disabled_tables: "{}",
+  nullable_orgid_tenant_tables: "{}",
   storage_buckets: 2,
-  rls_policies: 90,
+  rls_policies: 185,
 };
 
 /** A fake db adapter (supabase db query --linked) with programmable results. */

@@ -19,29 +19,32 @@ import {
   EXPECTED_STORAGE_BUCKETS,
   buildIntrospectionSql,
 } from "./shared/schema-expectations.mjs";
+import { normalizeSchemaRow, IntrospectionParseError } from "./shared/schema-normalize.mjs";
 import { isEntrypoint } from "./shared/runtime.mjs";
 
 /**
- * PURE comparison of introspected totals against the expected baseline.
- * @param {Record<string, any>} row  the single introspection row
+ * PURE comparison of the NORMALIZED introspection totals against the expected
+ * baseline. Input is the strictly-typed object from normalizeSchemaRow (integer
+ * counts + string[] arrays) — so this function does NO coercion and never turns
+ * a parse issue into a false "missing functions". Callers must normalize first.
+ * @param {ReturnType<typeof normalizeSchemaRow>} norm
  * @returns {{ok:boolean, diffs:string[], totals:object}}
  */
-export function compareSchema(row) {
+export function compareSchema(norm) {
   const diffs = [];
-  const num = (v) => (typeof v === "number" ? v : Number(v ?? 0));
-  const arr = (v) => (Array.isArray(v) ? v : []);
-
-  const publicTables = num(row.public_tables);
-  const namespaces = num(row.namespaces);
-  const migrations = num(row.migrations);
-  const functionsPresent = arr(row.functions_present);
-  const indexes = num(row.indexes);
-  const fkConstraints = num(row.fk_constraints);
-  const checkConstraints = num(row.check_constraints);
-  const rlsDisabled = arr(row.rls_disabled_tables);
-  const nullableOrgId = arr(row.nullable_orgid_tenant_tables);
-  const storageBuckets = num(row.storage_buckets);
-  const rlsPolicies = num(row.rls_policies);
+  const {
+    publicTables,
+    namespaces,
+    migrations,
+    functionsPresent,
+    indexes,
+    fkConstraints,
+    checkConstraints,
+    rlsDisabledTables: rlsDisabled,
+    nullableOrgidTenantTables: nullableOrgId,
+    storageBuckets,
+    rlsPolicies,
+  } = norm;
 
   if (publicTables !== EXPECTED_TABLE_COUNT) diffs.push(`public tables: expected ${EXPECTED_TABLE_COUNT}, found ${publicTables}`);
   if (namespaces < EXPECTED_NAMESPACES.length) diffs.push(`namespaces: expected >= ${EXPECTED_NAMESPACES.length} (${EXPECTED_NAMESPACES.join(",")}), found ${namespaces}`);
@@ -95,21 +98,48 @@ export async function verifySchema({ mode, db, stage }) {
     };
   }
 
+  // 1. run the introspection query (temp-file adapter).
   let rows;
   try {
     rows = await db.query(buildIntrospectionSql());
-  } catch (err) {
-    stage.fail("schema introspection failed");
-    return { ok: false, mutated: false, reason: `schema introspection failed: ${err instanceof Error ? err.message : "error"}` };
+  } catch {
+    // Query/transport failure — a distinct category, never "schema drift".
+    stage.fail("introspection query failed (INTROSPECTION_QUERY_FAILURE)");
+    return { ok: false, mutated: false, category: "INTROSPECTION_QUERY_FAILURE", reason: "schema introspection query failed" };
   }
   if (!Array.isArray(rows) || rows.length === 0) {
-    stage.fail("schema introspection returned no rows");
-    return { ok: false, mutated: false, reason: "schema introspection returned no rows" };
+    stage.fail("introspection returned no rows (INTROSPECTION_QUERY_FAILURE)");
+    return { ok: false, mutated: false, category: "INTROSPECTION_QUERY_FAILURE", reason: "schema introspection returned no rows" };
   }
-  const result = compareSchema(rows[0]);
+
+  // 2. NORMALIZE + strict-validate. A parse failure is INTROSPECTION_PARSE_FAILURE
+  //    and MUST NOT be reported as schema drift / missing functions.
+  let norm;
+  try {
+    norm = normalizeSchemaRow(rows[0]);
+  } catch (err) {
+    const field = err instanceof IntrospectionParseError ? err.field : "<row>";
+    stage.fail(`introspection parse failure at ${field} (INTROSPECTION_PARSE_FAILURE)`);
+    return {
+      ok: false,
+      mutated: false,
+      category: "INTROSPECTION_PARSE_FAILURE",
+      reason: `introspection parse failure (harness result parsing, NOT a schema defect): field ${field}`,
+    };
+  }
+
+  // 3. compare the NORMALIZED object against the CI baseline.
+  const result = compareSchema(norm);
   if (!result.ok) {
-    stage.fail(`schema drift: ${result.diffs.length} finding(s)`);
-    return { ok: false, mutated: false, reason: `schema drift (no auto-repair): ${result.diffs.join("; ")}`, diffs: result.diffs, totals: result.totals };
+    stage.fail(`schema drift: ${result.diffs.length} finding(s) (SCHEMA_DRIFT)`);
+    return {
+      ok: false,
+      mutated: false,
+      category: "SCHEMA_DRIFT",
+      reason: `schema drift (no auto-repair): ${result.diffs.join("; ")}`,
+      diffs: result.diffs,
+      totals: result.totals,
+    };
   }
   stage.markComplete("SCHEMA_VERIFIED", { schema: result.totals }, "schema matches CI baseline");
   return { ok: true, mutated: false, totals: result.totals };

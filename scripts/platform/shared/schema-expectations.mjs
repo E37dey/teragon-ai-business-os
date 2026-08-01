@@ -35,9 +35,14 @@ export const ORG_ID_EXEMPT_TABLES = ["organizations", "roles"];
 
 /**
  * The single read-only introspection SQL used to gather all safe totals in one
- * round-trip. Returns exactly one row of counts/arrays. Contains no secrets and
- * mutates nothing. `format('%L', ...)`-free — the function list is inlined from
- * REQUIRED_FUNCTIONS at call time.
+ * round-trip. Returns exactly one row. Contains no secrets and mutates nothing.
+ *
+ * S7.1.2: every collection field is emitted as a JSON array via
+ * `coalesce(to_jsonb(array_agg(distinct v order by v)), '[]'::jsonb)` (empty ⇒
+ * `[]`, never null / `{}` / `"{}"`), so the JSON envelope carries real JSON
+ * arrays instead of Postgres array literals. `distinct` de-duplicates overloads.
+ * The parser (schema-normalize) still accepts the legacy PG-literal shape for
+ * robustness. Integer counts stay scalar `int`.
  */
 export function buildIntrospectionSql() {
   const fnList = REQUIRED_FUNCTIONS.map((f) => `'${f}'`).join(",");
@@ -49,7 +54,8 @@ export function buildIntrospectionSql() {
       (select count(*)::int from information_schema.schemata
          where schema_name in ('public','storage','auth')) as namespaces,
       (select count(*)::int from supabase_migrations.schema_migrations) as migrations,
-      (select coalesce(array_agg(p.proname order by p.proname),'{}') from pg_proc p
+      (select coalesce(to_jsonb(array_agg(distinct p.proname order by p.proname)), '[]'::jsonb)
+         from pg_proc p
          join pg_namespace n on n.oid=p.pronamespace
          where n.nspname='public' and p.proname in (${fnList})) as functions_present,
       (select count(*)::int from pg_indexes where schemaname='public') as indexes,
@@ -57,11 +63,12 @@ export function buildIntrospectionSql() {
          where constraint_schema='public' and constraint_type='FOREIGN KEY') as fk_constraints,
       (select count(*)::int from information_schema.table_constraints
          where constraint_schema='public' and constraint_type='CHECK') as check_constraints,
-      (select coalesce(array_agg(t.tablename order by t.tablename),'{}') from pg_tables t
+      (select coalesce(to_jsonb(array_agg(distinct t.tablename order by t.tablename)), '[]'::jsonb)
+         from pg_tables t
          join pg_class c on c.relname=t.tablename
          join pg_namespace nn on nn.oid=c.relnamespace and nn.nspname='public'
          where t.schemaname='public' and c.relrowsecurity=false) as rls_disabled_tables,
-      (select coalesce(array_agg(c.table_name order by c.table_name),'{}')
+      (select coalesce(to_jsonb(array_agg(distinct c.table_name order by c.table_name)), '[]'::jsonb)
          from information_schema.columns c
          where c.table_schema='public' and c.column_name='organization_id'
            and c.is_nullable='YES' and c.table_name not in (${exemptList})) as nullable_orgid_tenant_tables,
