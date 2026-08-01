@@ -171,6 +171,11 @@ export const COMMAND_CREDENTIALS = {
   "rls-validate": {
     supabaseAuth: true,
   },
+  // S7.2 — staging seed talks to the LINKED project via the Management-API SQL
+  // endpoint (Supabase authorization only; no extra names).
+  "seed-staging": {
+    supabaseAuth: true,
+  },
   "bootstrap-admin": {
     serviceClient: true,
     names: ["TERAGON_ADMIN_EMAIL", "TERAGON_ADMIN_PASSWORD"],

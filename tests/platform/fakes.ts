@@ -148,13 +148,31 @@ export const GOOD_SCHEMA_ROW = {
   rls_policies: 185,
 };
 
+/** A per-domain seed-count row where every domain has >=1 canonical record. */
+export const GOOD_SEED_COUNTS = {
+  crm: 3, products_printers: 2, service_repairs: 1, training: 3, tasks_approvals: 2, knowledge_memory: 2, governance_audit: 1,
+};
+
 /** A fake db adapter (supabase db query --linked) with programmable results. */
-export function fakeDb(opts: { schemaRow?: Record<string, unknown>; scriptResults?: Record<string, { ok: boolean; error?: string }>; queryThrows?: boolean } = {}) {
+export function fakeDb(opts: {
+  schemaRow?: Record<string, unknown>;
+  scriptResults?: Record<string, { ok: boolean; error?: string }>;
+  queryThrows?: boolean;
+  seedCountRow?: Record<string, number>;
+  seedCountRows?: Record<string, number>[];
+} = {}) {
   const calls: Call[] = [];
+  let seedQueryIndex = 0;
   return {
     calls,
     called: (m: string) => calls.some((c) => c.method === m),
     async query(sql: string) {
+      // Route by query shape: the seed stage's count query selects "as crm".
+      if (/\bas crm\b/.test(sql)) {
+        calls.push({ method: "query", args: ["seed-counts"] });
+        if (opts.seedCountRows) return [opts.seedCountRows[Math.min(seedQueryIndex++, opts.seedCountRows.length - 1)]];
+        return [opts.seedCountRow ?? GOOD_SEED_COUNTS];
+      }
       calls.push({ method: "query", args: [sql.slice(0, 20)] });
       if (opts.queryThrows) throw new Error("sql execution failed");
       return [opts.schemaRow ?? GOOD_SCHEMA_ROW];

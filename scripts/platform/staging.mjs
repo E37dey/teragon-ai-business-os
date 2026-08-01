@@ -25,6 +25,7 @@ import { migrateStaging } from "./migrate.mjs";
 import { verifySchema } from "./schema-verify.mjs";
 import { validateRls } from "./rls-validate.mjs";
 import { bootstrapAdmin } from "./bootstrap-admin.mjs";
+import { seedStaging } from "./seed-staging.mjs";
 import { configureNetlify } from "./configure-netlify.mjs";
 import { deployPreview } from "./deploy-preview.mjs";
 import { verifyPreview } from "./verify-preview.mjs";
@@ -36,6 +37,7 @@ const STEPS = [
   { command: "schema-verify", state: "SCHEMA_VERIFIED", run: verifySchema },
   { command: "rls-validate", state: "RLS_VALIDATED", run: validateRls },
   { command: "bootstrap-admin", state: "ADMIN_BOOTSTRAPPED", run: bootstrapAdmin },
+  { command: "seed-staging", state: "STAGING_SEEDED", run: seedStaging },
   { command: "configure-netlify", state: "NETLIFY_CONFIGURED", run: configureNetlify },
   { command: "deploy-preview", state: "PREVIEW_DEPLOYED", run: deployPreview },
   { command: "verify-preview", state: null, run: verifyPreview },
