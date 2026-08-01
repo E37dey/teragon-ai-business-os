@@ -59,6 +59,10 @@ export function redact(input) {
   // Generic shapes — do not depend on prior registration.
   text = text.replace(/\b(sk-[A-Za-z0-9_-]{6,})/g, REDACTION_MASK);
   text = text.replace(/\b([Bb]earer)\s+[A-Za-z0-9._~+/=-]{12,}/g, `$1 ${REDACTION_MASK}`);
+  // Mask the value FOLLOWING --db-password (or --password) in any command
+  // preview / failure message, independent of secret-value registration. Covers
+  // both `--db-password VALUE` and `--db-password=VALUE` forms.
+  text = text.replace(/(--(?:db-)?password)(\s+|=)(\S+)/gi, `$1$2${REDACTION_MASK}`);
   return text;
 }
 

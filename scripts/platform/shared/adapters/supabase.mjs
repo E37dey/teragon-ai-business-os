@@ -65,12 +65,19 @@ export function createSupabaseAdapter(deps) {
       return parseJson(await run("supabase", ["projects", "list", "--output", "json"]), []);
     },
     // --- Management API (CLI) — mutate (APPLY only) --------------------------
-    async createProject({ name, orgId, region }) {
-      // DB password via env only (never argv). CLI reads SUPABASE_DB_PASSWORD.
+    async createProject({ name, orgId, region, dbPassword }) {
+      // The Supabase CLI REQUIRES --db-password in non-interactive mode (env
+      // alone is NOT honoured for `projects create`). It must be an explicit,
+      // non-empty argv element. Refuse with a NAMES-only error otherwise — the
+      // password VALUE is never placed in any message, log, or report.
+      if (typeof dbPassword !== "string" || dbPassword.trim() === "") {
+        throw new Error("createProject requires a database password (by name): SUPABASE_DB_PASSWORD");
+      }
+      // Exact argv, each token a SEPARATE element (no shell interpolation). The
+      // value following --db-password is masked by the redacting exec/log layer.
       const out = await run(
         "supabase",
-        ["projects", "create", name, "--org-id", orgId, "--region", region, "--output", "json"],
-        { SUPABASE_DB_PASSWORD: cred("SUPABASE_DB_PASSWORD") ?? "" },
+        ["projects", "create", name, "--org-id", orgId, "--region", region, "--db-password", dbPassword, "--output", "json"],
       );
       const parsed = parseJson(out, {});
       return { ref: parsed.id ?? parsed.ref ?? null, raw: parsed };

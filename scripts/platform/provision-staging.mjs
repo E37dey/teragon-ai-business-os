@@ -145,9 +145,16 @@ export async function provisionStaging({ mode, credentials, supabase, stage, val
   let ref = decision.ref;
   let mutated = false;
   if (decision.action === "create") {
-    // 4. create — DB password via env, never argv.
+    // 4. create — the DB password is REQUIRED as an explicit --db-password argv
+    //    element (CLI mandate in non-interactive mode). Sourced from the provider
+    //    (never process.env directly); the value is redacted in every log/report.
     log.info(`creating staging project "${DEFAULT_STAGING_NAME}" in org (region ${region}).`);
-    const created = await supabase.createProject({ name: DEFAULT_STAGING_NAME, orgId, region });
+    const created = await supabase.createProject({
+      name: DEFAULT_STAGING_NAME,
+      orgId,
+      region,
+      dbPassword: credentials.getRequired("SUPABASE_DB_PASSWORD"),
+    });
     ref = created.ref;
     mutated = true;
     if (!ref) {

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { provisionStaging, selectStagingProject } from "../../scripts/platform/provision-staging.mjs";
 import { createSupabaseAdapter } from "../../scripts/platform/shared/adapters/supabase.mjs";
 import { createCredentialProvider } from "../../scripts/platform/shared/credentials.mjs";
+import { redact } from "../../scripts/platform/shared/log.mjs";
 import { fakeSupabase, memoryStage } from "./fakes";
 
 const readyAuth = async () => ({ ready: true, via: "cli-session" });
@@ -109,19 +110,26 @@ describe("provisionStaging apply — health + verification", () => {
   });
 });
 
-describe("real Supabase adapter — DB password supplied securely (env, never argv)", () => {
-  it("createProject passes the password via child env, not a logged flag", async () => {
-    const seen: { args: string[]; env: Record<string, string> }[] = [];
+describe("real Supabase adapter — DB password supplied as required --db-password argv", () => {
+  it("createProject sends --db-password (CLI mandate) and it is redacted for logs", async () => {
+    const seen: { args: string[] }[] = [];
     const adapter = createSupabaseAdapter({
       credentials: (n: string) => (n === "SUPABASE_DB_PASSWORD" ? "TOP-SECRET-PW-123456" : undefined),
-      capture: async (_cmd: string, args: string[], env: Record<string, string> = {}) => {
-        seen.push({ args, env });
+      capture: async (_cmd: string, args: string[]) => {
+        seen.push({ args });
         return JSON.stringify({ id: "created1" });
       },
     });
-    await adapter.createProject({ name: "teragon-staging", orgId: "org-1", region: "eu-central-1" });
-    const call = seen[0]!;
-    expect(call.args.join(" ")).not.toContain("TOP-SECRET-PW-123456");
-    expect(call.env.SUPABASE_DB_PASSWORD).toBe("TOP-SECRET-PW-123456");
+    await adapter.createProject({ name: "teragon-staging", orgId: "org-1", region: "eu-central-1", dbPassword: "TOP-SECRET-PW-123456" });
+    const { args } = seen[0]!;
+    const i = args.indexOf("--db-password");
+    expect(args[i + 1]).toBe("TOP-SECRET-PW-123456"); // exact value, one element
+    // the logging layer masks the value following --db-password
+    expect(redact(`RUN: supabase ${args.join(" ")}`)).not.toContain("TOP-SECRET-PW-123456");
+  });
+
+  it("refuses (NAMES-only, no value) when the password is absent", async () => {
+    const adapter = createSupabaseAdapter({ credentials: () => undefined, capture: async () => "{}" });
+    await expect(adapter.createProject({ name: "n", orgId: "o", region: "r" })).rejects.toThrow(/SUPABASE_DB_PASSWORD/);
   });
 });

@@ -48,8 +48,13 @@ export function fakeSupabase(opts: {
       rec("listProjects");
       return opts.projects ?? [];
     },
-    async createProject(a: unknown) {
-      rec("createProject", a);
+    async createProject(a: { name?: string; orgId?: string; region?: string; dbPassword?: string }) {
+      // Model the CLI contract: a non-empty db password is mandatory. Record the
+      // args REDACTED — never the password value — so no call log can leak it.
+      if (typeof a?.dbPassword !== "string" || a.dbPassword.trim() === "") {
+        throw new Error("createProject requires a database password (by name): SUPABASE_DB_PASSWORD");
+      }
+      rec("createProject", { name: a.name, orgId: a.orgId, region: a.region, hasDbPassword: true });
       return { ref: opts.createdRef ?? "newref01", raw: {} };
     },
     async getProjectHealth(ref: string) {
