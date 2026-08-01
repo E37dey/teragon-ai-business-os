@@ -198,8 +198,10 @@ export async function provisionStaging({ mode, credentials, supabase, stage, val
   // 6. link only after verification
   await supabase.link(ref);
 
-  // 7. record safe masked ref
-  stage.markComplete("PROJECT_READY", { project: { refMask: mask(ref), orgVerified: true, region } }, decision.action);
+  // 7. record the ref. The project ref is PUBLIC (it is the <ref>.supabase.co
+  //    host component, not a secret), so the full ref is stored to enable a
+  //    later resume to detect the exact project; a masked form is kept for logs.
+  stage.markComplete("PROJECT_READY", { project: { ref, refMask: mask(ref), orgVerified: true, region } }, decision.action);
 
   // 8. connection discovery (S7.0.1): resolve URL + classify API keys, inject
   //    into the runtime context so migrate/bootstrap/netlify become ready in the
@@ -212,7 +214,7 @@ export async function provisionStaging({ mode, credentials, supabase, stage, val
   }
   stage.markComplete(
     "PROJECT_READY",
-    { project: { refMask: mask(ref), orgVerified: true, region, urlHost: conn.report.urlHost, browserKeySource: conn.report.browserKeySource, serverKeySource: conn.report.serverKeySource } },
+    { project: { ref, refMask: mask(ref), orgVerified: true, region, urlHost: conn.report.urlHost, browserKeySource: conn.report.browserKeySource, serverKeySource: conn.report.serverKeySource } },
     "connection discovered",
   );
   return { ok: true, mutated, action: decision.action, refMask: mask(ref), connection: conn.report };

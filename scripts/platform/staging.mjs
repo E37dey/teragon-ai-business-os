@@ -16,10 +16,10 @@ import { log } from "./shared/log.mjs";
 import { createCredentialProvider, describeValidation } from "./shared/credentials.mjs";
 import { createSupabaseAdapter } from "./shared/adapters/supabase.mjs";
 import { createNetlifyAdapter } from "./shared/adapters/netlify.mjs";
-import { createStageTracker } from "./shared/stage.mjs";
+import { createStageTracker, mask } from "./shared/stage.mjs";
 import { discoverAndInjectConnection } from "./shared/connection.mjs";
 import { resolveMode, assertApplyAllowed, isEntrypoint } from "./shared/runtime.mjs";
-import { provisionStaging } from "./provision-staging.mjs";
+import { provisionStaging, selectStagingProject, DEFAULT_STAGING_NAME } from "./provision-staging.mjs";
 import { migrateStaging } from "./migrate.mjs";
 import { bootstrapAdmin } from "./bootstrap-admin.mjs";
 import { configureNetlify } from "./configure-netlify.mjs";
@@ -74,45 +74,135 @@ async function runPlan(credentials, stage) {
   return readiness.applyReady;
 }
 
-async function runApply(credentials, adapters, stage) {
+/**
+ * Run the staging apply. Returns a verdict (never process.exit — the caller
+ * decides) so the two-path provision handling + resume rebuild are testable.
+ *
+ * provision-staging is handled EXPLICITLY for both paths, rebuilding the
+ * connection context EXACTLY ONCE per run:
+ *   A. Fresh — provisionStaging creates/verifies the project AND discovers +
+ *      injects the connection (URL + browser/server keys) inside its core.
+ *   B. Resume (PROJECT_READY already completed) — skip creation, then
+ *      rebuildConnectionOnResume() re-verifies the tracked project and rebuilds
+ *      the connection context BEFORE advancing to migrate.
+ * @returns {Promise<{ok:boolean, failedStep?:string, reason?:string}>}
+ */
+export async function runApply(credentials, adapters, stage, extraDeps = {}) {
   log.step("STAGING APPLY — APPLY_STAGING=true. Stop-on-first-failure, idempotent resume.");
   for (const step of STEPS) {
-    if (step.state && stage.completed(step.state)) {
+    const alreadyDone = Boolean(step.state) && stage.completed(step.state);
+
+    if (step.command === "provision-staging") {
+      if (alreadyDone) {
+        // PATH B — resume. Rebuild the connection context BEFORE any `continue`,
+        // so migrate/bootstrap/netlify have their runtime creds. Zero createProject.
+        log.ok(`[provision-staging] already completed (PROJECT_READY) — skipping creation; rebuilding connection context.`);
+        const rc = await rebuildConnectionOnResume(credentials, adapters.supabase, stage);
+        if (!rc.ok) {
+          credentials.clearRuntime(); // clear any partial privileged material
+          log.error(`staging halted at provision-staging (resume): ${rc.reason}`);
+          return { ok: false, failedStep: "provision-staging", reason: rc.reason };
+        }
+        log.ok(`[provision-staging] connection context rebuilt (browser=${rc.report.browserKeySource}, server=${rc.report.serverKeySource}).`);
+      } else {
+        // PATH A — fresh. The core discovers + injects the connection once.
+        const validation = await credentials.validate("provision-staging");
+        log.step(`[provision-staging] applying`);
+        const result = await provisionStaging({ mode: "apply", credentials, ...adapters, stage, validation, ...extraDeps });
+        if (!result.ok) {
+          credentials.clearRuntime();
+          log.error(`staging halted at provision-staging: ${result.reason}`);
+          return { ok: false, failedStep: "provision-staging", reason: result.reason };
+        }
+        log.ok(`[provision-staging] done (${result.action}).`);
+      }
+      continue;
+    }
+
+    if (alreadyDone) {
       log.ok(`[${step.command}] already completed (${step.state}) — skipping (idempotent resume).`);
-      // RESUME: provisioning is skipped but the in-memory server key is gone on
-      // a fresh process. Re-fetch the connection context from the CLI session —
-      // NEVER create another project — so downstream stages are ready again.
-      if (step.command === "provision-staging") await ensureConnectionContext(credentials, adapters.supabase, stage);
       continue;
     }
     const validation = await credentials.validate(step.command);
     log.step(`[${step.command}] applying`);
-    const result = await step.run({ mode: "apply", credentials, ...adapters, stage, validation });
+    const result = await step.run({ mode: "apply", credentials, ...adapters, stage, validation, ...extraDeps });
     if (!result.ok) {
       log.error(`staging halted at ${step.command}: ${result.reason ?? (result.problems ?? []).join("; ")}`);
-      process.exit(2);
+      return { ok: false, failedStep: step.command, reason: result.reason ?? (result.problems ?? []).join("; ") };
     }
     log.ok(`[${step.command}] done.`);
   }
   log.step("STAGING APPLY complete.");
+  return { ok: true };
 }
 
 /**
- * On a resumed apply (project already provisioned, ref known, NO locally-stored
- * privileged key), rebuild the in-memory runtime context by re-fetching the key
- * metadata from the authenticated CLI session. Never creates a second project.
+ * Rebuild the in-memory connection context on a RESUMED apply — never creating a
+ * second project. Resolves the existing project ref (provider → tracker →
+ * read-only verified reuse by name+org), cross-checks it against the tracked
+ * mask, re-verifies live identity (name/org/region/health), then retrieves +
+ * classifies the current API keys and injects the runtime connection values.
+ * Fails CLOSED (returns a sanitized verdict) on any verification/discovery
+ * failure — PROJECT_READY stays the safe resume point. NAMES/kinds only in the
+ * report; no key material.
+ * @returns {Promise<{ok:boolean, reason?:string, report?:object}>}
  */
-async function ensureConnectionContext(credentials, supabase, stage) {
-  if (credentials.has("SUPABASE_SERVER_KEY")) return; // already in memory
-  const ref = credentials.get("SUPABASE_PROJECT_REF");
-  if (!ref) return; // provision step will handle it
-  log.info("resume: re-fetching project connection metadata (no new project).");
-  const conn = await discoverAndInjectConnection({ supabase, credentials, ref, orgId: credentials.get("SUPABASE_ORG_ID") });
-  if (!conn.ok) {
-    log.error(`resume connection discovery failed: ${conn.reason}`);
-    stage.fail(`resume connection discovery failed: ${conn.reason}`);
-    process.exit(2);
+export async function rebuildConnectionOnResume(credentials, supabase, stage) {
+  // Exactly-once guard: if already rebuilt in this run, do not discover again.
+  if (credentials.has("SUPABASE_SERVER_KEY")) {
+    return { ok: true, report: { alreadyPresent: true, browserKeySource: "n/a", serverKeySource: "n/a" } };
   }
+  const orgId = credentials.get("SUPABASE_ORG_ID");
+  const tracked = stage.read().project ?? {};
+
+  // 1. resolve the ref WITHOUT creating anything.
+  let ref = credentials.get("SUPABASE_PROJECT_REF") ?? tracked.ref ?? null;
+  if (!ref) {
+    // read-only verified reuse: find the existing teragon-staging project by name+org.
+    let projects = [];
+    try {
+      projects = await supabase.listProjects();
+    } catch {
+      return { ok: false, reason: "could not list projects to resolve the tracked staging project on resume" };
+    }
+    const decision = selectStagingProject({ projects, orgId, desiredName: DEFAULT_STAGING_NAME });
+    if (decision.action !== "reuse") {
+      // NEVER create on resume because a runtime ref is absent.
+      return { ok: false, reason: `cannot resolve the existing staging project on resume (${decision.action}: ${decision.reason})` };
+    }
+    ref = decision.ref;
+  }
+  if (!ref) return { ok: false, reason: "no tracked staging project ref on resume" };
+
+  // 2. cross-check the resolved ref against the tracker's recorded mask.
+  if (tracked.refMask && mask(ref) !== tracked.refMask) {
+    return { ok: false, reason: "resolved project ref does not match the tracked project (mask mismatch)" };
+  }
+
+  // 3. re-verify live identity (name/org/region/health) BEFORE trusting the ref.
+  let health;
+  try {
+    health = await supabase.getProjectHealth(ref);
+  } catch {
+    return { ok: false, reason: "could not verify the tracked project on resume" };
+  }
+  if (!health.found) return { ok: false, reason: "tracked project not found on resume" };
+  const p = health.project ?? {};
+  const projOrg = p.organization_id ?? p.orgId ?? p.organizationId ?? null;
+  if (orgId && projOrg && projOrg !== orgId) return { ok: false, reason: "tracked project org mismatch on resume" };
+  if (p.name && String(p.name) !== DEFAULT_STAGING_NAME) return { ok: false, reason: "tracked project identity mismatch on resume" };
+  if (health.status && !/ACTIVE_HEALTHY|ACTIVE|HEALTHY/i.test(String(health.status))) {
+    return { ok: false, reason: `tracked project not healthy on resume (${health.status})` };
+  }
+
+  // 4. retrieve + classify keys + inject runtime connection values.
+  const conn = await discoverAndInjectConnection({ supabase, credentials, ref, orgId });
+  if (!conn.ok) return { ok: false, reason: conn.reason };
+
+  // 5. confirm the required runtime creds are now present.
+  const present = credentials.has("SUPABASE_URL") && credentials.has("SUPABASE_BROWSER_KEY") && credentials.has("SUPABASE_SERVER_KEY");
+  if (!present) return { ok: false, reason: "connection values not present in runtime after rebuild" };
+  return { ok: true, report: conn.report };
 }
 
 async function main() {
@@ -137,8 +227,9 @@ async function main() {
     supabase: createSupabaseAdapter({ credentials: credentials.get }),
     netlify: createNetlifyAdapter({ credentials: credentials.get }),
   };
-  await runApply(credentials, adapters, stage);
-  process.exit(0);
+  const verdict = await runApply(credentials, adapters, stage);
+  credentials.clearRuntime(); // privileged runtime values never outlive the run
+  process.exit(verdict.ok ? 0 : 2);
 }
 
 if (isEntrypoint(import.meta.url)) {
