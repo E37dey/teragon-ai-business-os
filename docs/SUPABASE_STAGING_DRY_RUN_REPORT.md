@@ -52,6 +52,30 @@ exists — no create, link, migrate, netlify-change, or deploy is ever performed
   the provider reports authorization via `cli-session` with no
   `SUPABASE_ACCESS_TOKEN` present. **Remote mutations performed: ZERO.**
 
+## S7.0.2 — live read-only API-key probe
+
+After the live apply created the real project it failed at key classification
+(`type: "default"` non-semantic metadata). The classifier was hardened and a
+reproducible read-only probe (`scripts/platform/probe-keys.mjs`, no APPLY_STAGING,
+no mutation) verifies it against the existing project. Safe result ONLY:
+
+```
+project identity verified: YES
+returned record count: 4
+browser classification source: PUBLISHABLE
+server classification source: SECRET
+classification result: PASS
+remote mutations: ZERO
+```
+
+Sanitized response shape (no values): the `api-keys` response is an array of
+records, each with `name`/`type` fields (the value `default` for the modern
+keys) and an `api_key` field; the two selected records had `api_key` values in
+the modern `sb_publishable_…` / `sb_secret_…` format, chosen over the coexisting
+legacy pair. Project count is unchanged (5 before and after); the tracker remains
+`FAILED` with `completed:[PLAN_READY, PROJECT_READY]` — resumable from
+PROJECT_READY (the next apply re-fetches keys, it does not re-create the project).
+
 ## To actually apply (operator, later — not done here)
 
 1. Set `APPLY_STAGING=true` and run `npm run platform:staging:apply`. The

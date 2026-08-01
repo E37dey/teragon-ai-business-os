@@ -102,8 +102,15 @@ export function createSupabaseAdapter(deps) {
       return { url: endpoint || `https://${ref}.supabase.co` };
     },
     async getProjectApiKeys(ref) {
-      // NEVER log this JSON — it contains key values. Parsed in memory only.
-      const out = await run("supabase", ["projects", "api-keys", "--project-ref", ref, "--output", "json"]);
+      // Capture stdout PRIVATELY, parse in memory. NEVER forward the raw stdout
+      // (key values) to logs/errors/disk. On CLI failure throw a sanitized error
+      // that carries NO raw output (which could contain key material via stderr).
+      let out;
+      try {
+        out = await run("supabase", ["projects", "api-keys", "--project-ref", ref, "--output", "json"]);
+      } catch {
+        throw new Error("failed to retrieve project API keys");
+      }
       return parseJson(out, []);
     },
     // --- migrations ---------------------------------------------------------

@@ -82,6 +82,39 @@ describe("provision injects connection so downstream becomes READY in the same a
   });
 });
 
+describe("failed classification prevents downstream readiness (fail-closed)", () => {
+  it("keeps migrate/netlify NOT ready and injects no key when keys are unclassifiable", async () => {
+    const provider = createCredentialProvider({ env: baseEnv(), fileText: "", authResolver: sessionAuth });
+    const supabase = fakeSupabase({ apiKeys: [{ type: "default", api_key: "opaque-not-a-key" }] });
+    const r = await discoverAndInjectConnection({ supabase, credentials: provider, ref: "ref1", orgId: "org-1" });
+    expect(r.ok).toBe(false);
+    expect(r.report.classificationSuccess).toBe(false);
+    expect(provider.has("SUPABASE_SERVER_KEY")).toBe(false);
+    expect((await provider.validate("migrate")).ok).toBe(false);
+    expect((await provider.validate("configure-netlify")).ok).toBe(false);
+  });
+
+  it("clears the runtime server key after orchestration", async () => {
+    const provider = createCredentialProvider({ env: baseEnv(), fileText: "", authResolver: sessionAuth });
+    const supabase = fakeSupabase();
+    await discoverAndInjectConnection({ supabase, credentials: provider, ref: "ref1", orgId: "org-1" });
+    expect(provider.has("SUPABASE_SERVER_KEY")).toBe(true);
+    provider.clearRuntime();
+    expect(provider.has("SUPABASE_SERVER_KEY")).toBe(false);
+    expect(provider.has("SUPABASE_URL")).toBe(false);
+  });
+
+  it("the connection report never carries a key value", async () => {
+    const provider = createCredentialProvider({ env: baseEnv(), fileText: "", authResolver: sessionAuth });
+    const supabase = fakeSupabase();
+    const r = await discoverAndInjectConnection({ supabase, credentials: provider, ref: "ref1", orgId: "org-1" });
+    expect(r.report.recordCount).toBe(2);
+    expect(r.report.classificationSuccess).toBe(true);
+    expect(JSON.stringify(r.report)).not.toContain(SERVER_KEY_VALUE);
+    expect(JSON.stringify(r.report)).not.toContain(BROWSER_KEY_VALUE);
+  });
+});
+
 describe("resume — re-fetch keys, never a second project", () => {
   it("rebuilds the runtime context from a stored ref without creating a project", async () => {
     // stored ref (safe metadata) present; NO server key in memory.

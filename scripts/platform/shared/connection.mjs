@@ -34,33 +34,42 @@ export async function discoverAndInjectConnection({ supabase, credentials, ref, 
   const url = meta?.url;
   if (!url) return { ok: false, reason: "could not resolve project URL from metadata" };
 
-  // 3. retrieve + classify API keys (values never logged).
+  // 3. retrieve + classify API keys (raw response held PRIVATELY; never logged).
   let classified;
+  let recordCount = 0;
   try {
-    const apiKeys = await supabase.getProjectApiKeys(ref);
+    let apiKeys = await supabase.getProjectApiKeys(ref);
+    recordCount = Array.isArray(apiKeys) ? apiKeys.length : 0;
     classified = classifyProjectKeys(apiKeys);
+    apiKeys = null; // drop the raw key list reference once classified
   } catch (err) {
-    // Fail CLOSED after creation: inability to retrieve required key types stops here.
-    return { ok: false, reason: err instanceof Error ? err.message : "key retrieval failed" };
+    // Fail CLOSED after creation: inability to retrieve/identify required key
+    // types stops here. The message is already sanitized (no key material).
+    return { ok: false, reason: err instanceof Error ? err.message : "key retrieval failed", report: { recordCount, classificationSuccess: false } };
   }
 
-  // 4. inject into the runtime context + recalc readiness.
+  // 4. inject into the runtime context + recalc readiness, then drop key refs.
+  const browserSource = classified.browser.source;
+  const serverSource = classified.server.source;
   credentials.setRuntimeValues({
     SUPABASE_PROJECT_REF: ref,
     SUPABASE_URL: url,
     SUPABASE_BROWSER_KEY: classified.browser.value,
     SUPABASE_SERVER_KEY: classified.server.value,
   });
+  classified = null; // clear the temporary key values after injection
   await credentials.refreshReadiness();
 
-  // report carries NAMES + source kinds only — never a key value.
+  // report carries counts + source KINDS + success only — never a key value.
   return {
     ok: true,
     report: {
       ref,
       urlHost: safeHost(url),
-      browserKeySource: classified.browser.source,
-      serverKeySource: classified.server.source,
+      recordCount,
+      classificationSuccess: true,
+      browserKeySource: browserSource,
+      serverKeySource: serverSource,
       injected: ["SUPABASE_PROJECT_REF", "SUPABASE_URL", "SUPABASE_BROWSER_KEY", "SUPABASE_SERVER_KEY"],
     },
   };

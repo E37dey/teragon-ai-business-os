@@ -84,15 +84,42 @@ runtime > staging-file. Every script reads credentials only through the provider
 There is deliberately no method that serializes all credentials. Runtime secrets
 are in-memory only and cleared on process exit.
 
-### Modern + legacy key model (`shared/keys.mjs`)
+### Modern + legacy key model (`shared/keys.mjs`, hardened S7.0.2)
 
 After project verification the pipeline queries the project API keys and
-normalizes them to `SUPABASE_BROWSER_KEY` (from `PUBLISHABLE` modern or
-`ANON_LEGACY`) and `SUPABASE_SERVER_KEY` (from `SECRET` modern or
-`SERVICE_ROLE_LEGACY`), retaining the source kind. It FAILS CLOSED on unknown or
-ambiguous key types, or when a browser-safe/server-only key can't be uniquely
-identified. The raw key JSON is never logged. The browser key may become a
-`VITE_` var; the server key never.
+normalizes them to `SUPABASE_BROWSER_KEY` (`PUBLISHABLE` modern or `ANON_LEGACY`)
+and `SUPABASE_SERVER_KEY` (`SECRET` modern or `SERVICE_ROLE_LEGACY`), retaining
+the source kind. The browser key may become a `VITE_` var; the server key never.
+
+**Root cause fixed (S7.0.2):** the live CLI returns entries whose `type` field is
+the non-semantic value `default` (both publishable and secret may report
+`default`). Classification therefore does NOT trust `name`/`type` alone. Each
+record is resolved by a deterministic per-record precedence:
+
+- **A. Recognized explicit semantic** name/type — only exact `publishable`/`anon`
+  (browser) or `secret`/`service_role` (server); `default`/`primary`/`generated`/
+  empty are ignored as non-semantic.
+- **B. Modern key format** — inspected in memory (preferring a safe prefix field):
+  `sb_publishable_` → browser, `sb_secret_` → server; any other `sb_` → rejected.
+- **C. Legacy names** — exact `anon`/`service_role` (subsumed by A over both
+  fields).
+- **D. Legacy JWT role** — when JWT-shaped with no reliable name, the payload is
+  decoded LOCALLY (classification only, never verification/auth); `role` `anon` →
+  browser, `service_role` → server; any other role rejected.
+
+A real modern project exposes BOTH new keys (publishable/secret) AND legacy keys
+(anon/service_role) at once — the live response is **4 records**. Each slot is
+filled by PREFERRING the modern kind and falling back to legacy; that
+coexistence is not ambiguous. It FAILS CLOSED when: a slot has no candidate; the
+chosen kind has more than one DISTINCT value; a record's semantic metadata
+conflicts with its key format; a modern key has an unsupported prefix; a legacy
+JWT has an unexpected role; or the response shape is unknown. The raw CLI JSON,
+key values, JWTs, and sensitive prefixes are NEVER logged or placed in errors —
+error messages carry only a record index, a short safe format identifier, the
+detected source kind, and the ambiguity category. The `api-keys` adapter captures
+stdout privately and, on failure, throws a sanitized error with no raw output;
+the safe result exposes only record count, selected source kinds, and a success
+boolean — no values.
 
 ### Connection discovery (`shared/connection.mjs`)
 
