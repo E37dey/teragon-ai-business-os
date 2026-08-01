@@ -203,3 +203,63 @@ describe("runApply — S7_STOP_AFTER=RLS_VALIDATED boundary", () => {
     expect(tracker.completed("RLS_VALIDATED")).toBe(false);
   });
 });
+
+// --- S7.1.1 resume: MIGRATIONS_APPLIED already completed (no re-migrate) ------
+function resumeStageMigrated() {
+  const { tracker, store } = memoryStage();
+  store.text = JSON.stringify({
+    version: 1,
+    state: "MIGRATIONS_APPLIED",
+    completed: ["PLAN_READY", "PROJECT_READY", "MIGRATIONS_APPLIED"],
+    project: { ref: REF, refMask: mask(REF), orgVerified: true, region: REGION },
+    netlify: {},
+    admin: {},
+    history: [],
+  });
+  return tracker;
+}
+
+describe("runApply resume from MIGRATIONS_APPLIED — schema + RLS only, no re-migrate", () => {
+  it("skips provision AND migrate (zero db push), runs schema then RLS, stops at RLS_VALIDATED", async () => {
+    const p = provider();
+    const adapters = stagingAdapters();
+    const tracker = resumeStageMigrated();
+    const verdict = await runApply(p, adapters, tracker, { stopAfter: "RLS_VALIDATED" });
+    expect(verdict.ok).toBe(true);
+    expect(verdict.stoppedAt).toBe("RLS_VALIDATED");
+    // createProject = 0 AND migration-apply = 0 (db push never called on resume)
+    expect(adapters.supabase.called("createProject")).toBe(false);
+    expect(adapters.supabase.called("dbPush")).toBe(false);
+    // connection rebuilt (keys fetched) then schema-verify then RLS
+    expect(adapters.supabase.called("getProjectApiKeys")).toBe(true);
+    expect(adapters.db.called("query")).toBe(true);
+    expect(adapters.db.calls.filter((c) => c.method === "runScriptFile")).toHaveLength(8);
+    // schema passes BEFORE RLS runs; both recorded; later stages not run
+    expect(tracker.completed("SCHEMA_VERIFIED")).toBe(true);
+    expect(tracker.completed("RLS_VALIDATED")).toBe(true);
+    expect(adapters.supabase.called("createUser")).toBe(false);
+    expect(adapters.netlify.calls.some((c) => c.method === "setEnv")).toBe(false);
+  });
+
+  it("schema-query FAILURE prevents RLS from running", async () => {
+    const p = provider();
+    const adapters = { ...stagingAdapters(), db: fakeDb({ queryThrows: true }) };
+    const tracker = resumeStageMigrated();
+    const verdict = await runApply(p, adapters, tracker, { stopAfter: "RLS_VALIDATED" });
+    expect(verdict.ok).toBe(false);
+    expect(verdict.failedStep).toBe("schema-verify");
+    expect(adapters.db.calls.filter((c) => c.method === "runScriptFile")).toHaveLength(0); // RLS never ran
+    expect(tracker.completed("MIGRATIONS_APPLIED")).toBe(true); // safe checkpoint kept
+    expect(tracker.completed("SCHEMA_VERIFIED")).toBe(false);
+  });
+
+  it("schema-ASSERTION drift prevents RLS from running", async () => {
+    const p = provider();
+    const adapters = { ...stagingAdapters(), db: fakeDb({ schemaRow: { ...GOOD_SCHEMA_ROW, public_tables: 46 } }) };
+    const tracker = resumeStageMigrated();
+    const verdict = await runApply(p, adapters, tracker, { stopAfter: "RLS_VALIDATED" });
+    expect(verdict.ok).toBe(false);
+    expect(verdict.failedStep).toBe("schema-verify");
+    expect(adapters.db.calls.filter((c) => c.method === "runScriptFile")).toHaveLength(0);
+  });
+});
