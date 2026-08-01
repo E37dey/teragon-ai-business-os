@@ -49,8 +49,9 @@ export function createSupabaseAdapter(deps) {
   async function serviceClient() {
     if (deps.serviceClientFactory) return deps.serviceClientFactory();
     const url = cred("SUPABASE_URL");
-    const key = cred("SUPABASE_SERVICE_ROLE_KEY");
-    if (!url || !key) throw new Error("service-role client requires SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY");
+    // Normalized server key resolves from SECRET (modern) or SERVICE_ROLE (legacy).
+    const key = cred("SUPABASE_SERVER_KEY");
+    if (!url || !key) throw new Error("service-role client requires SUPABASE_URL + SUPABASE_SERVER_KEY");
     const { createClient } = await import("@supabase/supabase-js");
     return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
   }
@@ -83,6 +84,20 @@ export function createSupabaseAdapter(deps) {
       await run("supabase", ["link", "--project-ref", ref], {
         SUPABASE_DB_PASSWORD: cred("SUPABASE_DB_PASSWORD") ?? "",
       });
+    },
+    // --- connection discovery (S7.0.1) --------------------------------------
+    async getConnectionMetadata(ref) {
+      // Authoritative, canonical project URL. Prefer any explicit endpoint from
+      // the projects list; fall back to the canonical <ref>.supabase.co host.
+      const projects = parseJson(await run("supabase", ["projects", "list", "--output", "json"]), []);
+      const found = (Array.isArray(projects) ? projects : []).find((p) => (p.id ?? p.ref) === ref);
+      const endpoint = found?.endpoint ?? found?.api_url ?? null;
+      return { url: endpoint || `https://${ref}.supabase.co` };
+    },
+    async getProjectApiKeys(ref) {
+      // NEVER log this JSON — it contains key values. Parsed in memory only.
+      const out = await run("supabase", ["projects", "api-keys", "--project-ref", ref, "--output", "json"]);
+      return parseJson(out, []);
     },
     // --- migrations ---------------------------------------------------------
     async remoteMigrationList() {

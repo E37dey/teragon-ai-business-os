@@ -53,7 +53,40 @@ export const OPTIONAL_DEPLOY_ENV_NAMES = new Set([
   "SUPABASE_SERVICE_ROLE_KEY",
   "TERAGON_ADMIN_EMAIL_CONFIRMED",
   "SUPABASE_ACCESS_TOKEN",
+  // S7.0.1 — modern key names + normalized aliases + review pins.
+  "SUPABASE_PUBLISHABLE_KEY",
+  "SUPABASE_SECRET_KEY",
+  "SUPABASE_BROWSER_KEY",
+  "SUPABASE_SERVER_KEY",
+  "REVIEW_BRANCH",
+  "REVIEW_COMMIT",
 ]);
+
+/**
+ * S7.0.1 modern+legacy key model. Internally the pipeline speaks two NORMALIZED
+ * names; each resolves from the modern source first, then the legacy fallback:
+ *   SUPABASE_BROWSER_KEY ← SUPABASE_PUBLISHABLE_KEY (modern) | SUPABASE_ANON_KEY (legacy)
+ *   SUPABASE_SERVER_KEY  ← SUPABASE_SECRET_KEY      (modern) | SUPABASE_SERVICE_ROLE_KEY (legacy)
+ * The browser key MAY be exposed as a VITE_ var; the server key NEVER.
+ */
+export const KEY_ALIASES = {
+  SUPABASE_BROWSER_KEY: ["SUPABASE_PUBLISHABLE_KEY", "SUPABASE_ANON_KEY"],
+  SUPABASE_SERVER_KEY: ["SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY"],
+};
+
+/**
+ * Project-DERIVED names that only exist AFTER a project is created/selected. A
+ * plan must NOT treat these as blocking pre-creation — the apply retrieves them.
+ */
+export const POST_PROVISION_NAMES = [
+  "SUPABASE_PROJECT_REF",
+  "SUPABASE_URL",
+  "SUPABASE_BROWSER_KEY",
+  "SUPABASE_SERVER_KEY",
+];
+
+/** Names needed to CREATE/SELECT a project (must exist pre-provision). */
+export const PRE_PROVISION_NAMES = ["SUPABASE_ORG_ID", "SUPABASE_DB_PASSWORD"];
 
 /**
  * S7.0 secret VALUE names — the subset whose VALUES must be scrubbed from every
@@ -65,10 +98,42 @@ export const SECRET_VALUE_NAMES = [
   "SUPABASE_ACCESS_TOKEN",
   "SUPABASE_DB_PASSWORD",
   "SUPABASE_SERVICE_ROLE_KEY",
+  "SUPABASE_SECRET_KEY",
+  "SUPABASE_SERVER_KEY",
   "SUPABASE_ANON_KEY",
+  "SUPABASE_PUBLISHABLE_KEY",
+  "SUPABASE_BROWSER_KEY",
   "TERAGON_ADMIN_PASSWORD",
   "NETLIFY_AUTH_TOKEN",
 ];
+
+/**
+ * Names that MAY be persisted to the gitignored .env.staging.local (safe
+ * metadata + generated passwords already covered by S6.1). The privileged
+ * SERVER key + the Management-API access token are DELIBERATELY absent — they
+ * are never persisted (kept in process memory, re-fetched from the CLI session
+ * on resume). The browser key MAY be persisted but stays redacted in output.
+ */
+export const PERSISTABLE_SAFE_NAMES = [
+  "SUPABASE_ORG_ID",
+  "SUPABASE_PROJECT_REF",
+  "SUPABASE_URL",
+  "SUPABASE_DB_PASSWORD",
+  "TERAGON_ADMIN_EMAIL",
+  "TERAGON_ADMIN_EMAIL_CONFIRMED",
+  "TERAGON_ADMIN_PASSWORD",
+  "NETLIFY_SITE_ID",
+  "SUPABASE_PUBLISHABLE_KEY",
+  "SUPABASE_ANON_KEY",
+];
+
+/** Names that must NEVER be written to any file (memory-only). */
+export const NEVER_PERSIST_NAMES = new Set([
+  "SUPABASE_ACCESS_TOKEN",
+  "SUPABASE_SECRET_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "SUPABASE_SERVER_KEY",
+]);
 
 /**
  * S7.0 unified per-command credential specification. The single source of truth
@@ -105,7 +170,7 @@ export const COMMAND_CREDENTIALS = {
   "configure-netlify": {
     netlifyAuth: true,
     serviceClient: true,
-    names: ["NETLIFY_SITE_ID", "SUPABASE_URL", "SUPABASE_ANON_KEY"],
+    names: ["NETLIFY_SITE_ID", "SUPABASE_URL", "SUPABASE_BROWSER_KEY"],
   },
   "deploy-preview": {
     netlifyAuth: true,

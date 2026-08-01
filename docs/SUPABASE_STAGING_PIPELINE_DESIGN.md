@@ -67,6 +67,62 @@ remote DB, resetting production, or overwriting unrelated Netlify config.
    authorization when `SUPABASE_ACCESS_TOKEN` is absent (expressed as
    "authorization = env-token OR cli-session", never a bare token NAME).
 
+## S7.0.1 — connection-value wiring
+
+The connection values that only exist AFTER a project is created/selected (URL +
+API keys) are obtained and propagated through the SAME credential provider
+mid-apply, so the plan no longer falsely reports the whole pipeline blocked.
+
+### Runtime credential context (`shared/credentials.mjs`)
+
+The provider now holds an in-memory runtime layer on top of env + staging-file:
+`loadFromProcessEnvironment()`, `loadFromLocalSecureFile()`,
+`loadFromSupabaseCliSession()`, `setRuntimeValue()/setRuntimeValues()`,
+`refreshReadiness()`, `getRequired()`, `getOptional()`, `getPresenceReport()`,
+`createRedactedChildEnvironment()`, `clearRuntime()`. Precedence: `process.env` >
+runtime > staging-file. Every script reads credentials only through the provider.
+There is deliberately no method that serializes all credentials. Runtime secrets
+are in-memory only and cleared on process exit.
+
+### Modern + legacy key model (`shared/keys.mjs`)
+
+After project verification the pipeline queries the project API keys and
+normalizes them to `SUPABASE_BROWSER_KEY` (from `PUBLISHABLE` modern or
+`ANON_LEGACY`) and `SUPABASE_SERVER_KEY` (from `SECRET` modern or
+`SERVICE_ROLE_LEGACY`), retaining the source kind. It FAILS CLOSED on unknown or
+ambiguous key types, or when a browser-safe/server-only key can't be uniquely
+identified. The raw key JSON is never logged. The browser key may become a
+`VITE_` var; the server key never.
+
+### Connection discovery (`shared/connection.mjs`)
+
+`PROJECT_READY → re-verify ref belongs to org → resolve URL from authoritative
+metadata → retrieve + classify API keys → setRuntimeValues() → refreshReadiness()`
+→ migrate/bootstrap/netlify become READY in the same apply. Readiness never
+derives from project creation alone.
+
+### Readiness states (`classifyPipelineReadiness`)
+
+- `PRE_PROVISION_READY` — creds to create/select a project exist.
+- `POST_PROVISION_PENDING` — project-derived URL/keys not yet existing (EXPECTED
+  before creation; NOT a block).
+- `APPLY_READY` — the orchestrator can obtain the post-provision values
+  automatically during the same apply.
+- `BLOCKED` only when: CLI session unavailable, org unresolved, DB password
+  absent, admin confirmation absent, or Netlify target unresolved (and, at an
+  actual mutation, `APPLY_STAGING` absent).
+
+### Safe persistence + resume
+
+Persisted to gitignored `.env.staging.local` (owner-only): `SUPABASE_PROJECT_REF`,
+`SUPABASE_URL`, `SUPABASE_ORG_ID`, `NETLIFY_SITE_ID`, `TERAGON_ADMIN_EMAIL`,
+`TERAGON_ADMIN_EMAIL_CONFIRMED`, and the browser key (redacted in output).
+The privileged SERVER key and the Management-API access token are NEVER persisted
+— kept in process memory and re-fetched from the authenticated CLI session on
+resume. A resumed apply (stored ref, no stored privileged key, live session)
+re-verifies the project and re-fetches key metadata; it never creates a second
+project because a runtime key is absent.
+
 ## Human inputs still required before an operator can apply
 
 - `SUPABASE_PROJECT_REF` — only if reusing an existing project (else created).

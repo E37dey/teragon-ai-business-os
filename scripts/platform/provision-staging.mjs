@@ -23,6 +23,7 @@ import { log } from "./shared/log.mjs";
 import { createCredentialProvider, enforceOrExit, describeValidation } from "./shared/credentials.mjs";
 import { createSupabaseAdapter } from "./shared/adapters/supabase.mjs";
 import { createStageTracker, mask } from "./shared/stage.mjs";
+import { discoverAndInjectConnection } from "./shared/connection.mjs";
 import { resolveMode, assertApplyAllowed, isEntrypoint } from "./shared/runtime.mjs";
 
 export const DEFAULT_STAGING_NAME = "teragon-staging";
@@ -192,7 +193,22 @@ export async function provisionStaging({ mode, credentials, supabase, stage, val
 
   // 7. record safe masked ref
   stage.markComplete("PROJECT_READY", { project: { refMask: mask(ref), orgVerified: true, region } }, decision.action);
-  return { ok: true, mutated, action: decision.action, refMask: mask(ref) };
+
+  // 8. connection discovery (S7.0.1): resolve URL + classify API keys, inject
+  //    into the runtime context so migrate/bootstrap/netlify become ready in the
+  //    SAME apply. Fails CLOSED if required key types cannot be retrieved AFTER
+  //    creation. Persist only SAFE metadata (ref + URL); never the server key.
+  const conn = await discoverAndInjectConnection({ supabase, credentials, ref, orgId });
+  if (!conn.ok) {
+    stage.fail(`connection discovery failed: ${conn.reason}`);
+    return { ok: false, mutated, reason: `connection discovery failed: ${conn.reason}` };
+  }
+  stage.markComplete(
+    "PROJECT_READY",
+    { project: { refMask: mask(ref), orgVerified: true, region, urlHost: conn.report.urlHost, browserKeySource: conn.report.browserKeySource, serverKeySource: conn.report.serverKeySource } },
+    "connection discovered",
+  );
+  return { ok: true, mutated, action: decision.action, refMask: mask(ref), connection: conn.report };
 }
 
 // --- thin entrypoint ---------------------------------------------------------

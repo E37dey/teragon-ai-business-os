@@ -31,15 +31,20 @@ const FUNCTIONS = ["functions"];
  */
 export function buildNetlifyVarPlan(v) {
   const plan = [
+    // --- browser-safe (build+runtime) ---------------------------------------
     { key: "VITE_SUPABASE_URL", value: v.supabaseUrl ?? "", scopes: BROWSER, secret: false, browserSafe: true },
-    { key: "VITE_SUPABASE_ANON_KEY", value: v.anonKey ?? "", scopes: BROWSER, secret: false, browserSafe: true },
+    // The app supports VITE_SUPABASE_ANON_KEY; the value is the normalized
+    // browser key (publishable modern OR anon legacy) — kept redacted in output.
+    { key: "VITE_SUPABASE_ANON_KEY", value: v.browserKey ?? "", scopes: BROWSER, secret: false, browserSafe: true },
     { key: "VITE_SUPABASE_ORG", value: v.org ?? "", scopes: BROWSER, secret: false, browserSafe: true },
     // explicit preview persistence-provider selector (so the preview really
     // talks to staging Supabase and the acceptance harness can prove no silent
     // IndexedDB fallback). Does NOT change the source default (LOCAL_INDEXEDDB).
     { key: "VITE_PERSISTENCE_PROVIDER", value: v.previewProvider ?? "SUPABASE", scopes: BROWSER, secret: false, browserSafe: true },
-    // server-only privileged — Functions scope, secret, NEVER VITE_.
-    { key: "SUPABASE_SERVICE_ROLE_KEY", value: v.serviceKey ?? "", scopes: FUNCTIONS, secret: true, browserSafe: false },
+    // --- server-only (Functions scope, NEVER VITE_) -------------------------
+    { key: "SUPABASE_URL", value: v.supabaseUrl ?? "", scopes: FUNCTIONS, secret: false, browserSafe: false },
+    // privileged server key — Functions scope, secret, NEVER VITE_, never browser.
+    { key: "SUPABASE_SERVICE_ROLE_KEY", value: v.serverKey ?? "", scopes: FUNCTIONS, secret: true, browserSafe: false },
   ];
   assertScopeInvariants(plan);
   return plan;
@@ -86,9 +91,9 @@ export function isTeragonSite(site, expectedSiteId) {
 export async function configureNetlify({ mode, credentials, netlify, stage, validation }) {
   const varPlan = buildNetlifyVarPlan({
     supabaseUrl: credentials.get("SUPABASE_URL"),
-    anonKey: credentials.get("SUPABASE_ANON_KEY"),
+    browserKey: credentials.get("SUPABASE_BROWSER_KEY"),
     org: credentials.get("SUPABASE_ORG_ID"),
-    serviceKey: credentials.get("SUPABASE_SERVICE_ROLE_KEY"),
+    serverKey: credentials.get("SUPABASE_SERVER_KEY"),
     previewProvider: credentials.get("VITE_PERSISTENCE_PROVIDER") ?? "SUPABASE",
   });
   const plan = mode !== "apply";

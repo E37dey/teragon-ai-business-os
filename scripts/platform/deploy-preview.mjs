@@ -78,9 +78,10 @@ export function computeDistChecksum(dir = join(REPO_ROOT, "dist")) {
  * Core preview-deploy routine with injected adapter + command runner.
  * @param {Object} deps
  */
-export async function deployPreview({ mode, credentials, netlify, stage, validation, cmd = run, git, env = process.env }) {
+export async function deployPreview({ mode, credentials, netlify, stage, validation, cmd = run, git }) {
   const plan = mode !== "apply";
-  const expected = { branch: env["REVIEW_BRANCH"], commit: env["REVIEW_COMMIT"] };
+  // Reviewed branch/commit pins come through the provider (no direct env read).
+  const expected = { branch: credentials.getOptional("REVIEW_BRANCH"), commit: credentials.getOptional("REVIEW_COMMIT") };
 
   if (plan) {
     return {

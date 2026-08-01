@@ -30,6 +30,7 @@ import readline from "node:readline";
 import { log, registerSecretNames } from "./shared/log.mjs";
 import { REPO_ROOT, netlifyStatePresent } from "./shared/context.mjs";
 import { resolveSupabaseAuth, supabaseSessionPresent } from "./shared/supabase-auth.mjs";
+import { NEVER_PERSIST_NAMES } from "./shared/names.mjs";
 
 const STAGING_FILE = join(REPO_ROOT, ".env.staging.local");
 // Strict enough to reject trailing junk like a possessive "…com's": the TLD is
@@ -85,9 +86,33 @@ function writeStaging(values) {
     "# AUTO-GENERATED. NEVER commit (gitignored). Values are secret — move the\n" +
     "# generated passwords into a trusted password manager before production.\n" +
     "# Supabase Management-API auth is provided by the authenticated CLI session\n" +
-    "# (no SUPABASE_ACCESS_TOKEN copied here) unless you set one explicitly.\n\n";
-  const order = ["SUPABASE_ORG_ID", "SUPABASE_DB_PASSWORD", "TERAGON_ADMIN_EMAIL", "TERAGON_ADMIN_PASSWORD", "NETLIFY_SITE_ID"];
-  const body = order.filter((k) => present(values[k])).map((k) => `${k}=${values[k]}`).join("\n");
+    "# (no SUPABASE_ACCESS_TOKEN copied here) unless you set one explicitly.\n" +
+    "# S7.0.1: safe project metadata (ref/url/browser key/confirm flag) is\n" +
+    "# preserved here on rewrite; the privileged SERVER key + access token are\n" +
+    "# NEVER written (kept in memory, re-fetched from the CLI session on resume).\n\n";
+  // Ordered safe metadata (S6.1 + S7.0.1). The privileged server key + access
+  // token are DELIBERATELY excluded (see NEVER_PERSIST_NAMES). Any additional
+  // already-present SAFE key is preserved so a rewrite never drops metadata.
+  const order = [
+    "SUPABASE_ORG_ID",
+    "SUPABASE_PROJECT_REF",
+    "SUPABASE_URL",
+    "SUPABASE_DB_PASSWORD",
+    "SUPABASE_PUBLISHABLE_KEY",
+    "SUPABASE_ANON_KEY",
+    "TERAGON_ADMIN_EMAIL",
+    "TERAGON_ADMIN_EMAIL_CONFIRMED",
+    "TERAGON_ADMIN_PASSWORD",
+    "NETLIFY_SITE_ID",
+  ];
+  const written = new Set(order);
+  const extra = Object.keys(values)
+    .filter((k) => !written.has(k) && !NEVER_PERSIST_NAMES.has(k) && present(values[k]))
+    .sort();
+  const body = [...order, ...extra]
+    .filter((k) => present(values[k]) && !NEVER_PERSIST_NAMES.has(k))
+    .map((k) => `${k}=${values[k]}`)
+    .join("\n");
   writeFileSync(STAGING_FILE, header + body + "\n", { encoding: "utf8", mode: 0o600 });
   try {
     chmodSync(STAGING_FILE, 0o600);

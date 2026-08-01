@@ -32,6 +32,8 @@ export function fakeSupabase(opts: {
   existingUser?: { userId: string } | null;
   profile?: Record<string, unknown> | null;
   membership?: Record<string, unknown> | null;
+  apiKeys?: unknown[];
+  connectionUrl?: string;
 } = {}) {
   const calls: Call[] = [];
   const rec = (method: string, ...args: unknown[]) => calls.push({ method, args });
@@ -56,6 +58,19 @@ export function fakeSupabase(opts: {
     },
     async link(ref: string) {
       rec("link", ref);
+    },
+    async getConnectionMetadata(ref: string) {
+      rec("getConnectionMetadata", ref);
+      return { url: opts.connectionUrl ?? `https://${ref}.supabase.co` };
+    },
+    async getProjectApiKeys(ref: string) {
+      rec("getProjectApiKeys", ref);
+      return (
+        opts.apiKeys ?? [
+          { name: "anon", api_key: "anon-legacy-value-abcdef" },
+          { name: "service_role", api_key: "service-role-value-abcdef" },
+        ]
+      );
     },
     async remoteMigrationList() {
       rec("remoteMigrationList");
@@ -97,6 +112,8 @@ export function throwingSupabase() {
     createProject: boom("createProject"),
     getProjectHealth: boom("getProjectHealth"),
     link: boom("link"),
+    getConnectionMetadata: boom("getConnectionMetadata"),
+    getProjectApiKeys: boom("getProjectApiKeys"),
     remoteMigrationList: boom("remoteMigrationList"),
     dbPush: boom("dbPush"),
     findUserByEmail: boom("findUserByEmail"),

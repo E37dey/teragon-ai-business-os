@@ -4,15 +4,21 @@
 by **context/scope**, with a hard rule that privileged values never reach the
 browser bundle. Unrelated existing vars are preserved.
 
-## Variable scope map
+## Variable scope map (S7.0.1 normalized keys)
 
-| Variable | Scope | Secret | `VITE_`? ships to browser | Purpose |
-| --- | --- | --- | --- | --- |
-| `VITE_SUPABASE_URL` | builds + runtime | no | yes (browser-safe) | staging project URL |
-| `VITE_SUPABASE_ANON_KEY` | builds + runtime | no | yes (publishable/anon) | client key |
-| `VITE_SUPABASE_ORG` | builds + runtime | no | yes | org id (not a secret) |
-| `VITE_PERSISTENCE_PROVIDER` | builds + runtime | no | yes | explicit preview persistence-provider selector (`SUPABASE`) |
-| `SUPABASE_SERVICE_ROLE_KEY` | **functions only** | **yes** | **never `VITE_`** | server-only privileged key |
+Values come from the normalized runtime keys: `SUPABASE_BROWSER_KEY`
+(publishable modern | anon legacy) and `SUPABASE_SERVER_KEY` (secret modern |
+service_role legacy), discovered during provisioning and injected into the
+credential runtime context.
+
+| Variable | Scope | Secret | `VITE_`? ships to browser | Source | Purpose |
+| --- | --- | --- | --- | --- | --- |
+| `VITE_SUPABASE_URL` | builds + runtime | no | yes | `SUPABASE_URL` | staging project URL (client) |
+| `VITE_SUPABASE_ANON_KEY` | builds + runtime | no | yes | `SUPABASE_BROWSER_KEY` | browser key (publishable/anon) |
+| `VITE_SUPABASE_ORG` | builds + runtime | no | yes | `SUPABASE_ORG_ID` | org id (not a secret) |
+| `VITE_PERSISTENCE_PROVIDER` | builds + runtime | no | yes | `SUPABASE` | explicit preview persistence-provider selector |
+| `SUPABASE_URL` | **functions only** | no | **never `VITE_`** | `SUPABASE_URL` | server-side project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | **functions only** | **yes** | **never `VITE_`** | `SUPABASE_SERVER_KEY` | server-only privileged key |
 
 ## Invariants (enforced in code + tests)
 

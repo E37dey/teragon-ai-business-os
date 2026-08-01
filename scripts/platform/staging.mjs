@@ -17,6 +17,7 @@ import { createCredentialProvider, describeValidation } from "./shared/credentia
 import { createSupabaseAdapter } from "./shared/adapters/supabase.mjs";
 import { createNetlifyAdapter } from "./shared/adapters/netlify.mjs";
 import { createStageTracker } from "./shared/stage.mjs";
+import { discoverAndInjectConnection } from "./shared/connection.mjs";
 import { resolveMode, assertApplyAllowed, isEntrypoint } from "./shared/runtime.mjs";
 import { provisionStaging } from "./provision-staging.mjs";
 import { migrateStaging } from "./migrate.mjs";
@@ -40,18 +41,37 @@ async function runPlan(credentials, stage) {
   const st = stage.read();
   log.info(`stage tracker: state=${st.state} completed=[${st.completed.join(", ") || "none"}]`);
 
-  let allReady = true;
+  // S7.0.1 readiness classification — distinguishes pre-provision creds from
+  // project-DERIVED values (which do NOT exist before creation and must not be
+  // reported as blocking).
+  const readiness = await credentials.classifyPipelineReadiness();
+  log.step("Pipeline readiness (S7.0.1)");
+  log.info(`state: ${readiness.state}`);
+  log.info(`PRE_PROVISION_READY (can create/select a project): ${readiness.preProvisionReady ? "YES" : "NO"}`);
+  log.info(
+    `POST_PROVISION_PENDING (project-derived URL/keys not yet existing — EXPECTED before creation): ${readiness.postProvisionPending ? "YES" : "NO"}`,
+  );
+  log.info(
+    `APPLY_READY (orchestrator can fetch post-provision values during the same apply): ${readiness.applyReady ? "YES" : "NO"}`,
+  );
+  if (readiness.blocked) for (const r of readiness.blockedReasons) log.warn(`blocked: ${r}`);
+
   for (const step of STEPS) {
     const v = await credentials.validate(step.command);
-    if (!v.ok) allReady = false;
     log.step(`[${step.command}]`);
     for (const line of describeValidation(v)) log.plain(`  ${line}`);
   }
   log.step("PLAN summary");
-  log.info(`all steps credential-ready: ${allReady ? "YES" : "NO (staging cannot apply yet — see missing names above)"}`);
+  if (readiness.applyReady) {
+    log.ok(
+      "APPLY_READY — the pipeline can acquire the post-provision connection values (URL + browser/server keys) automatically during apply. It is NOT blocked by their pre-creation absence.",
+    );
+  } else {
+    log.warn(`BLOCKED — ${readiness.blockedReasons.join("; ")}`);
+  }
   log.info("APPLY is gated behind APPLY_STAGING=true; production behind DEPLOY_PRODUCTION=true. Neither is set here.");
   log.step("STAGING PLAN complete — remote mutations performed: ZERO. (exit 0)");
-  return allReady;
+  return readiness.applyReady;
 }
 
 async function runApply(credentials, adapters, stage) {
@@ -59,6 +79,10 @@ async function runApply(credentials, adapters, stage) {
   for (const step of STEPS) {
     if (step.state && stage.completed(step.state)) {
       log.ok(`[${step.command}] already completed (${step.state}) — skipping (idempotent resume).`);
+      // RESUME: provisioning is skipped but the in-memory server key is gone on
+      // a fresh process. Re-fetch the connection context from the CLI session —
+      // NEVER create another project — so downstream stages are ready again.
+      if (step.command === "provision-staging") await ensureConnectionContext(credentials, adapters.supabase, stage);
       continue;
     }
     const validation = await credentials.validate(step.command);
@@ -73,10 +97,30 @@ async function runApply(credentials, adapters, stage) {
   log.step("STAGING APPLY complete.");
 }
 
+/**
+ * On a resumed apply (project already provisioned, ref known, NO locally-stored
+ * privileged key), rebuild the in-memory runtime context by re-fetching the key
+ * metadata from the authenticated CLI session. Never creates a second project.
+ */
+async function ensureConnectionContext(credentials, supabase, stage) {
+  if (credentials.has("SUPABASE_SERVER_KEY")) return; // already in memory
+  const ref = credentials.get("SUPABASE_PROJECT_REF");
+  if (!ref) return; // provision step will handle it
+  log.info("resume: re-fetching project connection metadata (no new project).");
+  const conn = await discoverAndInjectConnection({ supabase, credentials, ref, orgId: credentials.get("SUPABASE_ORG_ID") });
+  if (!conn.ok) {
+    log.error(`resume connection discovery failed: ${conn.reason}`);
+    stage.fail(`resume connection discovery failed: ${conn.reason}`);
+    process.exit(2);
+  }
+}
+
 async function main() {
   const mode = resolveMode();
   const credentials = createCredentialProvider();
   const stage = createStageTracker();
+  // Runtime secrets (discovered keys) are in-memory only and cleared on exit.
+  process.once("exit", () => credentials.clearRuntime());
 
   if (mode === "plan") {
     stage.markComplete("PLAN_READY", {}, "plan generated");

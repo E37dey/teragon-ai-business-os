@@ -1,42 +1,47 @@
-// TERAGON AI BUSINESS OS — unified credential provider (Gate S7.0).
+// TERAGON AI BUSINESS OS — unified credential provider + runtime context (S7.0/S7.0.1).
 // =============================================================================
-// ONE loader used by every platform script. It removes the duplicated ".env
-// parse + process.env read + fail-closed" logic that had crept into each
-// script, and it does so WITHOUT weakening the fail-closed contract.
+// ONE loader + ONE in-memory runtime context used by every platform script. It
+// removes duplicated ".env parse + process.env read + fail-closed" logic AND
+// solves the S7.0.1 problem: the connection values that only exist AFTER a
+// project is created/selected (URL + API keys) are injected into the SAME
+// provider mid-apply and become immediately visible to later stages, with
+// readiness recalculated — WITHOUT weakening fail-closed and WITHOUT persisting
+// or printing any privileged material.
 //
-// Deterministic, documented precedence for every NAME:
+// Layers + precedence for every NAME (highest first):
 //   1. process.env                       (CI / explicit operator override)
-//   2. .env.staging.local  (gitignored)  (S6.1 bootstrap output; parsed safely,
-//                                          values registered for redaction and
-//                                          NEVER logged)
-// PLUS a special authorization dimension for Supabase Management-API steps:
-//   3. an authenticated Supabase CLI session — used ONLY when
-//      SUPABASE_ACCESS_TOKEN is absent from (1) and (2). Expressed as an
-//      authorization REQUIREMENT ("env-token OR cli-session"), never as a bare
-//      token NAME, so a logged-in operator with no token still passes.
+//   2. runtime context                   (values discovered during apply, e.g.
+//                                          SUPABASE_URL / SUPABASE_SERVER_KEY —
+//                                          in-memory only, cleared on exit)
+//   3. .env.staging.local  (gitignored)  (S6.1 output; parsed safely; redacted)
+//   plus an authorization dimension: an authenticated Supabase CLI session used
+//   ONLY when SUPABASE_ACCESS_TOKEN is absent ("env-token OR cli-session").
 //
-// The provider is value-blind at its public surface: validate() reports NAMES
-// and an authorization KIND only. get() exists so a script can hand a value
-// straight to an adapter (e.g. a DB password to the CLI via env) — its result
-// is NEVER logged; every registered secret value is scrubbed by the logger.
+// NORMALIZED KEY NAMES (S7.0.1): SUPABASE_BROWSER_KEY / SUPABASE_SERVER_KEY
+// resolve from a modern source then a legacy fallback (see KEY_ALIASES).
 //
-// Injectable for tests: pass { env, fileText, authResolver } to exercise the
-// precedence and fail-closed logic against fakes with zero filesystem/CLI/
-// network access.
+// The provider is value-blind at its public surface. get()/getRequired()/
+// getOptional() return a value for handing straight to an adapter (never
+// logged). There is deliberately NO method that serializes ALL credentials.
 import process from "node:process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { REPO_ROOT } from "./context.mjs";
 import { registerSecretValues, log } from "./log.mjs";
 import { isPresent } from "./env.mjs";
-import { COMMAND_CREDENTIALS, SECRET_VALUE_NAMES } from "./names.mjs";
+import {
+  COMMAND_CREDENTIALS,
+  SECRET_VALUE_NAMES,
+  KEY_ALIASES,
+  POST_PROVISION_NAMES,
+  PRE_PROVISION_NAMES,
+} from "./names.mjs";
 import { resolveSupabaseAuth } from "./supabase-auth.mjs";
 
 const STAGING_FILE = join(REPO_ROOT, ".env.staging.local");
 
 /**
  * Parse KEY=VALUE lines from a .env-style text blob. Ignores blanks + comments.
- * Values are returned verbatim (trimmed) — the caller decides what is secret.
  * @param {string} text
  * @returns {Record<string,string>}
  */
@@ -51,7 +56,6 @@ export function parseEnvText(text) {
     if (eq === -1) continue;
     const k = line.slice(0, eq).trim();
     let v = line.slice(eq + 1).trim();
-    // Strip a single layer of matching surrounding quotes.
     if (v.length >= 2 && ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'")))) {
       v = v.slice(1, -1);
     }
@@ -60,7 +64,6 @@ export function parseEnvText(text) {
   return out;
 }
 
-/** Default staging-file reader (returns "" when the file is absent). */
 function readStagingFile() {
   try {
     return existsSync(STAGING_FILE) ? readFileSync(STAGING_FILE, "utf8") : "";
@@ -69,93 +72,157 @@ function readStagingFile() {
   }
 }
 
-/**
- * @typedef {Object} CredentialProvider
- * @property {(name:string)=>(string|undefined)} get        resolved value (NEVER log)
- * @property {(name:string)=>boolean} has                   presence by name
- * @property {(name:string)=>('env'|'staging-file'|undefined)} source  where a value came from
- * @property {()=>void} registerSecrets                     add known secret values to the log scrubber
- * @property {(command:string)=>Promise<CredentialValidation>} validate  per-command fail-closed check
- */
+function pickPresent(env) {
+  /** @type {Record<string,string>} */
+  const out = {};
+  for (const [k, v] of Object.entries(env)) if (isPresent(v)) out[k] = /** @type {string} */ (v);
+  return out;
+}
+
+function isSecretName(name) {
+  if (SECRET_VALUE_NAMES.includes(name)) return true;
+  // normalized keys are secret too (browser key stays redacted in output).
+  return name === "SUPABASE_BROWSER_KEY" || name === "SUPABASE_SERVER_KEY";
+}
 
 /**
- * @typedef {Object} CredentialValidation
- * @property {string} command
- * @property {boolean} ok
- * @property {string[]} missing                  missing plain NAMES
- * @property {{required:boolean, ready:boolean, via:'env-token'|'cli-session'|'none'}} supabaseAuth
- * @property {{required:boolean, ready:boolean}} netlifyAuth
- * @property {{required:boolean, present:boolean}} serviceClient
- * @property {{name:string, confirmed:boolean}|null} confirmGate
- */
-
-/**
- * Build the unified credential provider.
+ * Build the unified credential provider + runtime context.
  * @param {Object} [deps]
- * @param {Record<string,string|undefined>} [deps.env]   defaults to process.env
- * @param {string} [deps.fileText]                        raw .env.staging.local text (defaults to reading the file)
+ * @param {Record<string,string|undefined>} [deps.env]
+ * @param {string} [deps.fileText]
  * @param {(env:Record<string,string|undefined>)=>Promise<{ready:boolean, via:'env-token'|'cli-session'|'none'}>} [deps.authResolver]
- * @returns {CredentialProvider}
  */
 export function createCredentialProvider(deps = {}) {
-  const env = deps.env ?? process.env;
-  const fileText = deps.fileText ?? readStagingFile();
+  const envSource = deps.env ?? process.env;
   const authResolver = deps.authResolver ?? resolveSupabaseAuth;
-  const fileValues = parseEnvText(fileText);
 
-  /** process.env wins over the staging file. */
+  const layers = {
+    env: pickPresent(envSource),
+    /** @type {Record<string,string>} */ runtime: {},
+    file: deps.fileText !== undefined ? parseEnvText(deps.fileText) : parseEnvText(readStagingFile()),
+  };
+  /** @type {{ready:boolean, via:'env-token'|'cli-session'|'none'}} */
+  let sessionAuth = { ready: false, via: "none" };
+  let lastReadiness = null;
+
+  // --- layer loaders (idempotent) -------------------------------------------
+  function loadFromProcessEnvironment() {
+    layers.env = pickPresent(envSource);
+    return Object.keys(layers.env).length;
+  }
+  function loadFromLocalSecureFile() {
+    layers.file = deps.fileText !== undefined ? parseEnvText(deps.fileText) : parseEnvText(readStagingFile());
+    return Object.keys(layers.file).length;
+  }
+  async function loadFromSupabaseCliSession() {
+    sessionAuth = await authResolver(mergedForAuth());
+    return sessionAuth;
+  }
+
+  // --- resolution (env > runtime > file, with normalized-key aliases) --------
+  function rawLookup(name) {
+    if (isPresent(layers.env[name])) return { value: layers.env[name], source: "env" };
+    if (isPresent(layers.runtime[name])) return { value: layers.runtime[name], source: "runtime" };
+    if (isPresent(layers.file[name])) return { value: layers.file[name], source: "staging-file" };
+    return null;
+  }
+  function resolveEntry(name) {
+    const direct = rawLookup(name);
+    if (direct) return direct;
+    const aliases = KEY_ALIASES[name];
+    if (aliases)
+      for (const a of aliases) {
+        const r = rawLookup(a);
+        if (r) return { ...r, alias: a };
+      }
+    return null;
+  }
+
   function get(name) {
-    if (isPresent(env[name])) return env[name];
-    if (isPresent(fileValues[name])) return fileValues[name];
-    return undefined;
+    return resolveEntry(name)?.value;
   }
   function has(name) {
-    return isPresent(get(name));
+    return Boolean(resolveEntry(name));
   }
   function source(name) {
-    if (isPresent(env[name])) return "env";
-    if (isPresent(fileValues[name])) return "staging-file";
-    return undefined;
+    return resolveEntry(name)?.source;
+  }
+  function getOptional(name) {
+    return get(name);
+  }
+  function getRequired(name) {
+    const v = get(name);
+    // NAMES-only error — a required credential value is never placed in a message.
+    if (!isPresent(v)) throw new Error(`required credential not available (by name): ${name}`);
+    return v;
   }
 
-  // Merged view used only for auth resolution + secret registration.
-  const merged = { ...fileValues, ...pickPresent(env) };
+  // --- runtime injection (values discovered mid-apply) ----------------------
+  function setRuntimeValue(name, value) {
+    if (!isPresent(value)) return;
+    layers.runtime[name] = value;
+    if (isSecretName(name)) registerSecretValues([value]);
+  }
+  function setRuntimeValues(values) {
+    for (const [k, v] of Object.entries(values ?? {})) {
+      if (k.startsWith("__")) continue; // skip metadata like __browserSource
+      setRuntimeValue(k, v);
+    }
+  }
+  function clearRuntime() {
+    for (const k of Object.keys(layers.runtime)) delete layers.runtime[k];
+  }
 
+  function mergedForAuth() {
+    return { ...layers.file, ...layers.runtime, ...layers.env };
+  }
+
+  // --- redaction ------------------------------------------------------------
   function registerSecrets() {
-    registerSecretValues(SECRET_VALUE_NAMES.map((n) => get(n)));
+    const values = [];
+    for (const n of SECRET_VALUE_NAMES) {
+      const v = get(n);
+      if (isPresent(v)) values.push(v);
+    }
+    registerSecretValues(values);
   }
 
   /**
-   * Fail-closed per-command validation. NEVER throws and NEVER exits — it
-   * RETURNS a structured verdict so the caller (thin entrypoint OR orchestrator)
-   * decides whether to refuse. Callers MUST refuse before any remote action
-   * when ok === false. Registers secrets for redaction as a side effect.
-   * @param {string} command
-   * @returns {Promise<CredentialValidation>}
+   * A child ENV for a server-only adapter/CLI child process. It carries real
+   * values (the child needs them) but every secret value is registered with the
+   * logger first, so this object must NEVER be logged — only handed to a child.
    */
+  function createRedactedChildEnvironment() {
+    registerSecrets();
+    /** @type {Record<string,string>} */
+    const out = {};
+    for (const [k, v] of Object.entries({ ...layers.file, ...layers.runtime })) if (isPresent(v)) out[k] = v;
+    for (const [k, v] of Object.entries(layers.env)) if (isPresent(v)) out[k] = v;
+    return out;
+  }
+
+  // --- per-command validation (fail-closed) ---------------------------------
   async function validate(command) {
     registerSecrets();
     const spec = COMMAND_CREDENTIALS[command];
     if (!spec) throw new Error(`unknown platform command: ${command}`);
 
     const names = [...(spec.names ?? [])];
-    if (spec.serviceClient) names.push("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY");
+    if (spec.serviceClient) names.push("SUPABASE_URL", "SUPABASE_SERVER_KEY");
     if (spec.netlifyAuth) names.push("NETLIFY_AUTH_TOKEN");
 
     const missing = [...new Set(names)].filter((n) => !has(n));
 
-    // Supabase authorization = env-token OR cli-session (never a bare name).
     /** @type {{required:boolean, ready:boolean, via:'env-token'|'cli-session'|'none'}} */
     let supabaseAuth = { required: false, ready: false, via: "none" };
     if (spec.supabaseAuth) {
-      const resolved = await authResolver(merged);
+      const resolved = await authResolver(mergedForAuth());
       supabaseAuth = { required: true, ready: resolved.ready, via: resolved.via };
     }
-
     const netlifyAuth = { required: Boolean(spec.netlifyAuth), ready: has("NETLIFY_AUTH_TOKEN") };
     const serviceClient = {
       required: Boolean(spec.serviceClient),
-      present: has("SUPABASE_URL") && has("SUPABASE_SERVICE_ROLE_KEY"),
+      present: has("SUPABASE_URL") && has("SUPABASE_SERVER_KEY"),
     };
     const confirmGate = spec.confirmGate
       ? { name: spec.confirmGate, confirmed: (get(spec.confirmGate) ?? "").trim().toLowerCase() === "true" }
@@ -169,21 +236,102 @@ export function createCredentialProvider(deps = {}) {
     return { command, ok, missing, supabaseAuth, netlifyAuth, serviceClient, confirmGate };
   }
 
-  return { get, has, source, registerSecrets, validate };
-}
+  // --- pipeline readiness classification (S7.0.1) ---------------------------
+  // Distinguishes pre-provision creds from project-DERIVED values so the plan
+  // never reports the pipeline blocked merely because keys don't exist before a
+  // project is created.
+  async function classifyPipelineReadiness() {
+    const auth = await authResolver(mergedForAuth());
+    const authReady = auth.ready;
+    const orgResolved = has("SUPABASE_ORG_ID");
+    const dbPassword = has("SUPABASE_DB_PASSWORD");
+    const adminConfirmed =
+      has("TERAGON_ADMIN_EMAIL") && (get("TERAGON_ADMIN_EMAIL_CONFIRMED") ?? "").trim().toLowerCase() === "true";
+    const netlifyTarget = has("NETLIFY_AUTH_TOKEN") && has("NETLIFY_SITE_ID");
 
-function pickPresent(env) {
-  /** @type {Record<string,string>} */
-  const out = {};
-  for (const [k, v] of Object.entries(env)) if (isPresent(v)) out[k] = /** @type {string} */ (v);
-  return out;
+    const postPresent = POST_PROVISION_NAMES.filter((n) => has(n));
+    const postProvisionPresent = postPresent.length === POST_PROVISION_NAMES.length;
+    const preProvisionReady = authReady && orgResolved && dbPassword;
+
+    const blockedReasons = [];
+    if (!authReady) blockedReasons.push("Supabase CLI session/token unavailable");
+    if (!orgResolved) blockedReasons.push("SUPABASE_ORG_ID unresolved");
+    if (!dbPassword) blockedReasons.push("SUPABASE_DB_PASSWORD absent");
+    if (!adminConfirmed) blockedReasons.push("admin confirmation absent (TERAGON_ADMIN_EMAIL[_CONFIRMED])");
+    if (!netlifyTarget) blockedReasons.push("Netlify target unresolved (NETLIFY_AUTH_TOKEN + NETLIFY_SITE_ID)");
+
+    const applyReady = blockedReasons.length === 0;
+    const state = !applyReady
+      ? "BLOCKED"
+      : postProvisionPresent
+        ? "APPLY_READY (post-provision values already present)"
+        : "APPLY_READY (post-provision values will be fetched during apply)";
+
+    lastReadiness = {
+      state,
+      preProvisionReady,
+      postProvisionPresent,
+      postProvisionPending: !postProvisionPresent,
+      applyReady,
+      blocked: !applyReady,
+      blockedReasons,
+      derivedPresentNames: postPresent, // NAMES only
+      pins: { orgResolved, dbPassword, adminConfirmed, netlifyTarget, authVia: auth.via },
+    };
+    return lastReadiness;
+  }
+  async function refreshReadiness() {
+    return classifyPipelineReadiness();
+  }
+
+  // --- presence report (NAMES + booleans ONLY — never values) ---------------
+  function getPresenceReport() {
+    const interesting = [
+      ...new Set([
+        ...PRE_PROVISION_NAMES,
+        ...POST_PROVISION_NAMES,
+        "TERAGON_ADMIN_EMAIL",
+        "TERAGON_ADMIN_EMAIL_CONFIRMED",
+        "TERAGON_ADMIN_PASSWORD",
+        "NETLIFY_AUTH_TOKEN",
+        "NETLIFY_SITE_ID",
+      ]),
+    ];
+    /** @type {Record<string,{present:boolean, source:(string|undefined)}>} */
+    const names = {};
+    for (const n of interesting) names[n] = { present: has(n), source: source(n) };
+    return { names, readiness: lastReadiness?.state ?? null };
+  }
+
+  return {
+    // loaders
+    loadFromProcessEnvironment,
+    loadFromLocalSecureFile,
+    loadFromSupabaseCliSession,
+    // resolution
+    get,
+    getOptional,
+    getRequired,
+    has,
+    source,
+    // runtime context
+    setRuntimeValue,
+    setRuntimeValues,
+    clearRuntime,
+    // readiness + reports
+    validate,
+    refreshReadiness,
+    classifyPipelineReadiness,
+    getPresenceReport,
+    // redaction / child env
+    registerSecrets,
+    createRedactedChildEnvironment,
+  };
 }
 
 /**
  * Human-readable, NAMES-only summary of a validation verdict for logs/plans.
- * Never prints a value. Marks WHY a command would refuse.
- * @param {CredentialValidation} v
- * @returns {string[]}
+ * @param {{command:string, ok:boolean, missing:string[], supabaseAuth:{required:boolean,ready:boolean,via:string}, serviceClient:{required:boolean,present:boolean}, netlifyAuth:{required:boolean,ready:boolean}, confirmGate:({name:string,confirmed:boolean}|null)}} v
  */
 export function describeValidation(v) {
   const lines = [];
@@ -193,7 +341,7 @@ export function describeValidation(v) {
     lines.push(`  supabase authorization: ${v.supabaseAuth.ready ? `ready via ${v.supabaseAuth.via}` : "MISSING (need env-token OR cli-session)"}`);
   }
   if (v.serviceClient.required) {
-    lines.push(`  service-role client (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY): ${v.serviceClient.present ? "present" : "MISSING"}`);
+    lines.push(`  service-role client (SUPABASE_URL + SUPABASE_SERVER_KEY): ${v.serviceClient.present ? "present" : "MISSING (fetched from project during apply)"}`);
   }
   if (v.netlifyAuth.required) {
     lines.push(`  netlify authorization (NETLIFY_AUTH_TOKEN): ${v.netlifyAuth.ready ? "present" : "MISSING"}`);
@@ -207,8 +355,7 @@ export function describeValidation(v) {
 /**
  * Fail-closed enforcement used by APPLY-mode entrypoints only. Logs the NAMES-
  * only reason and exits BEFORE any remote action when the verdict is not ok.
- * Plan mode never calls this — it reports readiness and mutates nothing.
- * @param {CredentialValidation} v
+ * @param {{ok:boolean, command:string}} v
  */
 export function enforceOrExit(v) {
   if (v.ok) {
