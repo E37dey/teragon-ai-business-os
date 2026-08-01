@@ -1,54 +1,237 @@
 #!/usr/bin/env node
-// TERAGON AI BUSINESS OS — provision staging Supabase project (Gate S1).
+// TERAGON AI BUSINESS OS — provision the staging Supabase project (Gate S7.0).
 // =============================================================================
-// Fail-closed: exits BEFORE any remote action if credentials are missing.
-// Idempotent: verify-before-create — reuses an existing project ref, never
-// duplicates. Contacts nothing until the guard passes (it cannot in this env,
-// where credentials are absent — reaching the guard IS the tested behavior).
-import { guardOrExit } from "./shared/guard.mjs";
-import { run } from "./shared/exec.mjs";
-import { SUPABASE_PROVISION } from "./shared/names.mjs";
-import { log } from "./shared/log.mjs";
+// Verify-before-create, fail-closed, idempotent, ZERO duplicate projects.
+//
+// Flow (apply):
+//   1. inspect orgs → verify the selected org is accessible
+//   2. inspect existing projects → select by the rules in selectStagingProject:
+//        • reuse ONLY a project explicitly identified as Teragon staging in the
+//          selected org (exact name OR a verified SUPABASE_PROJECT_REF)
+//        • REJECT production-looking / unrelated / ambiguous matches
+//   3. verify region
+//   4. create ONLY when no approved staging project exists — DB password supplied
+//      via env (never a logged argv flag)
+//   5. poll project health with a bounded timeout
+//   6. capture the real ref, verify it belongs to the selected org, THEN link
+//   7. record the SAFE masked ref via the stage tracker
+//
+// plan mode contacts nothing and mutates nothing: it reports credential
+// readiness and the intended actions.
 import process from "node:process";
+import { log } from "./shared/log.mjs";
+import { createCredentialProvider, enforceOrExit, describeValidation } from "./shared/credentials.mjs";
+import { createSupabaseAdapter } from "./shared/adapters/supabase.mjs";
+import { createStageTracker, mask } from "./shared/stage.mjs";
+import { resolveMode, assertApplyAllowed, isEntrypoint } from "./shared/runtime.mjs";
 
-guardOrExit({ script: "provision-staging", needs: SUPABASE_PROVISION });
+export const DEFAULT_STAGING_NAME = "teragon-staging";
+const PRODUCTION_RE = /prod|production|live/i;
+const STAGING_HINT_RE = /staging|teragon/i;
 
-// --- remote body (only reached with credentials present) --------------------
-// Structured, idempotent `npx supabase` sequence. Kept behind the guard.
-async function main() {
-  const ref = (process.env["SUPABASE_PROJECT_REF"] ?? "").trim();
-
-  if (ref) {
-    // IDEMPOTENT: a project ref already exists → verify + reuse, never create.
-    log.info(`SUPABASE_PROJECT_REF present → verifying existing project (no create).`);
-    // WOULD RUN: npx supabase projects list           (confirm ref is visible to the token)
-    // WOULD RUN: npx supabase link --project-ref <ref> (link local repo, reuse)
-    await run("npx", ["supabase", "projects", "list"]);
-    await run("npx", ["supabase", "link", "--project-ref", ref]);
-  } else {
-    // No ref → create a new staging project in the org, then link.
-    // Password is passed via env to the CLI, never as a logged flag value.
-    log.info(`No SUPABASE_PROJECT_REF → creating a new staging project (verify-before-create).`);
-    // WOULD RUN: npx supabase projects create teragon-staging \
-    //              --org-id $SUPABASE_ORG_ID --region ${SUPABASE_REGION:-eu-central-1} \
-    //              --db-password $SUPABASE_DB_PASSWORD
-    // Then capture the returned ref and: npx supabase link --project-ref <newRef>
-    const region = (process.env["SUPABASE_REGION"] ?? "eu-central-1").trim();
-    await run("npx", [
-      "supabase",
-      "projects",
-      "create",
-      "teragon-staging",
-      "--org-id",
-      process.env["SUPABASE_ORG_ID"] ?? "",
-      "--region",
-      region,
-    ]);
-  }
-  log.ok("provision-staging complete (idempotent).");
+function projectRef(p) {
+  return p?.id ?? p?.ref ?? null;
+}
+function projectOrg(p) {
+  return p?.organization_id ?? p?.orgId ?? p?.organizationId ?? null;
 }
 
-main().catch((err) => {
-  log.error(`provision-staging failed: ${err instanceof Error ? err.message : String(err)}`);
-  process.exit(1);
-});
+/**
+ * PURE project-selection decision. No adapters, no I/O — unit-tested directly.
+ * @param {Object} args
+ * @param {Array<object>} args.projects           all projects visible to the token
+ * @param {string} args.orgId                     selected organization
+ * @param {string} [args.desiredName]             canonical staging project name
+ * @param {string} [args.explicitRef]             SUPABASE_PROJECT_REF, if provided
+ * @returns {{action:'reuse'|'create'|'reject', ref:(string|null), project:(object|null), reason:string}}
+ */
+export function selectStagingProject({ projects, orgId, desiredName = DEFAULT_STAGING_NAME, explicitRef }) {
+  const all = Array.isArray(projects) ? projects : [];
+
+  // Path A — an explicit ref was supplied: verify it hard.
+  if (explicitRef && explicitRef.trim()) {
+    const ref = explicitRef.trim();
+    const found = all.find((p) => projectRef(p) === ref);
+    if (!found) return reject(null, `SUPABASE_PROJECT_REF ${mask(ref)} is not visible to this token`);
+    if (projectOrg(found) !== orgId)
+      return reject(ref, `SUPABASE_PROJECT_REF belongs to a different org than the selected one`);
+    if (PRODUCTION_RE.test(String(found.name ?? "")))
+      return reject(ref, `SUPABASE_PROJECT_REF names a production-looking project ("${found.name}") — refusing`);
+    if (String(found.name ?? "") !== desiredName && !/staging/i.test(String(found.name ?? "")))
+      return reject(ref, `SUPABASE_PROJECT_REF is not an identified Teragon staging project ("${found.name}")`);
+    return { action: "reuse", ref, project: found, reason: `verified existing staging project ${mask(ref)} in org` };
+  }
+
+  // Path B — discover by name in the selected org.
+  const inOrg = all.filter((p) => projectOrg(p) === orgId);
+  const exact = inOrg.filter((p) => String(p.name ?? "") === desiredName);
+  if (exact.length === 1) {
+    const ref = projectRef(exact[0]);
+    if (PRODUCTION_RE.test(String(exact[0].name ?? "")))
+      return reject(ref, `the single name match looks production — refusing`);
+    return { action: "reuse", ref, project: exact[0], reason: `reusing the one project named "${desiredName}" in the org` };
+  }
+  if (exact.length > 1) {
+    return reject(null, `ambiguous: ${exact.length} projects named "${desiredName}" in the org — set SUPABASE_PROJECT_REF`);
+  }
+
+  // No exact match. If any staging-hinted (but not exact) project exists, it is
+  // ambiguous — refuse to create a possible duplicate; require an explicit ref.
+  const hinted = inOrg.filter((p) => STAGING_HINT_RE.test(String(p.name ?? "")) && !PRODUCTION_RE.test(String(p.name ?? "")));
+  if (hinted.length > 0) {
+    return reject(
+      null,
+      `no exact "${desiredName}", but ${hinted.length} staging-like project(s) exist — refusing to create a duplicate; set SUPABASE_PROJECT_REF`,
+    );
+  }
+  return { action: "create", ref: null, project: null, reason: `no staging project exists in the org — will create "${desiredName}"` };
+}
+
+function reject(ref, reason) {
+  return { action: "reject", ref: ref ?? null, project: null, reason };
+}
+
+/**
+ * Core provisioning routine with injected adapters. Returns a structured result
+ * (never process.exit — the entrypoint decides). Mutates nothing in plan mode.
+ * @param {Object} deps
+ * @param {'plan'|'apply'} deps.mode
+ * @param {ReturnType<import('./shared/credentials.mjs').createCredentialProvider>} deps.credentials
+ * @param {ReturnType<import('./shared/adapters/supabase.mjs').createSupabaseAdapter>} deps.supabase
+ * @param {ReturnType<import('./shared/stage.mjs').createStageTracker>} deps.stage
+ * @param {import('./shared/credentials.mjs').CredentialValidation} deps.validation
+ * @param {{healthTimeoutMs?:number, pollIntervalMs?:number, sleep?:(ms:number)=>Promise<void>}} [deps.opts]
+ */
+export async function provisionStaging({ mode, credentials, supabase, stage, validation, opts = {} }) {
+  const orgId = credentials.get("SUPABASE_ORG_ID");
+  const region = (credentials.get("SUPABASE_REGION") ?? "eu-central-1").trim();
+  const explicitRef = credentials.get("SUPABASE_PROJECT_REF");
+  const plan = mode !== "apply";
+
+  if (plan) {
+    return {
+      ok: true,
+      mutated: false,
+      action: "plan",
+      intended: [
+        `verify org ${orgId ?? "(missing)"} is accessible`,
+        `inspect projects → select "${DEFAULT_STAGING_NAME}" (verify-before-create; reject prod/ambiguous)`,
+        `verify region ${region}`,
+        explicitRef ? `reuse verified ref ${mask(explicitRef)}` : "create only if no approved staging project exists",
+        "poll health (bounded), verify ref↔org, then link; record masked ref",
+      ],
+    };
+  }
+
+  if (!validation.ok) return { ok: false, mutated: false, reason: "credentials not ready" };
+
+  // 1. verify org
+  stage.enter("PROVISIONING", "verifying org + inspecting projects");
+  const orgs = await supabase.listOrgs();
+  if (!Array.isArray(orgs) || !orgs.some((o) => (o.id ?? o.organization_id) === orgId)) {
+    stage.fail("selected org not accessible");
+    return { ok: false, mutated: false, reason: `selected org ${orgId} is not accessible to this authorization` };
+  }
+
+  // 2. select
+  const projects = await supabase.listProjects();
+  const decision = selectStagingProject({ projects, orgId, explicitRef });
+  if (decision.action === "reject") {
+    stage.fail(decision.reason);
+    return { ok: false, mutated: false, reason: decision.reason };
+  }
+
+  let ref = decision.ref;
+  let mutated = false;
+  if (decision.action === "create") {
+    // 4. create — DB password via env, never argv.
+    log.info(`creating staging project "${DEFAULT_STAGING_NAME}" in org (region ${region}).`);
+    const created = await supabase.createProject({ name: DEFAULT_STAGING_NAME, orgId, region });
+    ref = created.ref;
+    mutated = true;
+    if (!ref) {
+      stage.fail("create returned no project ref");
+      return { ok: false, mutated, reason: "project create returned no ref" };
+    }
+  } else {
+    log.ok(`reuse: ${decision.reason} (${mask(ref)}).`);
+  }
+
+  // 3/5. verify region + poll health (bounded)
+  const healthTimeout = opts.healthTimeoutMs ?? 180000;
+  const interval = opts.pollIntervalMs ?? 5000;
+  const sleep = opts.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  const deadline = Date.now() + healthTimeout;
+  let healthy = false;
+  let lastStatus = "UNKNOWN";
+  let health = null;
+  while (Date.now() < deadline) {
+    health = await supabase.getProjectHealth(ref);
+    lastStatus = health.status;
+    if (health.found && projectOrg(health.project) && projectOrg(health.project) !== orgId) {
+      stage.fail("provisioned ref does not belong to the selected org");
+      return { ok: false, mutated, reason: "ref↔org mismatch after provisioning" };
+    }
+    if (health.project && String(health.project.region ?? region) !== region) {
+      stage.fail(`region mismatch: expected ${region}, got ${health.project.region}`);
+      return { ok: false, mutated, reason: `region mismatch (expected ${region})` };
+    }
+    if (/ACTIVE_HEALTHY|ACTIVE|HEALTHY/i.test(String(lastStatus))) {
+      healthy = true;
+      break;
+    }
+    await sleep(interval);
+  }
+  if (!healthy) {
+    stage.fail(`project health timeout (last=${lastStatus})`);
+    return { ok: false, mutated, reason: `project did not become healthy within ${healthTimeout}ms (last=${lastStatus})` };
+  }
+
+  // 6. link only after verification
+  await supabase.link(ref);
+
+  // 7. record safe masked ref
+  stage.markComplete("PROJECT_READY", { project: { refMask: mask(ref), orgVerified: true, region } }, decision.action);
+  return { ok: true, mutated, action: decision.action, refMask: mask(ref) };
+}
+
+// --- thin entrypoint ---------------------------------------------------------
+async function main() {
+  const mode = resolveMode();
+  const gate = assertApplyAllowed(mode);
+  const credentials = createCredentialProvider();
+  const validation = await credentials.validate("provision-staging");
+
+  log.step(`provision-staging — mode=${mode}`);
+  if (mode === "apply" && !gate.allowed) {
+    log.error(`refused: ${gate.reason}. No remote action taken.`);
+    process.exit(3);
+  }
+  if (mode === "apply") {
+    enforceOrExit(validation);
+  } else {
+    for (const line of describeValidation(validation)) log.plain(`  ${line}`);
+  }
+
+  const supabase = createSupabaseAdapter({ credentials: credentials.get });
+  const stage = createStageTracker();
+  const result = await provisionStaging({ mode, credentials, supabase, stage, validation });
+  if (!result.ok) {
+    log.error(`provision-staging refused/failed: ${result.reason}`);
+    process.exit(result.reason && result.mutated ? 1 : 2);
+  }
+  if (result.action === "plan") {
+    log.step("provision-staging PLAN — nothing contacted or mutated.");
+    for (const line of result.intended) log.plain(`  would: ${line}`);
+  } else {
+    log.ok(`provision-staging complete (${result.action}, ref ${result.refMask}).`);
+  }
+  process.exit(0);
+}
+
+if (isEntrypoint(import.meta.url)) {
+  main().catch((err) => {
+    log.error(`provision-staging failed: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  });
+}

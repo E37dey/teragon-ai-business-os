@@ -1,0 +1,64 @@
+{
+  "note": "S5-validated migration lineage. migrate.mjs refuses to push a set whose combined digest differs from this. Regenerate ONLY after re-validating live (Gate S5).",
+  "validatedGate": "S5.2",
+  "count": 14,
+  "combined": "54a033d5ca8530e2e59442222f00fa599ce45b83fd670c1d74ba4af6de33c97a",
+  "entries": [
+    {
+      "file": "001_foundation.sql",
+      "sha256": "8c94bfe5450c9c8994c60144d5c1e737ef2cfb067ee67350e973bb8d6cf6ed76"
+    },
+    {
+      "file": "002_identity_membership.sql",
+      "sha256": "7e0c6561c0c66b702377cd1accbbf12a7c7ba4684f69abf7c5e57d28967e197c"
+    },
+    {
+      "file": "003_crm.sql",
+      "sha256": "90225525ca2a302ef150bcba6426fcf7c303af72f173fab9451b59c354c0a2da"
+    },
+    {
+      "file": "004_products_printers.sql",
+      "sha256": "e3c01a8857fe9335b8a90ce56cb255d3522ffab80615b4eb88eed21d6673bb31"
+    },
+    {
+      "file": "005_service_repairs.sql",
+      "sha256": "c3b5c4fa6727e0b500036dd319bf9ef98f81674856eae06024b33554fe65aa7c"
+    },
+    {
+      "file": "006_training.sql",
+      "sha256": "9de4013228acf4dcefd81ed98c761f9d4f71b8bc8de77b478f3c52599c37f89e"
+    },
+    {
+      "file": "007_tasks_approvals.sql",
+      "sha256": "0c9dcd296ef9abfb4c47cc8802abea2269845a9130a26de13e53bec109710418"
+    },
+    {
+      "file": "008_knowledge_memory_learning.sql",
+      "sha256": "e72194ca87bc81608e036c7702a59ee6bdae5fd18196a3e7a9810b77ffc0f986"
+    },
+    {
+      "file": "009_governance_audit.sql",
+      "sha256": "913e1efe750bf707ee7bbc286dd0d4a17e927b5be4833623784b81e6a0770262"
+    },
+    {
+      "file": "010_indexes.sql",
+      "sha256": "8fb78a40c247c1fabf84e9bc0813de93b52f26ee8ee4a37c13077ce134d7cbcd"
+    },
+    {
+      "file": "011_rls_helpers.sql",
+      "sha256": "9702874c59b71b914d2c58c5c8cf5732bf1bfc42289d835d7b989bba5a55dd32"
+    },
+    {
+      "file": "012_rls_policies.sql",
+      "sha256": "961c796898d1f72602b282ebb8acf7bf016fb8816f013e361f5dec2c7aa7f6f6"
+    },
+    {
+      "file": "013_storage_and_functions.sql",
+      "sha256": "c56cd78d70ae8497216cdd842ec839b20db8765cd67f02d963efaf1f703eba8a"
+    },
+    {
+      "file": "014_staging_seed.sql",
+      "sha256": "f1e30ed01bc10fff99824d8551ba52bbc81aca3ffe45cc3318a85f25e1aa858e"
+    }
+  ]
+}

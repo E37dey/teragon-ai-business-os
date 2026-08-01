@@ -1,0 +1,143 @@
+// TERAGON AI BUSINESS OS — real Supabase adapter (Gate S7.0).
+// =============================================================================
+// Wraps the Supabase CLI (Management API) + the service-role Admin API
+// (@supabase/supabase-js) behind a small, injectable method surface. The script
+// CORES depend ONLY on this surface, so tests can substitute a deterministic
+// fake with zero network. This module is invoked ONLY in APPLY mode (never in
+// plan mode, never in this S7.0 task — credentials are absent here).
+//
+// Security: the DB password is passed to the CLI via the child ENV
+// (SUPABASE_DB_PASSWORD), never as a logged argv flag. No token, password, key,
+// or session is ever returned in a loggable field.
+import { execFile } from "node:child_process";
+import process from "node:process";
+
+function needsShell(command) {
+  return process.platform === "win32" && /^(npm|npx|netlify|supabase)$/i.test(command);
+}
+
+/** Run a CLI command capturing stdout; rejects on non-zero. env is merged. */
+function capture(command, args, env = {}) {
+  return new Promise((resolve, reject) => {
+    execFile(
+      command,
+      args,
+      { env: { ...process.env, ...env }, timeout: 120000, windowsHide: true, shell: needsShell(command), maxBuffer: 16 * 1024 * 1024 },
+      (err, stdout, stderr) => (err ? reject(new Error(stderr || err.message)) : resolve(String(stdout).trim())),
+    );
+  });
+}
+
+function parseJson(text, fallback) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * @param {Object} deps
+ * @param {(name:string)=>(string|undefined)} deps.credentials  value resolver (never logged)
+ * @param {(command:string,args:string[],env?:object)=>Promise<string>} [deps.capture]  injectable runner
+ * @param {()=>Promise<any>} [deps.serviceClientFactory]  injectable @supabase/supabase-js client factory
+ */
+export function createSupabaseAdapter(deps) {
+  const cred = deps.credentials;
+  const run = deps.capture ?? capture;
+
+  async function serviceClient() {
+    if (deps.serviceClientFactory) return deps.serviceClientFactory();
+    const url = cred("SUPABASE_URL");
+    const key = cred("SUPABASE_SERVICE_ROLE_KEY");
+    if (!url || !key) throw new Error("service-role client requires SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY");
+    const { createClient } = await import("@supabase/supabase-js");
+    return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  }
+
+  return {
+    // --- Management API (CLI) — read ----------------------------------------
+    async listOrgs() {
+      return parseJson(await run("supabase", ["orgs", "list", "--output", "json"]), []);
+    },
+    async listProjects() {
+      return parseJson(await run("supabase", ["projects", "list", "--output", "json"]), []);
+    },
+    // --- Management API (CLI) — mutate (APPLY only) --------------------------
+    async createProject({ name, orgId, region }) {
+      // DB password via env only (never argv). CLI reads SUPABASE_DB_PASSWORD.
+      const out = await run(
+        "supabase",
+        ["projects", "create", name, "--org-id", orgId, "--region", region, "--output", "json"],
+        { SUPABASE_DB_PASSWORD: cred("SUPABASE_DB_PASSWORD") ?? "" },
+      );
+      const parsed = parseJson(out, {});
+      return { ref: parsed.id ?? parsed.ref ?? null, raw: parsed };
+    },
+    async getProjectHealth(ref) {
+      const projects = parseJson(await run("supabase", ["projects", "list", "--output", "json"]), []);
+      const found = (Array.isArray(projects) ? projects : []).find((p) => (p.id ?? p.ref) === ref);
+      return { status: found?.status ?? found?.health ?? "UNKNOWN", found: Boolean(found), project: found ?? null };
+    },
+    async link(ref) {
+      await run("supabase", ["link", "--project-ref", ref], {
+        SUPABASE_DB_PASSWORD: cred("SUPABASE_DB_PASSWORD") ?? "",
+      });
+    },
+    // --- migrations ---------------------------------------------------------
+    async remoteMigrationList() {
+      const out = await run("supabase", ["migration", "list", "--linked", "--output", "json"]).catch(() => "[]");
+      return parseJson(out, []);
+    },
+    async dbPush() {
+      await run("supabase", ["db", "push", "--linked"], { SUPABASE_DB_PASSWORD: cred("SUPABASE_DB_PASSWORD") ?? "" });
+    },
+    // --- Admin API (service role) -------------------------------------------
+    async findUserByEmail(email) {
+      const client = await serviceClient();
+      // listUsers is paginated; scan a bounded number of pages for the email.
+      for (let page = 1; page <= 20; page++) {
+        const { data, error } = await client.auth.admin.listUsers({ page, perPage: 200 });
+        if (error) throw new Error(`listUsers failed: ${error.message}`);
+        const hit = data.users.find((u) => (u.email ?? "").toLowerCase() === email.toLowerCase());
+        if (hit) return { userId: hit.id };
+        if (data.users.length < 200) break;
+      }
+      return null;
+    },
+    async createUser({ email, password }) {
+      const client = await serviceClient();
+      const { data, error } = await client.auth.admin.createUser({ email, password, email_confirm: true });
+      if (error || !data.user) throw new Error(`createUser failed: ${error?.message ?? "no user"}`);
+      return { userId: data.user.id };
+    },
+    async bootstrapAdminRpc({ userId, orgId, orgName, name, email }) {
+      const client = await serviceClient();
+      const { error } = await client.rpc("bootstrap_admin", {
+        p_user_id: userId,
+        p_org_id: orgId,
+        p_org_name: orgName ?? "",
+        p_name: name ?? "",
+        p_email: email ?? "",
+      });
+      if (error) throw new Error(`bootstrap_admin failed: ${error.message}`);
+    },
+    async getProfile(userId) {
+      const client = await serviceClient();
+      const { data, error } = await client.from("profiles").select("id, organization_id, role_id, active, status").eq("id", userId).maybeSingle();
+      if (error) throw new Error(`profile read failed: ${error.message}`);
+      return data;
+    },
+    async getMembership(userId, orgId) {
+      const client = await serviceClient();
+      const { data, error } = await client
+        .from("memberships")
+        .select("profile_id, organization_id, role_id, active")
+        .eq("profile_id", userId)
+        .eq("organization_id", orgId)
+        .maybeSingle();
+      if (error) throw new Error(`membership read failed: ${error.message}`);
+      return data;
+    },
+  };
+}
