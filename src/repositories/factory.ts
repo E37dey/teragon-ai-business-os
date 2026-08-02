@@ -7,8 +7,36 @@ import { COLLECTIONS, type CollectionKey } from "./collections";
 import { IndexedDBRepository, idbAvailable } from "./IndexedDBRepository";
 import { InMemoryRepository } from "./InMemoryRepository";
 import { SEED } from "./seed";
+import { PERSISTENCE_PROVIDER, type PersistenceProvider } from "@/persistence/provider";
 
 const singletons = new Map<CollectionKey, Repository<BaseEntity>>();
+
+/**
+ * S9.1-A hard gate: in SUPABASE mode the legacy IndexedDB repository path is
+ * FORBIDDEN — domain UI must go through the authenticated composition boundary
+ * (src/persistence/composition). getRepository() fails closed instead of
+ * silently opening a local IndexedDB store or returning stale local data.
+ * Carries only the requested collection name; never a credential/token/session.
+ */
+export class ProviderBypassError extends Error {
+  readonly code = "PROVIDER_BYPASS_FORBIDDEN" as const;
+  readonly collection: CollectionKey;
+  constructor(collection: CollectionKey) {
+    super(`getRepository("${collection}") is forbidden in SUPABASE mode — use the domain composition boundary`);
+    this.name = "ProviderBypassError";
+    this.collection = collection;
+  }
+}
+
+// Test seam: the active provider defaults to the build-resolved one; targeted
+// tests may override it. Never changes the LOCAL default at runtime.
+let providerOverride: PersistenceProvider | null = null;
+export function __setProviderForTests(provider: PersistenceProvider | null): void {
+  providerOverride = provider;
+}
+function activeProvider(): PersistenceProvider {
+  return providerOverride ?? PERSISTENCE_PROVIDER;
+}
 
 /** Test hook — drop all cached repositories (fresh factory state per test). */
 export function __resetRepositoriesForTests(): void {
@@ -18,6 +46,10 @@ export function __resetRepositoriesForTests(): void {
 export function getRepository<T extends BaseEntity = BaseEntity>(
   collection: CollectionKey,
 ): Repository<T> {
+  if (activeProvider() === "SUPABASE") {
+    // Fail closed: never open IndexedDB or return a local repo in SUPABASE mode.
+    throw new ProviderBypassError(collection);
+  }
   let repo = singletons.get(collection);
   if (!repo) {
     repo = idbAvailable()
