@@ -49,6 +49,57 @@ export interface StagingAuthEnv {
   readonly adminPassword: string;
 }
 
+/** The ONLY staging project this suite may reach (override via STAGING_EXPECTED_REF). */
+export const EXPECTED_PROJECT_REF = process.env.STAGING_EXPECTED_REF ?? "bjvirkmagwpqroakazjj";
+
+/**
+ * Classify a browser key's privilege WITHOUT printing it. Publishable/anon keys
+ * are browser-safe; secret/service_role keys must NEVER reach the browser client.
+ */
+export function keyPrivilegeClass(
+  key: string,
+): "publishable" | "anon" | "service_role" | "secret" | "unknown" {
+  if (key.startsWith("sb_publishable_")) return "publishable";
+  if (key.startsWith("sb_secret_")) return "secret";
+  const parts = key.split(".");
+  if (parts.length === 3 && parts[1]) {
+    try {
+      const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")) as {
+        role?: string;
+      };
+      if (payload.role === "service_role") return "service_role";
+      if (payload.role === "anon") return "anon";
+    } catch {
+      return "unknown";
+    }
+  }
+  return "unknown";
+}
+
+/**
+ * Fail HARD if the target is not the expected remote staging project, or if the
+ * browser key carries privilege. Enforces "wrong project reached" and "privileged
+ * key in browser client" as hard stops. Never prints the URL host or the key.
+ */
+export function assertBrowserSafeStagingTarget(env: StagingAuthEnv): void {
+  if (!/^https:\/\//.test(env.url) || /localhost|127\.0\.0\.1/.test(env.url)) {
+    throw new Error(
+      "[staging-auth-live] refusing to run: target is not a remote https staging project (LOCAL_INDEXEDDB / local stack is never the live target).",
+    );
+  }
+  if (!env.url.includes(EXPECTED_PROJECT_REF)) {
+    throw new Error(
+      `[staging-auth-live] refusing to run: wrong project reached (expected ref ${EXPECTED_PROJECT_REF}).`,
+    );
+  }
+  const klass = keyPrivilegeClass(env.anonKey);
+  if (klass === "service_role" || klass === "secret") {
+    throw new Error(
+      "[staging-auth-live] refusing to run: a PRIVILEGED key was supplied to the browser client (must be publishable/anon only).",
+    );
+  }
+}
+
 export function loadStagingAuthEnv(): StagingAuthEnv {
   const file = parseDotEnv(join(repoRoot, ".env.staging.local"));
   const toml = parseNetlifyPreviewEnv();
@@ -84,5 +135,6 @@ export function assertStagingAuthLiveOrThrow(): StagingAuthEnv {
         "(URL/anon key from netlify.toml deploy-preview; admin creds from .env.staging.local). Values are never printed.",
     );
   }
+  assertBrowserSafeStagingTarget(env);
   return env;
 }

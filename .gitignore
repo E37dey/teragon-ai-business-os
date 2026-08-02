@@ -16,6 +16,8 @@ dist-ssr
 .netlify
 playwright-report
 test-results
+# Live-suite machine-readable reports (safe counts, but ephemeral — never committed).
+ci-artifacts/
 *.tsbuildinfo
 .claude/
 
