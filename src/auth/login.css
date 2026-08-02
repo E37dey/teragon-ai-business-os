@@ -1,0 +1,138 @@
+/**
+ * TERAGON AI BUSINESS OS — Gate S8.1: login / session screen styling.
+ *
+ * Enterprise look via design tokens ONLY (light + dark inherit token VALUES via
+ * data-theme). No neon, no glow, system Hebrew font stack, visible focus rings.
+ */
+
+.auth-login {
+  min-block-size: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--os-space-8);
+  background: var(--os-bg-app);
+  color: var(--os-text-primary);
+  font-family: var(--os-font);
+}
+
+.auth-gate-loading {
+  min-block-size: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--os-bg-app);
+  color: var(--os-text-secondary);
+  font-family: var(--os-font);
+}
+.auth-gate-loading__label {
+  font-size: var(--os-text-md);
+}
+
+.auth-login__card {
+  inline-size: 100%;
+  max-inline-size: 400px;
+  background: var(--os-surface-1);
+  border: 1px solid var(--os-border-default);
+  border-radius: var(--os-radius-xl);
+  box-shadow: var(--os-shadow-raised);
+  padding: var(--os-space-10) var(--os-space-9);
+}
+
+.auth-login__head {
+  margin-block-end: var(--os-space-9);
+  text-align: center;
+}
+.auth-login__title {
+  margin: 0 0 var(--os-space-4);
+  font-size: var(--os-text-lg);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--os-text-primary);
+}
+.auth-login__subtitle {
+  margin: 0;
+  font-size: var(--os-text-sm);
+  color: var(--os-text-secondary);
+}
+
+.auth-login__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--os-space-6);
+}
+.auth-login__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--os-space-3);
+}
+.auth-login__label {
+  font-size: var(--os-text-sm);
+  color: var(--os-text-secondary);
+}
+.auth-login__input {
+  inline-size: 100%;
+  box-sizing: border-box;
+  padding: var(--os-space-5) var(--os-space-6);
+  font-size: var(--os-text-md);
+  font-family: var(--os-font);
+  color: var(--os-text-primary);
+  background: var(--os-surface-2);
+  border: 1px solid var(--os-border-default);
+  border-radius: var(--os-radius-md);
+  transition: border-color 120ms ease;
+}
+.auth-login__input::placeholder {
+  color: var(--os-text-disabled);
+}
+.auth-login__input:focus-visible {
+  outline: none;
+  border-color: var(--os-accent-primary);
+  box-shadow: var(--os-focus-ring);
+}
+.auth-login__input[aria-invalid="true"] {
+  border-color: var(--danger-border);
+}
+.auth-login__input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auth-login__error {
+  margin: 0;
+  padding: var(--os-space-5) var(--os-space-6);
+  font-size: var(--os-text-sm);
+  color: var(--danger-text);
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--os-radius-md);
+}
+
+.auth-login__status {
+  padding: var(--os-space-7) 0;
+  text-align: center;
+  font-size: var(--os-text-md);
+  color: var(--os-text-secondary);
+}
+
+.auth-login__actions {
+  margin-block-start: var(--os-space-4);
+}
+.auth-login__submit {
+  inline-size: 100%;
+  justify-content: center;
+}
+.auth-login__actions .os-btn-wrap {
+  display: block;
+}
+.auth-login__actions .os-btn {
+  inline-size: 100%;
+  justify-content: center;
+}
+
+@media (max-width: 1023px) {
+  .auth-login__card {
+    max-inline-size: 100%;
+    padding: var(--os-space-9) var(--os-space-7);
+  }
+}

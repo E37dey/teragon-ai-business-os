@@ -6,8 +6,15 @@ import { Suspense, lazy } from "react";
 import type { ComponentType, LazyExoticComponent } from "react";
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import OsShell from "./OsShell";
-import { AppTopLayout, NotFoundPage, RoutedPlaceholder, TopLevelPresentation } from "./routerPages";
+import {
+  AppTopLayout,
+  LoginRoute,
+  NotFoundPage,
+  RoutedPlaceholder,
+  TopLevelPresentation,
+} from "./routerPages";
 import { APP_ROUTES } from "./routes";
+import { RequireAuth } from "@/auth/RequireAuth";
 import DesignShowcase from "@/design-system/showcase/DesignShowcase";
 
 // Module page registry — path → lazy page (single place the shell learns about modules).
@@ -61,9 +68,17 @@ export const appRouteObjects: RouteObject[] = [
     children: [
       // Presentation — TOP-LEVEL route outside OsShell for true full-screen (W7-F request #1)
       { path: "/submission/presentation", element: <TopLevelPresentation /> },
+      // Public login route — standalone, never gated (prevents redirect loops).
+      { path: "/login", element: <LoginRoute /> },
       {
         path: "/",
-        element: <OsShell />,
+        // Route protection: everything inside OsShell requires an authenticated
+        // session in SUPABASE mode. In LOCAL mode RequireAuth is a pass-through.
+        element: (
+          <RequireAuth>
+            <OsShell />
+          </RequireAuth>
+        ),
         children: [
           ...APP_ROUTES.filter((r) => r.path !== "/submission/presentation").map(
             (r): RouteObject => {

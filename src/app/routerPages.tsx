@@ -38,6 +38,17 @@ export function TopLevelPresentation() {
   );
 }
 
+const LazyLoginPage = lazy(() => import("@/auth/LoginPage"));
+
+/** Standalone, full-screen login route element (S8.1). Never gated. */
+export function LoginRoute() {
+  return (
+    <Suspense fallback={<div className="os-route-loading" aria-busy="true" />}>
+      <LazyLoginPage />
+    </Suspense>
+  );
+}
+
 /** Shared top layout: floating "חזרה למצגת" control renders app-wide (W7-F). */
 export function AppTopLayout() {
   return (

@@ -4,6 +4,7 @@ import { RouterProvider } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./app/queryClient";
 import { createAppRouter } from "./app/router";
+import { AuthProvider } from "./auth/AuthProvider";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { seedIfEmpty } from "./repositories";
 import { runMigrationsAtBoot } from "./migrations";
@@ -29,9 +30,11 @@ async function boot() {
   createRoot(rootEl).render(
     <StrictMode>
       <ThemeProvider>
-        <QueryClientProvider client={queryClient}>
-          <RouterProvider router={createAppRouter()} />
-        </QueryClientProvider>
+        <AuthProvider>
+          <QueryClientProvider client={queryClient}>
+            <RouterProvider router={createAppRouter()} />
+          </QueryClientProvider>
+        </AuthProvider>
       </ThemeProvider>
     </StrictMode>,
   );
