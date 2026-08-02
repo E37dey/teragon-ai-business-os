@@ -17,11 +17,8 @@ import { useDomainCollection, domainReadMessage } from "@/app/data/useDomainColl
 import { PERSISTENCE_PROVIDER } from "@/persistence/provider";
 import type { Customer, CustomerType } from "@/domain/types";
 import { totalRevenue } from "@/domain/selectors";
-import {
-  createCustomer,
-  customerInputSchema,
-  type CustomerInput,
-} from "@/app/quick-create/actions";
+import { customerInputSchema, type CustomerInput } from "@/app/quick-create/actions";
+import { useCustomerMutation, type CustomerMutationResult } from "@/app/data/useCustomerMutation";
 import { ils } from "@/modules/quotations/fmt";
 import { Modal } from "@/design-system";
 
@@ -45,6 +42,19 @@ const selStyle: CSSProperties = {
 
 const TYPES: readonly (CustomerType | "הכול")[] = ["הכול", "פרטי", "עסק", "בית ספר", "ארגון"];
 
+function emptyValues(): Record<string, string> {
+  return { name: "", type: "פרטי", phone: "", email: "", city: "" };
+}
+
+/** A stable, deterministic customer id for one create submission (reused on retry). */
+function freshSubmissionId(): string {
+  const rand =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+  return `cu-${rand}`;
+}
+
 function contactChip(state: Customer["contactState"]): ReactElement {
   if (state === "פעיל") return <StatusChip status="פעיל" />;
   if (state === "ממתין למענה") return <StatusChip status="אזהרה" label="ממתין למענה" />;
@@ -60,18 +70,43 @@ export default function CustomersPage(): ReactElement {
   const customersQ = useDomainCollection<Customer>("customers");
   const customers = useMemo(() => customersQ.data ?? [], [customersQ.data]);
 
+  const { create, update, isSubmitting } = useCustomerMutation();
+
   const [type, setType] = useState<CustomerType | "הכול">("הכול");
   const [text, setText] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
-  const [values, setValues] = useState<Record<string, string>>({
-    name: "",
-    type: "פרטי",
-    phone: "",
-    email: "",
-    city: "",
-  });
+  // One deterministic submission id per open create form — reused across retries
+  // so a double click / uncertain-response retry yields ONE logical customer.
+  const [submissionId, setSubmissionId] = useState(freshSubmissionId);
+  const [values, setValues] = useState<Record<string, string>>(emptyValues);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<Customer | null>(null);
+  const [editValues, setEditValues] = useState<Record<string, string>>(emptyValues);
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({});
+
+  const openCreate = (): void => {
+    setSubmissionId(freshSubmissionId());
+    setValues(emptyValues());
+    setErrors({});
+    setCreateOpen(true);
+  };
+
+  const openEdit = (c: Customer): void => {
+    setEditing(c);
+    setEditValues({ name: c.name, type: c.type, phone: c.phone, email: c.email, city: c.city });
+    setEditErrors({});
+  };
+
+  const clientErrors = (vals: Record<string, string>): Record<string, string> | null => {
+    const parsed = customerInputSchema.safeParse(vals);
+    if (parsed.success) return null;
+    const errs: Record<string, string> = {};
+    for (const i of parsed.error.issues) {
+      const k = String(i.path[0] ?? "");
+      if (k && !(k in errs)) errs[k] = i.message;
+    }
+    return errs;
+  };
 
   const filtered = useMemo(
     () =>
@@ -88,28 +123,41 @@ export default function CustomersPage(): ReactElement {
   const waiting = customers.filter((c) => c.contactState === "ממתין למענה");
   const topByRevenue = [...customers].sort((a, b) => b.revenue - a.revenue).slice(0, 5);
 
+  const busy = isSubmitting;
+
   const submit = async (): Promise<void> => {
-    const parsed = customerInputSchema.safeParse(values);
-    if (!parsed.success) {
-      const errs: Record<string, string> = {};
-      for (const i of parsed.error.issues) {
-        const k = String(i.path[0] ?? "");
-        if (k && !(k in errs)) errs[k] = i.message;
-      }
+    const errs = clientErrors(values);
+    if (errs) {
       setErrors(errs);
       return;
     }
-    setBusy(true);
-    try {
-      const created = await createCustomer(parsed.data as CustomerInput);
-      toast(`הלקוח «${created.name}» נוצר`, "success");
+    // Same submissionId across retries → the write seam guarantees one logical record.
+    const res = await create(values as unknown as CustomerInput, submissionId);
+    if (res.ok) {
+      toast(`הלקוח «${res.data.name}» נוצר`, "success");
       setCreateOpen(false);
       setErrors({});
-      setValues({ name: "", type: "פרטי", phone: "", email: "", city: "" });
-    } catch {
-      toast("יצירת הלקוח נכשלה — נסו שוב", "danger");
-    } finally {
-      setBusy(false);
+      setValues(emptyValues());
+      setSubmissionId(freshSubmissionId());
+    } else {
+      toast(res.error.message, "danger");
+    }
+  };
+
+  const submitEdit = async (): Promise<void> => {
+    if (!editing) return;
+    const errs = clientErrors(editValues);
+    if (errs) {
+      setEditErrors(errs);
+      return;
+    }
+    const res: CustomerMutationResult = await update(editing.id, editValues as unknown as CustomerInput);
+    if (res.ok) {
+      toast(`הלקוח «${res.data.name}» עודכן`, "success");
+      setEditing(null);
+      setEditErrors({});
+    } else {
+      toast(res.error.message, "danger");
     }
   };
 
@@ -185,18 +233,9 @@ export default function CustomersPage(): ReactElement {
           <OsButton variant="ghost" icon="clock" onClick={() => void customersQ.refetch()}>
             {customersQ.isFetching ? "מרענן…" : "רענון"}
           </OsButton>
-          {isSupabase ? (
-            <span
-              style={{ fontSize: "var(--os-text-sm, 13px)", color: "var(--os-text-muted)" }}
-              role="note"
-            >
-              יצירת לקוח עדיין אינה זמינה בסביבת התצוגה
-            </span>
-          ) : (
-            <OsButton icon="plus" onClick={() => setCreateOpen(true)}>
-              לקוח חדש
-            </OsButton>
-          )}
+          <OsButton icon="plus" onClick={openCreate}>
+            לקוח חדש
+          </OsButton>
         </div>
       </div>
 
@@ -267,77 +306,132 @@ export default function CustomersPage(): ReactElement {
               render: (c) => <span className="os-num">{ils(c.revenue)}</span>,
             },
             { key: "contactState", header: "מצב קשר", render: (c) => contactChip(c.contactState) },
+            {
+              key: "actions",
+              header: "פעולות",
+              render: (c) => (
+                // span stops the row-click (navigate) so edit stays a distinct action.
+                <span onClick={(e) => e.stopPropagation()} style={{ display: "inline-flex" }}>
+                  <OsButton variant="ghost" onClick={() => openEdit(c)}>
+                    עריכה
+                  </OsButton>
+                </span>
+              ),
+            },
           ]}
         />
       </Panel>
 
-      {!isSupabase && createOpen && (
-        <Modal open onClose={() => setCreateOpen(false)} title="לקוח חדש">
-          <form
-            className="os-qc-form"
-            noValidate
-            onSubmit={(e) => {
-              e.preventDefault();
-              void submit();
-            }}
-          >
-            {(
-              [
-                { name: "name", label: "שם הלקוח", type: "text" },
-                { name: "type", label: "סוג", type: "select" },
-                { name: "phone", label: "טלפון", type: "text" },
-                { name: "email", label: "אימייל", type: "text" },
-                { name: "city", label: "עיר", type: "text" },
-              ] as const
-            ).map((f) => (
-              <div key={f.name} className="os-qc-field">
-                <label className="os-qc-label" htmlFor={`cust-${f.name}`}>
-                  {f.label}
-                </label>
-                {f.type === "select" ? (
-                  <select
-                    id={`cust-${f.name}`}
-                    className="os-qc-input"
-                    value={values[f.name] ?? ""}
-                    onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.value }))}
-                  >
-                    {(["פרטי", "עסק", "בית ספר", "ארגון"] as const).map((o) => (
-                      <option key={o} value={o}>
-                        {o}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    id={`cust-${f.name}`}
-                    className="os-qc-input"
-                    type="text"
-                    value={values[f.name] ?? ""}
-                    onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.value }))}
-                  />
-                )}
-                {errors[f.name] && (
-                  <span className="os-qc-error" role="alert">
-                    {errors[f.name]}
-                  </span>
-                )}
-              </div>
-            ))}
-            <div className="os-qc-actions">
-              {busy ? (
-                <OsButton type="submit" disabled disabledReason="שמירה מתבצעת…">
-                  שומר…
-                </OsButton>
-              ) : (
-                <OsButton type="submit">שמירה</OsButton>
-              )}
-              <OsButton variant="ghost" onClick={() => setCreateOpen(false)}>
-                ביטול
-              </OsButton>
-            </div>
-          </form>
-        </Modal>
+      {createOpen && (
+        <CustomerFormModal
+          title="לקוח חדש"
+          values={values}
+          errors={errors}
+          busy={busy}
+          onChange={(name, v) => setValues((prev) => ({ ...prev, [name]: v }))}
+          onSubmit={submit}
+          onClose={() => setCreateOpen(false)}
+        />
+      )}
+
+      {editing && (
+        <CustomerFormModal
+          title={`עריכת לקוח — ${editing.name}`}
+          values={editValues}
+          errors={editErrors}
+          busy={busy}
+          onChange={(name, v) => setEditValues((prev) => ({ ...prev, [name]: v }))}
+          onSubmit={submitEdit}
+          onClose={() => setEditing(null)}
+        />
       )}
     </div>
+  );
+}
+
+const FORM_FIELDS = [
+  { name: "name", label: "שם הלקוח", type: "text" },
+  { name: "type", label: "סוג", type: "select" },
+  { name: "phone", label: "טלפון", type: "text" },
+  { name: "email", label: "אימייל", type: "text" },
+  { name: "city", label: "עיר", type: "text" },
+] as const;
+
+/** The essential-fields customer form (create + edit), in a calm modal. */
+function CustomerFormModal({
+  title,
+  values,
+  errors,
+  busy,
+  onChange,
+  onSubmit,
+  onClose,
+}: {
+  title: string;
+  values: Record<string, string>;
+  errors: Record<string, string>;
+  busy: boolean;
+  onChange: (name: string, value: string) => void;
+  onSubmit: () => void;
+  onClose: () => void;
+}): ReactElement {
+  return (
+    <Modal open onClose={onClose} title={title}>
+      <form
+        className="os-qc-form"
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          void onSubmit();
+        }}
+      >
+        {FORM_FIELDS.map((f) => (
+          <div key={f.name} className="os-qc-field">
+            <label className="os-qc-label" htmlFor={`cust-${f.name}`}>
+              {f.label}
+            </label>
+            {f.type === "select" ? (
+              <select
+                id={`cust-${f.name}`}
+                className="os-qc-input"
+                value={values[f.name] ?? ""}
+                onChange={(e) => onChange(f.name, e.target.value)}
+              >
+                {(["פרטי", "עסק", "בית ספר", "ארגון"] as const).map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                id={`cust-${f.name}`}
+                className="os-qc-input"
+                type="text"
+                value={values[f.name] ?? ""}
+                onChange={(e) => onChange(f.name, e.target.value)}
+              />
+            )}
+            {errors[f.name] && (
+              <span className="os-qc-error" role="alert">
+                {errors[f.name]}
+              </span>
+            )}
+          </div>
+        ))}
+        <div className="os-qc-actions">
+          {busy ? (
+            <OsButton type="submit" disabled disabledReason="שמירה מתבצעת…">
+              שומר…
+            </OsButton>
+          ) : (
+            <OsButton type="submit">שמירה</OsButton>
+          )}
+          <OsButton variant="ghost" onClick={onClose}>
+            ביטול
+          </OsButton>
+        </div>
+      </form>
+    </Modal>
   );
 }

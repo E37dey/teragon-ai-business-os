@@ -190,7 +190,7 @@ describe("S9.2-A1b · CustomersPage in SUPABASE mode", () => {
     );
   }
 
-  it("renders remote customers and hides the IndexedDB create control", async () => {
+  it("renders the remote customer list (read comes from Supabase results)", async () => {
     listSafe.mockResolvedValue({
       ok: true,
       data: [
@@ -201,7 +201,7 @@ describe("S9.2-A1b · CustomersPage in SUPABASE mode", () => {
     renderPage();
     await waitFor(() => expect(screen.getByTestId("customers-page")).toBeTruthy());
     expect(screen.getByText("רמי לוי")).toBeTruthy();
-    expect(screen.queryByText("לקוח חדש")).toBeNull();
-    expect(screen.getByText("יצירת לקוח עדיין אינה זמינה בסביבת התצוגה")).toBeTruthy();
+    // create is enabled from S9.2-A1c; the old "not available" notice is gone
+    expect(screen.queryByText("יצירת לקוח עדיין אינה זמינה בסביבת התצוגה")).toBeNull();
   });
 });

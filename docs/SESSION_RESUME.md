@@ -5,7 +5,7 @@
 
 ## Current position
 - **Branch:** `feature/teragon-supabase-domain-integration` (Draft PR #3 → base `feature/teragon-supabase-app-auth`)
-- **HEAD after this session:** the `feat(customers): connect customer list and read views to Supabase composition` commit (S9.2-A1b). Prior: `372a7b1` (S9.2-A1a async loader seam).
+- **HEAD after this session:** the `feat(customers): add authenticated customer create and update flows` commit (S9.2-A1c). Prior: `ad75757` (S9.2-A1b route-aware list/read).
 - **Tree:** clean.
 
 ## Authorized scope (per session — ONE bounded checkpoint)
@@ -21,7 +21,14 @@
   - **DETAIL (`/customers/:id`) intentionally left blocked** — the 832-line 13-collection Customer-360 page is a broad rewrite (12 domains still NOT_CONNECTED); deferred to keep the commit bounded + the tree clean.
   - Tests: `tests/app/customer-read.test.tsx` (13) + rewired `tests/app/domain-not-connected-gate.test.tsx` (3). Targeted vitest 46-adjacent green, typecheck clean, oxlint clean. No full/live suite, no build:preview, no screenshots (SUPABASE list needs a live session → visual gate belongs with live validation).
   - **customers status = `READ_CONNECTED_LOCAL_TESTED`** (list only; detail NOT connected; every other domain NOT_CONNECTED).
-- **Next = S9.2-A1c: customer create/update + idempotency** — mutation seam through the composition boundary (still no contacts, no migration 015). Then customer DETAIL read wiring, then live customer read validation.
+- **S9.2-A1c DONE (customer create + update; idempotent):**
+  - `src/app/data/useCustomerMutation.ts` — provider-aware WRITE seam. LOCAL = existing approved behavior (`createCustomer` / local factory update). SUPABASE = authenticated write via `loadSupabaseDomainRepository("customers",...)`, org from `identity.organizationId` only, never `getRepository`/IndexedDB, no local fallback. Typed failures: AUTH_REQUIRED / IDENTITY_INVALID / DOMAIN_NOT_CONNECTED / REMOTE_REPOSITORY_LOAD_FAILED / REMOTE_WRITE_FAILED / VALIDATION_FAILED / DUPLICATE_SUBMISSION (safe Hebrew, no raw errors).
+  - **Idempotency (NO schema change):** create reuses ONE deterministic submission id + writes through `upsertSafe` — module-level in-flight collapse here + repo-level in-flight collapse + DB `onConflict:"id"` ⇒ double-click / uncertain-retry = one logical row. `entityToRow` injects the tenant `organization_id` from the canonical org (customers maps domain `organizationId`→`owning_org_id`, a different column), so a browser org can't spoof ownership. **The existing `upsertSafe` contract fully covers idempotency — no migration 015.**
+  - **Session safety:** issuing identity captured; a write resolving after logout/identity change does NOT repopulate protected cache. On success, adds the verified record to the scoped `["domain-collection","SUPABASE","customers",userId,orgId]` query + invalidates only that key.
+  - `CustomersPage.tsx` — create enabled in both modes (seam + submission id); new per-row "עריכה" opens a focused edit modal (essential fields only, no Customer-360); extracted `CustomerFormModal` (create+edit). Detail route still blocked.
+  - Tests: `tests/app/customer-mutation.test.tsx` (10) + read regression updated. Targeted 40 green (mutation 10 + read 13 + gate 3 + loader 9 + gate 5). typecheck + oxlint clean. Visual: LOCAL dev-server a11y-inspected at 1024/1280/1440 (list + create + edit dialogs; RTL, Light, no overflow) — SUPABASE-mode visual needs live Auth (deferred to live validation).
+  - **customers status = `READ_WRITE_CONNECTED_LOCAL_TESTED`** (list read + create/update; NOT LIVE_VALIDATED, NOT CRUD_COMPLETE — no remove, no contacts). Detail blocked; all other domains NOT_CONNECTED.
+- **Next = S9.2-A1d: customer DETAIL read + live customer validation** — wire `/customers/:id` read-only through composition (still no contacts/other domains), then the first live customer read/write validation on staging.
 
 ## Frozen facts (recorded once — do NOT re-verify)
 - Backend fully stood up on live `teragon-staging` (`bjvirkmagwpqroakazjj`): 14 migrations, schema verified, RLS 8/8, admin `soundcloudillusion@gmail.com` bootstrapped, deterministic seed. **S7.1/S7.2 PASS.**
