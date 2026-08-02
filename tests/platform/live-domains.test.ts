@@ -18,6 +18,7 @@ import {
   safeAuthCategory,
   parsePlaywrightTotals,
   assembleReport,
+  fullPreflight,
 } from "../../scripts/live-domains/run-domains-live.mjs";
 import {
   provisionCustomerFixtures,
@@ -239,5 +240,27 @@ describe("S9.2-A1d2a-1B3 · cleanup verifies deletion", () => {
     const c = await cleanupCustomerFixtures({ adapter, handle: prov.handle });
     expect(c.ok).toBe(false);
     expect(c.errors.join(" ")).toMatch(/still present/);
+  });
+});
+
+describe("S9.2-A1d2a-1B4 · fullPreflight (non-mutating, 5 booleans)", () => {
+  const svcFake = (user: unknown) => ({ auth: { admin: { listUsers: async () => ({ data: { users: user ? [user] : [] }, error: null }) } } });
+  const USER = { id: "u1", email: VALID_ENV.TERAGON_ADMIN_EMAIL, email_confirmed_at: "2026-01-01T00:00:00Z" };
+
+  it("PASS when target + service-role + admin + confirmed + password all hold", async () => {
+    const fp = await fullPreflight(VALID_ENV, { serviceFactory: () => svcFake(USER), anonFactory: () => fakeAuthClient(true) });
+    expect(fp).toMatchObject({ targetVerified: true, serviceRoleAccess: true, adminFound: true, emailConfirmed: true, passwordAuth: true });
+  });
+  it("password-auth failure is surfaced with no secret leak", async () => {
+    const fp = await fullPreflight(VALID_ENV, { serviceFactory: () => svcFake(USER), anonFactory: () => fakeAuthClient(false, { message: "Invalid login credentials eyJx.tok" }) });
+    expect(fp.passwordAuth).toBe(false);
+    expect(fp.category).toBe("invalid_credentials");
+    expect(JSON.stringify(fp)).not.toMatch(/eyJ|\.tok/); // no raw jwt/token leaks
+  });
+  it("ref mismatch short-circuits before constructing any client", async () => {
+    let built = false;
+    const fp = await fullPreflight({ ...VALID_ENV, SUPABASE_URL: "https://other0000000000000.supabase.co" }, { serviceFactory: () => { built = true; return svcFake(null); } });
+    expect(fp.targetVerified).toBe(false);
+    expect(built).toBe(false);
   });
 });

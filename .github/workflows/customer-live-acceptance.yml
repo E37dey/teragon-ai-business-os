@@ -12,6 +12,11 @@ on:
         description: Exact commit SHA to validate
         required: true
         type: string
+      preflight_only:
+        description: Non-mutating server-side preflight only (no browser, no fixtures)
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -63,6 +68,7 @@ jobs:
         id: live
         env:
           STAGING_DOMAINS_LIVE: "1"
+          STAGING_DOMAINS_PREFLIGHT_ONLY: ${{ inputs.preflight_only && '1' || '0' }}
           ACCEPTANCE_BASE_URL: http://localhost:4173
           INTENDED_COMMIT: ${{ inputs.commit }}
           ACC_RUN_ID: gha${{ github.run_id }}

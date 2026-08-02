@@ -155,6 +155,45 @@ export async function adminPreflight(env, deps = {}) {
   }
 }
 
+/**
+ * NON-MUTATING full preflight for the GitHub-hosted check: verifies the target,
+ * that the service-role Admin API can LOCATE the existing administrator and that
+ * the admin is email-confirmed, and that the admin password authenticates via the
+ * anon client. Reads only (listUsers) + signIn/signOut — creates NOTHING.
+ * @returns {Promise<{targetVerified:boolean, adminFound:boolean, emailConfirmed:boolean, serviceRoleAccess:boolean, passwordAuth:boolean, category:string}>}
+ */
+export async function fullPreflight(env, deps = {}) {
+  const out = { targetVerified: false, adminFound: false, emailConfirmed: false, serviceRoleAccess: false, passwordAuth: false, category: "" };
+  out.targetVerified = refFromUrl(env.SUPABASE_URL) === STAGING_REF;
+  if (!out.targetVerified) { out.category = "ref_mismatch"; return out; }
+  const email = String(env.TERAGON_ADMIN_EMAIL ?? "").trim();
+  try {
+    let svc = deps.serviceFactory ? deps.serviceFactory() : null;
+    if (!svc) {
+      const { createClient } = await import("@supabase/supabase-js");
+      svc = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+    }
+    let user = null;
+    for (let p = 1; p <= 25; p++) {
+      const { data, error } = await svc.auth.admin.listUsers({ page: p, perPage: 200 });
+      if (error) throw error;
+      out.serviceRoleAccess = true;
+      const us = data?.users ?? [];
+      const u = us.find((x) => (x.email || "").toLowerCase() === email.toLowerCase());
+      if (u) { user = u; break; }
+      if (us.length < 200) break;
+    }
+    out.adminFound = Boolean(user);
+    out.emailConfirmed = Boolean(user && (user.email_confirmed_at || user.confirmed_at));
+  } catch (e) {
+    out.category = safeAuthCategory(e);
+  }
+  const ap = await adminPreflight(env, deps.anonFactory ? { clientFactory: deps.anonFactory } : {});
+  out.passwordAuth = ap.pass;
+  if (!ap.pass && !out.category) out.category = ap.category;
+  return out;
+}
+
 /** Parse Playwright's JSON reporter into authoritative totals. */
 export function parsePlaywrightTotals(pwJson) {
   const totals = { files: 0, executed: 0, passed: 0, failed: 0, skipped: 0 };
@@ -217,6 +256,25 @@ async function main() {
   }
 
   const write = (rep) => writeFileSync(REPORT_PATH, JSON.stringify(rep, null, 2));
+
+  // GitHub-hosted NON-MUTATING preflight: report the 5 booleans + exit. No users,
+  // no records, no Playwright.
+  if (env.STAGING_DOMAINS_PREFLIGHT_ONLY === "1") {
+    const fp = await fullPreflight(env);
+    const pass = fp.targetVerified && fp.serviceRoleAccess && fp.adminFound && fp.emailConfirmed && fp.passwordAuth;
+    const rep = {
+      mode: "github-preflight",
+      targetProjectVerified: fp.targetVerified ? "yes" : "no",
+      adminUserFound: fp.adminFound ? "yes" : "no",
+      emailConfirmed: fp.emailConfirmed ? "yes" : "no",
+      serviceRoleAdminAccess: fp.serviceRoleAccess ? "pass" : "fail",
+      adminPasswordAuth: fp.passwordAuth ? "pass" : "fail",
+      maskedRef: pf.maskedRef, observedCommit: pf.commit, note: fp.category, verdict: pass ? "PASS" : "FAIL",
+    };
+    write(rep);
+    console.log(`[domains:live] github-preflight target=${rep.targetProjectVerified} adminFound=${rep.adminUserFound} emailConfirmed=${rep.emailConfirmed} serviceRole=${rep.serviceRoleAdminAccess} passwordAuth=${rep.adminPasswordAuth} verdict=${rep.verdict}`);
+    process.exit(pass ? 0 : 1);
+  }
   const readIdb = () => {
     try { return JSON.parse(readFileSync(IDB_PATH, "utf8")); } catch { return { open: 0, read: 0, write: 0 }; }
   };
