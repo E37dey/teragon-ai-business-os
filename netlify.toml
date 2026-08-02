@@ -101,3 +101,16 @@
   for = "/favicon.svg"
   [headers.values]
     Cache-Control = "public, max-age=3600"
+
+# --- Deploy-Preview Supabase env (S7.3A / Option B) --------------------------
+# BROWSER-PUBLIC build-time values for the deploy-preview context ONLY. These
+# ship in the client bundle (that is expected). Production / global
+# [build.environment] / branch / dev / Functions NEVER inherit them, so the
+# app default stays LOCAL_INDEXEDDB when this Preview override is absent.
+# NO privileged key here: only the public project URL, the PUBLISHABLE
+# (browser-safe) key, the org, and the provider selector.
+[context.deploy-preview.environment]
+  VITE_SUPABASE_URL = "https://bjvirkmagwpqroakazjj.supabase.co"
+  VITE_SUPABASE_ANON_KEY = "sb_publishable_yy-AzXfN8JeZmNDNFiDlPw_XONeKH_6"
+  VITE_SUPABASE_ORG = "org-teragon"
+  VITE_PERSISTENCE_PROVIDER = "SUPABASE"
