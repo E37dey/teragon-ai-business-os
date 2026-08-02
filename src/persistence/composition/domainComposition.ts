@@ -19,7 +19,9 @@ export type DomainErrorCode =
   | "AUTH_REQUIRED"
   | "IDENTITY_INVALID"
   | "DOMAIN_NOT_CONNECTED"
-  | "REMOTE_OPERATION_FAILED";
+  | "REMOTE_OPERATION_FAILED"
+  | "REMOTE_REPOSITORY_LOAD_FAILED"
+  | "PROVIDER_BYPASS_FORBIDDEN";
 
 export class DomainCompositionError extends Error {
   readonly code: DomainErrorCode;
@@ -31,12 +33,13 @@ export class DomainCompositionError extends Error {
 }
 
 /**
- * Collections whose UI is connected to the authenticated Supabase boundary.
- * CHECKPOINT A: intentionally EMPTY — every domain returns DOMAIN_NOT_CONNECTED
- * in SUPABASE mode. Customers/contacts are added in Checkpoint B (after A is
- * fully green), the rest later.
+ * Collections the authenticated Supabase seam is IMPLEMENTATION-READY to serve.
+ * S9.2-A1a: `customers` is loadable by loadSupabaseDomainRepository(), but is NOT
+ * yet route-mounted / LIVE_VALIDATED — the route-aware gate + UI wiring land in
+ * S9.2-A1b. Every other domain is still NOT_CONNECTED. (The DomainNotConnectedGate
+ * is not route-aware yet, so in SUPABASE mode all pages still show the notice.)
  */
-export const SUPABASE_CONNECTED_DOMAINS: readonly CollectionKey[] = [];
+export const SUPABASE_CONNECTED_DOMAINS: readonly CollectionKey[] = ["customers"];
 
 export function isSupabaseConnectedDomain(collection: CollectionKey): boolean {
   return SUPABASE_CONNECTED_DOMAINS.includes(collection);
