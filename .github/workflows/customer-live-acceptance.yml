@@ -1,0 +1,83 @@
+# TERAGON AI BUSINESS OS — Gate S9.2-A1d2a-1B: MANUAL live customer acceptance.
+# Runs the fail-closed live customer suite once against teragon-staging.
+# workflow_dispatch ONLY — never on push/pull_request. The service-role secret is
+# scoped to the server-side runner step and is ABSENT during the Vite build, so
+# it can never enter the browser bundle.
+name: customer-live-acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Exact commit SHA to validate
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: customer-live-acceptance
+  cancel-in-progress: false
+
+jobs:
+  live-customer:
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 30
+    steps:
+      - name: Checkout the exact selected commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      # Vite build — NO service-role secret in this step's env (publishable only,
+      # sourced from netlify.toml deploy-preview by preview-build.mjs).
+      - name: Build Preview-context app (SUPABASE, publishable only)
+        run: npm run build:preview
+
+      # Scan the built bundle BEFORE any fixture creation / live step.
+      - name: Scan bundle for secrets (no service_role in dist)
+        run: npm run scan:secrets
+
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Serve the exact dist locally
+        run: |
+          npx --yes serve -s dist -l 4173 &
+          npx --yes wait-on http://localhost:4173
+
+      # The ONLY step that receives the service-role secret. It never reaches the
+      # build/bundle. The runner preflights, runs the live suite once, and the
+      # suite always tears its fixtures down.
+      - name: Run live customer acceptance (once, always cleanup)
+        id: live
+        env:
+          STAGING_DOMAINS_LIVE: "1"
+          ACCEPTANCE_BASE_URL: http://localhost:4173
+          INTENDED_COMMIT: ${{ inputs.commit }}
+          ACC_RUN_ID: gha${{ github.run_id }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          TERAGON_ADMIN_EMAIL: ${{ secrets.TERAGON_ADMIN_EMAIL }}
+          TERAGON_ADMIN_PASSWORD: ${{ secrets.TERAGON_ADMIN_PASSWORD }}
+        run: npm run test:domains:live
+
+      # Upload only the redacted machine report (never traces with runtime data).
+      - name: Upload redacted report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-customer-report
+          path: e2e/live-domains/_report.json
+          if-no-files-found: warn
