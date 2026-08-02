@@ -50,6 +50,14 @@ export function createNetlifyAdapter(deps) {
 
   return {
     async getLinkedSite() {
+      // Resolve by the authoritative NETLIFY_SITE_ID via the API (works even when
+      // the repo is not locally linked). Fall back to `status` if no id is set.
+      const id = cred("NETLIFY_SITE_ID");
+      if (id) {
+        const out = await run("netlify", ["api", "getSite", "--data", JSON.stringify({ site_id: id })], authEnv());
+        const s = parseJson(out, {});
+        if (s?.id) return { id: s.id, name: s.name ?? null };
+      }
       const out = await run("netlify", ["status", "--json"], authEnv());
       const s = parseJson(out, {});
       return { id: s?.siteData?.id ?? null, name: s?.siteData?.name ?? null };

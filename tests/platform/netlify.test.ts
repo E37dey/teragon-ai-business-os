@@ -95,3 +95,39 @@ describe("configureNetlify apply (Preview context only)", () => {
     expect(netlify.calls.some((c) => c.method === "setEnv")).toBe(false);
   });
 });
+
+import { createNetlifyAdapter } from "../../scripts/platform/shared/adapters/netlify.mjs";
+
+describe("real Netlify adapter — getLinkedSite resolves by site id (not local link)", () => {
+  it("uses api getSite with NETLIFY_SITE_ID and returns {id,name}", async () => {
+    const seen: string[][] = [];
+    const adapter = createNetlifyAdapter({
+      credentials: (n: string) => (n === "NETLIFY_SITE_ID" ? "site-abc" : n === "NETLIFY_AUTH_TOKEN" ? "tok" : undefined),
+      capture: async (_cmd: string, args: string[]) => {
+        seen.push(args);
+        return JSON.stringify({ id: "site-abc", name: "teragon-os-demo" });
+      },
+    });
+    const site = await adapter.getLinkedSite();
+    expect(site).toEqual({ id: "site-abc", name: "teragon-os-demo" });
+    // used api getSite (not `status`) with the site id in the payload
+    expect(seen[0]!.slice(0, 2)).toEqual(["api", "getSite"]);
+    expect(seen[0]!.join(" ")).toContain("site-abc");
+  });
+
+  it("setEnv targets a single context (never --context all)", async () => {
+    const seen: string[][] = [];
+    const adapter = createNetlifyAdapter({
+      credentials: (n: string) => (n === "NETLIFY_SITE_ID" ? "site-abc" : undefined),
+      capture: async (_c: string, args: string[]) => {
+        seen.push(args);
+        return "{}";
+      },
+    });
+    await adapter.setEnv({ key: "VITE_SUPABASE_URL", value: "v", scopes: ["builds", "runtime"], secret: false, context: "deploy-preview" });
+    const args = seen[0]!;
+    expect(args).toContain("--context");
+    expect(args[args.indexOf("--context") + 1]).toBe("deploy-preview");
+    expect(args).not.toContain("all");
+  });
+});
