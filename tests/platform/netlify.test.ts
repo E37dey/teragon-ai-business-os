@@ -99,20 +99,20 @@ describe("configureNetlify apply (Preview context only)", () => {
 import { createNetlifyAdapter } from "../../scripts/platform/shared/adapters/netlify.mjs";
 
 describe("real Netlify adapter — getLinkedSite resolves by site id (not local link)", () => {
-  it("uses api getSite with NETLIFY_SITE_ID and returns {id,name}", async () => {
+  it("resolves via sites:list (no JSON argv) and matches by NETLIFY_SITE_ID", async () => {
     const seen: string[][] = [];
     const adapter = createNetlifyAdapter({
       credentials: (n: string) => (n === "NETLIFY_SITE_ID" ? "site-abc" : n === "NETLIFY_AUTH_TOKEN" ? "tok" : undefined),
       capture: async (_cmd: string, args: string[]) => {
         seen.push(args);
-        return JSON.stringify({ id: "site-abc", name: "teragon-os-demo" });
+        return JSON.stringify([{ id: "other", name: "x" }, { id: "site-abc", name: "teragon-os-demo" }]);
       },
     });
     const site = await adapter.getLinkedSite();
     expect(site).toEqual({ id: "site-abc", name: "teragon-os-demo" });
-    // used api getSite (not `status`) with the site id in the payload
-    expect(seen[0]!.slice(0, 2)).toEqual(["api", "getSite"]);
-    expect(seen[0]!.join(" ")).toContain("site-abc");
+    // used sites:list (no `api ... --data {json}` that cmd.exe would mangle)
+    expect(seen[0]!).toContain("sites:list");
+    expect(seen[0]!.some((a) => a.includes("{"))).toBe(false);
   });
 
   it("setEnv targets a single context (never --context all)", async () => {

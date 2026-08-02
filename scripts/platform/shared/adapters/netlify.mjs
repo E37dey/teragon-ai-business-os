@@ -50,13 +50,16 @@ export function createNetlifyAdapter(deps) {
 
   return {
     async getLinkedSite() {
-      // Resolve by the authoritative NETLIFY_SITE_ID via the API (works even when
-      // the repo is not locally linked). Fall back to `status` if no id is set.
+      // Resolve by the authoritative NETLIFY_SITE_ID via `sites:list` (works even
+      // when the repo is not locally linked). sites:list takes NO JSON argv, so
+      // it is safe under the Windows shell wrapper (unlike `api ... --data {…}`,
+      // whose JSON gets mangled by cmd.exe). Falls back to `status`.
       const id = cred("NETLIFY_SITE_ID");
       if (id) {
-        const out = await run("netlify", ["api", "getSite", "--data", JSON.stringify({ site_id: id })], authEnv());
-        const s = parseJson(out, {});
-        if (s?.id) return { id: s.id, name: s.name ?? null };
+        const out = await run("netlify", ["sites:list", "--json"], authEnv());
+        const list = parseJson(out, []);
+        const found = (Array.isArray(list) ? list : []).find((s) => (s.id ?? s.site_id) === id);
+        if (found) return { id: found.id ?? found.site_id, name: found.name ?? null };
       }
       const out = await run("netlify", ["status", "--json"], authEnv());
       const s = parseJson(out, {});

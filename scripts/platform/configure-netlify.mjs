@@ -121,52 +121,76 @@ export async function configureNetlify({ mode, credentials, netlify, stage, vali
 
   if (!validation.ok) return { ok: false, mutated: false, reason: "credentials not ready" };
 
-  const expectedSiteId = credentials.get("NETLIFY_SITE_ID");
-  const site = await netlify.getLinkedSite();
-  if (!isTeragonSite(site, expectedSiteId)) {
-    stage.fail("linked site is not the existing Teragon site");
-    return { ok: false, mutated: false, reason: `linked site "${site?.name ?? "?"}" is not the expected Teragon site` };
-  }
-
-  // Read-before-write: capture PRESENCE-only metadata for BOTH contexts.
-  const previewBefore = envKeys(await netlify.listEnv(PREVIEW_CONTEXT));
-  const productionBefore = envKeys(await netlify.listEnv(PRODUCTION_CONTEXT));
-
-  // Set each var — before EACH write verify name + Preview context + scope +
-  // Production excluded, then upsert into the Preview context ONLY.
-  for (const item of varPlan) {
-    if (item.context !== PREVIEW_CONTEXT || item.context === PRODUCTION_CONTEXT) {
-      stage.fail(`refusing non-preview write for ${item.key}`);
-      return { ok: false, mutated: true, reason: `refused: ${item.key} not targeting ${PREVIEW_CONTEXT}` };
+  // S7.3A: fail-closed. Any Netlify adapter exception is caught here — it can
+  // NEVER escape the stage tracker (a raw throw previously crashed the run). On
+  // failure we record a SAFE reason (no values), preserve STAGING_SEEDED, and
+  // run nothing further.
+  try {
+    const expectedSiteId = credentials.get("NETLIFY_SITE_ID");
+    const site = await netlify.getLinkedSite();
+    if (!isTeragonSite(site, expectedSiteId)) {
+      stage.fail("linked site is not the existing Teragon site");
+      return { ok: false, mutated: false, reason: `linked site "${site?.name ?? "?"}" is not the expected Teragon site` };
     }
-    if (!ourKeys.includes(item.key) || item.key.startsWith("VITE_") === false || item.secret) {
-      stage.fail(`refusing unexpected/privileged write for ${item.key}`);
-      return { ok: false, mutated: true, reason: `refused: ${item.key} is not a browser-safe Preview var` };
+
+    // Read-before-write: capture PRESENCE-only metadata for BOTH contexts.
+    const previewBefore = envKeys(await netlify.listEnv(PREVIEW_CONTEXT));
+    const productionBefore = envKeys(await netlify.listEnv(PRODUCTION_CONTEXT));
+
+    // Set each var — before EACH write verify name + Preview context + scope +
+    // Production excluded, then upsert into the Preview context ONLY.
+    for (const item of varPlan) {
+      if (item.context !== PREVIEW_CONTEXT || item.context === PRODUCTION_CONTEXT) {
+        stage.fail(`refusing non-preview write for ${item.key}`);
+        return { ok: false, mutated: true, reason: `refused: ${item.key} not targeting ${PREVIEW_CONTEXT}` };
+      }
+      if (!ourKeys.includes(item.key) || item.key.startsWith("VITE_") === false || item.secret) {
+        stage.fail(`refusing unexpected/privileged write for ${item.key}`);
+        return { ok: false, mutated: true, reason: `refused: ${item.key} is not a browser-safe Preview var` };
+      }
+      await netlify.setEnv({ key: item.key, value: item.value, scopes: item.scopes, secret: false, context: PREVIEW_CONTEXT });
     }
-    await netlify.setEnv({ key: item.key, value: item.value, scopes: item.scopes, secret: false, context: PREVIEW_CONTEXT });
-  }
 
-  // Verify: our keys present in Preview; unrelated Preview vars preserved;
-  // Production context UNCHANGED (same key set before/after).
-  const previewAfter = envKeys(await netlify.listEnv(PREVIEW_CONTEXT));
-  const productionAfter = envKeys(await netlify.listEnv(PRODUCTION_CONTEXT));
+    // Verify: our keys present in Preview; unrelated Preview vars preserved;
+    // Production context UNCHANGED (same key set before/after).
+    const previewAfter = envKeys(await netlify.listEnv(PREVIEW_CONTEXT));
+    const productionAfter = envKeys(await netlify.listEnv(PRODUCTION_CONTEXT));
 
-  const missingAfter = ourKeys.filter((k) => !previewAfter.includes(k));
-  const droppedPreviewUnrelated = previewBefore.filter((k) => !ourKeys.includes(k)).filter((k) => !previewAfter.includes(k));
-  const productionChanged = symmetricDiff(productionBefore, productionAfter);
-  if (missingAfter.length) {
-    stage.fail(`preview vars not present after set: ${missingAfter.join(", ")}`);
-    return { ok: false, mutated: true, reason: `expected preview vars missing after set: ${missingAfter.join(", ")}` };
-  }
-  if (droppedPreviewUnrelated.length) {
-    stage.fail(`unrelated preview vars dropped: ${droppedPreviewUnrelated.join(", ")}`);
-    return { ok: false, mutated: true, reason: `unrelated preview vars dropped (replace-all bug): ${droppedPreviewUnrelated.join(", ")}` };
-  }
-  if (productionChanged.length) {
-    stage.fail(`PRODUCTION context changed: ${productionChanged.join(", ")}`);
-    return { ok: false, mutated: true, reason: `Production context was modified (must be untouched): ${productionChanged.join(", ")}` };
-  }
+    const missingAfter = ourKeys.filter((k) => !previewAfter.includes(k));
+    const droppedPreviewUnrelated = previewBefore.filter((k) => !ourKeys.includes(k)).filter((k) => !previewAfter.includes(k));
+    const productionChanged = symmetricDiff(productionBefore, productionAfter);
+    if (missingAfter.length) {
+      stage.fail(`preview vars not present after set: ${missingAfter.join(", ")}`);
+      return { ok: false, mutated: true, reason: `expected preview vars missing after set: ${missingAfter.join(", ")}` };
+    }
+    if (droppedPreviewUnrelated.length) {
+      stage.fail(`unrelated preview vars dropped: ${droppedPreviewUnrelated.join(", ")}`);
+      return { ok: false, mutated: true, reason: `unrelated preview vars dropped (replace-all bug): ${droppedPreviewUnrelated.join(", ")}` };
+    }
+    if (productionChanged.length) {
+      stage.fail(`PRODUCTION context changed: ${productionChanged.join(", ")}`);
+      return { ok: false, mutated: true, reason: `Production context was modified (must be untouched): ${productionChanged.join(", ")}` };
+    }
 
+    return finalize({ stage, ourKeys, previewBefore, productionBefore });
+  } catch (err) {
+    const category = err instanceof Error ? sanitizeNetlifyError(err.message) : "netlify error";
+    stage.fail(`configure-netlify failed (Netlify adapter): ${category}`);
+    return { ok: false, mutated: false, reason: `configure-netlify failed: ${category}` };
+  }
+}
+
+/** SAFE error category for a Netlify adapter failure — never a value/body. */
+export function sanitizeNetlifyError(text) {
+  const t = String(text ?? "").toLowerCase();
+  if (t.includes("json") || t.includes("unexpected") || t.includes("syntax")) return "non-json/parse error (CLI arg or response)";
+  if (t.includes("401") || t.includes("unauthor") || t.includes("token")) return "unauthorized (Netlify token)";
+  if (t.includes("404") || t.includes("not found")) return "site/resource not found";
+  if (t.includes("network") || t.includes("fetch") || t.includes("timeout")) return "network/timeout";
+  return "netlify adapter error";
+}
+
+function finalize({ stage, ourKeys, previewBefore, productionBefore }) {
   stage.markComplete(
     "NETLIFY_PREVIEW_CONFIGURED",
     {
@@ -180,14 +204,16 @@ export async function configureNetlify({ mode, credentials, netlify, stage, vali
     },
     `set ${ourKeys.length} preview vars`,
   );
+  // Reached only after all invariants passed: unrelated preserved + Production
+  // unchanged are guaranteed here.
   return {
     ok: true,
     mutated: true,
     context: PREVIEW_CONTEXT,
     setKeys: ourKeys,
     scopes: BROWSER,
-    preservedUnrelated: droppedPreviewUnrelated.length === 0,
-    productionUnchanged: productionChanged.length === 0,
+    preservedUnrelated: true,
+    productionUnchanged: true,
   };
 }
 
