@@ -6,6 +6,7 @@ import { queryClient } from "./app/queryClient";
 import { createAppRouter } from "./app/router";
 import { AuthProvider } from "./auth/AuthProvider";
 import { ThemeProvider } from "./theme/ThemeProvider";
+import { installProvenance } from "./runtime/provenance";
 import { seedIfEmpty } from "./repositories";
 import { runMigrationsAtBoot } from "./migrations";
 import { applyUiSettingsAtBoot } from "./integration/wave8/applyUiSettings";
@@ -13,6 +14,9 @@ import { syncNotifications } from "./app/notifications/syncNotifications";
 import "./index.css";
 
 async function boot() {
+  // Publish SAFE runtime provenance first so an acceptance harness can verify the
+  // build (provider / masked ref / commit / flags) BEFORE any login or write.
+  installProvenance();
   try {
     await seedIfEmpty();
     // Wave 6: schema migrations (m001-m007) — idempotent, audited, never throws
