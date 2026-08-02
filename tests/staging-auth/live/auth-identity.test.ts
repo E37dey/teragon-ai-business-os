@@ -118,13 +118,17 @@ describe("LIVE staging auth — provider + canonical identity", () => {
     const { data } = await client.auth.getSession();
     expect(data.session).toBeNull();
     // Protected access is denied after logout: identity no longer resolves.
+    // With no auth.uid(), current_profile() returns a NULL composite ⇒ fail closed.
+    let denied = false;
     let deniedCategory = "";
     try {
       await resolveIdentity(client as unknown as IdentityClient);
     } catch (e) {
+      denied = true;
       deniedCategory = e instanceof IdentityError ? e.category : "THROWN";
     }
-    expect(deniedCategory).toBe("MISSING_PROFILE"); // no auth.uid() ⇒ no profile
+    expect(denied).toBe(true);
+    expect(deniedCategory).toBe("MISSING_PROFILE");
   });
 });
 

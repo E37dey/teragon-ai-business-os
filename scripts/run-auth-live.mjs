@@ -17,7 +17,8 @@ if (process.env.STAGING_AUTH_LIVE !== "1") {
   process.exit(1);
 }
 
-const run = spawnSync("npx", ["vitest", "run", "--config", "vitest.staging-auth.config.ts"], {
+// One command string with shell:true (avoids the DEP0190 args-with-shell warning).
+const run = spawnSync("npx vitest run --config vitest.staging-auth.config.ts", {
   stdio: "inherit",
   shell: true,
   env: process.env,

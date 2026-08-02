@@ -84,6 +84,23 @@ describe("resolveIdentity — fail closed", () => {
       "MISSING_PROFILE",
     );
   });
+  it("MISSING_PROFILE when current_profile returns an all-null composite (no session)", async () => {
+    // PostgREST serialises a NULL composite (e.g. after logout) as an all-null
+    // object; a null id means no profile, not malformed data.
+    const nulled = {
+      data: {
+        id: null,
+        organization_id: null,
+        role_id: null,
+        name: null,
+        email: null,
+        active: null,
+        status: null,
+      },
+      error: null,
+    };
+    expect(await categoryOf(makeClient({ profile: nulled }))).toBe("MISSING_PROFILE");
+  });
   it("MALFORMED_IDENTITY when the profile row is malformed", async () => {
     expect(await categoryOf(makeClient({ profile: { data: { id: 1 }, error: null } }))).toBe(
       "MALFORMED_IDENTITY",

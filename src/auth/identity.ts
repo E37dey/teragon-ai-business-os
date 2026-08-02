@@ -88,10 +88,16 @@ export async function resolveIdentity(client: IdentityClient): Promise<ResolvedI
   // 1) Profile (SECURITY DEFINER RPC — own row, even when inactive).
   const profileResult = await client.rpc("current_profile");
   throwOnPgError(profileResult, "current_profile");
-  if (profileResult.data === null || profileResult.data === undefined) {
+  const rawProfile = profileResult.data;
+  // No session (e.g. after logout) ⇒ current_profile() returns a NULL composite.
+  // PostgREST serialises that either as JSON null OR as an all-null object
+  // ({ id: null, ... }). Both mean "no profile for this uid" ⇒ MISSING_PROFILE
+  // (differentiated from genuinely malformed data, which has a non-null id).
+  const profileId = (rawProfile as { id?: unknown } | null)?.id;
+  if (rawProfile === null || rawProfile === undefined || profileId === null || profileId === undefined) {
     throw new IdentityError("MISSING_PROFILE", "no profile for the authenticated user");
   }
-  const profileParsed = ProfileSchema.safeParse(profileResult.data);
+  const profileParsed = ProfileSchema.safeParse(rawProfile);
   if (!profileParsed.success) {
     throw new IdentityError("MALFORMED_IDENTITY", "profile row failed validation");
   }
