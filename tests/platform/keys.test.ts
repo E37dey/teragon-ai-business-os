@@ -2,7 +2,7 @@
 // TEST_VALUE placeholders only — NEVER real keys. Covers the live root cause
 // (type:"default" non-semantic metadata) + modern/legacy/JWT + fail-closed.
 import { describe, expect, it } from "vitest";
-import { classifyProjectKeys, classifyKind } from "../../scripts/platform/shared/keys.mjs";
+import { classifyProjectKeys, classifyKind, extractServiceRoleLegacy } from "../../scripts/platform/shared/keys.mjs";
 
 // --- sanitized fixtures ------------------------------------------------------
 const PUB = "sb_publishable_TEST_VALUE_PLACEHOLDER";
@@ -171,5 +171,25 @@ describe("no key material ever leaks into errors", () => {
     } catch (e) {
       expect(String(e)).not.toContain("TEST_VALUE_PLACEHOLDER");
     }
+  });
+});
+
+describe("extractServiceRoleLegacy (S7.2.1 Auth Admin fallback)", () => {
+  it("finds the legacy service_role by JWT role", () => {
+    const r = extractServiceRoleLegacy([
+      { name: "default", api_key: PUB },
+      { name: "default", api_key: jwt("service_role") },
+    ]);
+    expect(r?.source).toBe("SERVICE_ROLE_LEGACY");
+    expect(r?.value).toBe(jwt("service_role"));
+  });
+
+  it("finds the legacy service_role by explicit name", () => {
+    const r = extractServiceRoleLegacy([{ name: "service_role", api_key: "legacy-svc-value" }]);
+    expect(r?.source).toBe("SERVICE_ROLE_LEGACY");
+  });
+
+  it("returns null when only modern keys are present", () => {
+    expect(extractServiceRoleLegacy([{ type: "default", api_key: PUB }, { type: "default", api_key: SEC }])).toBeNull();
   });
 });

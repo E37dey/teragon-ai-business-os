@@ -93,6 +93,33 @@ function fail(message, formatId) {
   return new Error(`key classification failed: ${message}${formatId ? ` (format: ${formatId})` : ""}`);
 }
 
+/**
+ * S7.2.1: extract the LEGACY service_role JWT (for the Auth Admin fallback when
+ * the modern SECRET key is gateway/WAF-blocked). Returns { value, source } or
+ * null. The value is returned for a server-only client only — never logged.
+ * @param {Array<object>} apiKeys
+ * @returns {{value:string, source:'SERVICE_ROLE_LEGACY'}|null}
+ */
+export function extractServiceRoleLegacy(apiKeys) {
+  for (const entry of Array.isArray(apiKeys) ? apiKeys : []) {
+    const value = keyValue(entry);
+    if (typeof value !== "string") continue;
+    // Explicit legacy name/type OR a JWT whose role is service_role.
+    const semantic = semanticSignal(entry);
+    const byName = semantic?.source === "SERVICE_ROLE_LEGACY";
+    let byJwt = false;
+    if (looksJwt(value)) {
+      try {
+        byJwt = JSON.parse(Buffer.from(value.split(".")[1], "base64url").toString("utf8"))?.role === "service_role";
+      } catch {
+        byJwt = false;
+      }
+    }
+    if (byName || byJwt) return { value, source: "SERVICE_ROLE_LEGACY" };
+  }
+  return null;
+}
+
 /** Resolve ONE record to a slot+source using the A→B→C→D precedence. */
 function classifyRecord(entry, index) {
   const sem = semanticSignal(entry); // A + C (over name AND type)

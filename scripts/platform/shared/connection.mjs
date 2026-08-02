@@ -10,7 +10,7 @@
 // Returns NAMES/sources only in its report; the actual key VALUES go straight
 // into the runtime context (registered for redaction), never into the report,
 // logs, or thrown errors. Injectable adapter → unit-testable with fakes.
-import { classifyProjectKeys } from "./keys.mjs";
+import { classifyProjectKeys, extractServiceRoleLegacy } from "./keys.mjs";
 
 /**
  * @param {Object} deps
@@ -37,10 +37,15 @@ export async function discoverAndInjectConnection({ supabase, credentials, ref, 
   // 3. retrieve + classify API keys (raw response held PRIVATELY; never logged).
   let classified;
   let recordCount = 0;
+  let authAdmin = null;
   try {
     let apiKeys = await supabase.getProjectApiKeys(ref);
     recordCount = Array.isArray(apiKeys) ? apiKeys.length : 0;
     classified = classifyProjectKeys(apiKeys);
+    // S7.2.1: also retain the LEGACY service_role JWT for the Auth Admin client
+    // (the modern SECRET is gateway/WAF-blocked on some projects). Server-only,
+    // never persisted, never a VITE_ var, cleared on exit with the runtime.
+    authAdmin = extractServiceRoleLegacy(apiKeys);
     apiKeys = null; // drop the raw key list reference once classified
   } catch (err) {
     // Fail CLOSED after creation: inability to retrieve/identify required key
@@ -51,13 +56,23 @@ export async function discoverAndInjectConnection({ supabase, credentials, ref, 
   // 4. inject into the runtime context + recalc readiness, then drop key refs.
   const browserSource = classified.browser.source;
   const serverSource = classified.server.source;
-  credentials.setRuntimeValues({
+  const runtime = {
     SUPABASE_PROJECT_REF: ref,
     SUPABASE_URL: url,
     SUPABASE_BROWSER_KEY: classified.browser.value,
     SUPABASE_SERVER_KEY: classified.server.value,
-  });
+  };
+  const injected = ["SUPABASE_PROJECT_REF", "SUPABASE_URL", "SUPABASE_BROWSER_KEY", "SUPABASE_SERVER_KEY"];
+  // The Auth Admin key: prefer the legacy service_role (broadly compatible with
+  // the GoTrue Admin API); fall back to the modern SECRET server key.
+  const authAdminSource = authAdmin ? authAdmin.source : serverSource;
+  if (authAdmin) {
+    runtime.SUPABASE_AUTH_ADMIN_KEY = authAdmin.value;
+    injected.push("SUPABASE_AUTH_ADMIN_KEY");
+  }
+  credentials.setRuntimeValues(runtime);
   classified = null; // clear the temporary key values after injection
+  authAdmin = null;
   await credentials.refreshReadiness();
 
   // report carries counts + source KINDS + success only — never a key value.
@@ -70,7 +85,8 @@ export async function discoverAndInjectConnection({ supabase, credentials, ref, 
       classificationSuccess: true,
       browserKeySource: browserSource,
       serverKeySource: serverSource,
-      injected: ["SUPABASE_PROJECT_REF", "SUPABASE_URL", "SUPABASE_BROWSER_KEY", "SUPABASE_SERVER_KEY"],
+      authAdminKeySource: authAdminSource,
+      injected,
     },
   };
 }

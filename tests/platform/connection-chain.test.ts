@@ -104,6 +104,44 @@ describe("failed classification prevents downstream readiness (fail-closed)", ()
     expect(provider.has("SUPABASE_URL")).toBe(false);
   });
 
+  it("routes the Auth Admin key to the legacy service_role (browser stays browser-safe)", async () => {
+    const provider = createCredentialProvider({ env: baseEnv(), fileText: "", authResolver: sessionAuth });
+    // live-shaped: publishable + secret + anon + service_role.
+    const supabase = fakeSupabase({
+      apiKeys: [
+        { name: "default", type: "default", api_key: "sb_publishable_LIVE" },
+        { name: "default", type: "default", api_key: "sb_secret_LIVE" },
+        { name: "anon", api_key: "anon-legacy-LIVE" },
+        { name: "service_role", api_key: "service-role-legacy-LIVE" },
+      ],
+    });
+    const r = await discoverAndInjectConnection({ supabase, credentials: provider, ref: "ref1", orgId: "org-1" });
+    expect(r.ok).toBe(true);
+    expect(r.report.browserKeySource).toBe("PUBLISHABLE"); // browser unchanged
+    expect(r.report.serverKeySource).toBe("SECRET"); // modern server key retained
+    expect(r.report.authAdminKeySource).toBe("SERVICE_ROLE_LEGACY"); // Auth Admin routed to legacy
+    // the Auth Admin client key resolves to the legacy service_role, NOT modern.
+    expect(provider.get("SUPABASE_AUTH_ADMIN_KEY")).toBe("service-role-legacy-LIVE");
+    expect(provider.get("SUPABASE_SERVER_KEY")).toBe("sb_secret_LIVE"); // not globally replaced
+    // no key value in the safe report
+    expect(JSON.stringify(r.report)).not.toContain("sb_secret_LIVE");
+    expect(JSON.stringify(r.report)).not.toContain("service-role-legacy-LIVE");
+  });
+
+  it("falls back to the modern SECRET for Auth Admin when no legacy key exists", async () => {
+    const provider = createCredentialProvider({ env: baseEnv(), fileText: "", authResolver: sessionAuth });
+    const supabase = fakeSupabase({
+      apiKeys: [
+        { name: "default", type: "default", api_key: "sb_publishable_ONLY" },
+        { name: "default", type: "default", api_key: "sb_secret_ONLY" },
+      ],
+    });
+    const r = await discoverAndInjectConnection({ supabase, credentials: provider, ref: "ref1", orgId: "org-1" });
+    expect(r.ok).toBe(true);
+    expect(r.report.authAdminKeySource).toBe("SECRET");
+    expect(provider.has("SUPABASE_AUTH_ADMIN_KEY")).toBe(false); // none injected; serviceClient falls back to SERVER_KEY
+  });
+
   it("the connection report never carries a key value", async () => {
     const provider = createCredentialProvider({ env: baseEnv(), fileText: "", authResolver: sessionAuth });
     const supabase = fakeSupabase();
