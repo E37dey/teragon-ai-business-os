@@ -13,6 +13,8 @@
     "test:supabase:live": "vitest run --config vitest.supabase-live.config.ts",
     "test:auth:live": "node scripts/run-auth-live.mjs",
     "test:staging:auth:live": "node scripts/run-auth-live.mjs",
+    "build:preview": "node scripts/preview-build.mjs",
+    "test:staging:acceptance": "node scripts/run-staging-acceptance.mjs",
     "test:e2e": "playwright test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

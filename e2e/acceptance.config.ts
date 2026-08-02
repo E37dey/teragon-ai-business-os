@@ -1,27 +1,24 @@
-// TERAGON AI BUSINESS OS — REMOTE STAGING ACCEPTANCE config (Gate S7.0).
+// TERAGON AI BUSINESS OS — LIVE STAGING ACCEPTANCE config (Gate S7.3B-PREP).
 // =============================================================================
-// The complete remote-acceptance harness. It is WIRED but GUARDED OFF: it never
-// runs in S7.0 (no remote URL is provided, and STAGING_ACCEPTANCE is not set),
-// and it is intentionally NOT discoverable by the default playwright.config.ts
-// (those pick up *.spec.ts; these files are *.accept.ts, matched ONLY here).
+// Drives a real browser against a LOCALLY-served Preview-context build wired to
+// live teragon-staging. It is intentionally NOT discoverable by the default
+// playwright.config.ts (those pick up *.spec.ts; these files are *.accept.ts,
+// matched ONLY here) and NOT by vitest. There is NO webServer — the operator
+// (or scripts/run-staging-acceptance.mjs) builds + serves dist locally first,
+// then runs:
 //
-// There is NO webServer: it never builds, never serves, never deploys. It drives
-// a real browser against an ALREADY-DEPLOYED staging Deploy Preview. Run later,
-// by an operator, ONLY after a preview exists:
-//
-//   STAGING_ACCEPTANCE=1 \
-//   STAGING_PREVIEW_URL=https://<preview>.netlify.app \
+//   STAGING_ACCEPTANCE_LIVE=1 \
+//   ACCEPTANCE_BASE_URL=http://localhost:<port> \
 //   STAGING_SUPABASE_PROJECT_REF=<ref> \
 //   INTENDED_COMMIT=<sha> \
 //   npx playwright test -c e2e/acceptance.config.ts
 //
-// The harness FAILS (never skips / never silently passes) when: no tests
-// execute, any test is skipped, the app silently falls back to IndexedDB, the
-// preview is connected to the wrong Supabase project, or the deployed commit is
-// not the intended commit.
+// The harness FAILS (never skips) when misconfigured, when the target is not a
+// LOCAL origin, when the wrong Supabase project is reached, or when zero tests
+// execute (see _acceptanceCore + the afterAll guard).
 import { defineConfig, devices } from "@playwright/test";
 
-const PREVIEW_URL = (process.env.STAGING_PREVIEW_URL ?? "").replace(/\/$/, "");
+const BASE_URL = (process.env.ACCEPTANCE_BASE_URL ?? "").replace(/\/$/, "");
 
 export default defineConfig({
   testDir: "./acceptance",
@@ -35,7 +32,7 @@ export default defineConfig({
   forbidOnly: true,
   reporter: [["list"]],
   use: {
-    baseURL: PREVIEW_URL || "http://acceptance.invalid",
+    baseURL: BASE_URL || "http://localhost:0",
     trace: "retain-on-failure",
     actionTimeout: 30_000,
     navigationTimeout: 60_000,
