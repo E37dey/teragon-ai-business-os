@@ -70,8 +70,8 @@ describe("S9.2-A1b · routeDomain (route → domain via the central contract)", 
   it("maps the customer LIST route to the customers domain", () => {
     expect(routeDomain("/customers")).toBe("customers");
   });
-  it("does NOT map the customer DETAIL route (deferred broad rewrite → stays blocked)", () => {
-    expect(routeDomain("/customers/cu-1")).toBeNull();
+  it("maps the customer DETAIL route to the customers domain (S9.2-A1d1)", () => {
+    expect(routeDomain("/customers/cu-1")).toBe("customers");
   });
   it("returns null for unconnected domains", () => {
     expect(routeDomain("/leads")).toBeNull();
@@ -99,14 +99,14 @@ describe("S9.2-A1b · DomainNotConnectedGateView (route-aware)", () => {
     expect(screen.getByTestId("page-body")).toBeTruthy();
     expect(screen.queryByText("DOMAIN_NOT_CONNECTED")).toBeNull();
   });
-  it("SUPABASE blocks the customer DETAIL route (notice, page never mounts)", () => {
+  it("SUPABASE mounts the connected customer DETAIL route (S9.2-A1d1)", () => {
     render(
       <DomainNotConnectedGateView provider="SUPABASE" pathname="/customers/cu-1">
         {child}
       </DomainNotConnectedGateView>,
     );
-    expect(screen.queryByTestId("page-body")).toBeNull();
-    expect(screen.getByText("DOMAIN_NOT_CONNECTED")).toBeTruthy();
+    expect(screen.getByTestId("page-body")).toBeTruthy();
+    expect(screen.queryByText("DOMAIN_NOT_CONNECTED")).toBeNull();
   });
   it("SUPABASE blocks every other domain route", () => {
     render(

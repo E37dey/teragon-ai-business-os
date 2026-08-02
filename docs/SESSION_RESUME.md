@@ -5,7 +5,7 @@
 
 ## Current position
 - **Branch:** `feature/teragon-supabase-domain-integration` (Draft PR #3 → base `feature/teragon-supabase-app-auth`)
-- **HEAD after this session:** the `feat(customers): add authenticated customer create and update flows` commit (S9.2-A1c). Prior: `ad75757` (S9.2-A1b route-aware list/read).
+- **HEAD after this session:** the `feat(customers): connect customer detail view to Supabase composition` commit (S9.2-A1d1). Prior: `2b54cfe` (S9.2-A1c create/update).
 - **Tree:** clean.
 
 ## Authorized scope (per session — ONE bounded checkpoint)
@@ -28,7 +28,14 @@
   - `CustomersPage.tsx` — create enabled in both modes (seam + submission id); new per-row "עריכה" opens a focused edit modal (essential fields only, no Customer-360); extracted `CustomerFormModal` (create+edit). Detail route still blocked.
   - Tests: `tests/app/customer-mutation.test.tsx` (10) + read regression updated. Targeted 40 green (mutation 10 + read 13 + gate 3 + loader 9 + gate 5). typecheck + oxlint clean. Visual: LOCAL dev-server a11y-inspected at 1024/1280/1440 (list + create + edit dialogs; RTL, Light, no overflow) — SUPABASE-mode visual needs live Auth (deferred to live validation).
   - **customers status = `READ_WRITE_CONNECTED_LOCAL_TESTED`** (list read + create/update; NOT LIVE_VALIDATED, NOT CRUD_COMPLETE — no remove, no contacts). Detail blocked; all other domains NOT_CONNECTED.
-- **Next = S9.2-A1d: customer DETAIL read + live customer validation** — wire `/customers/:id` read-only through composition (still no contacts/other domains), then the first live customer read/write validation on staging.
+- **S9.2-A1d1 DONE (customer DETAIL remote read + reduced 360):**
+  - `routeDomain.ts` — `/customers/:id` now maps to `customers` (single-segment regex); list + detail both mount, others blocked. Contract stays central.
+  - `src/app/data/useDomainRecord.ts` — single-record read by id. SUPABASE = `enabled:authed&&hasId`, `retry:false`, `getSafe(id)` via `loadSupabaseDomainRepository`; non-ok → typed `DomainReadError`; **not-found = `null`** (TanStack forbids `undefined`). Key `["domain-record","SUPABASE",collection,id,userId,orgId]`; purge on loss of auth. Never `getRepository` in SUPABASE.
+  - `src/modules/customers/SupabaseCustomerDetail.tsx` — calm reduced view: back link + name/status-chip/type header, ONE info Panel (email/phone/city/type/created/updated), ONE compact Hebrew notice "המידע המשלים יחובר בשלבי ההטמעה הבאים", edit action via `useCustomerMutation.update` (refetches the record). Mounts NO disconnected Customer-360 sections. Invalid-id / loading / not-found / safe-error states.
+  - `CustomerDetailPage.tsx` — top-level branch on the build-const provider: SUPABASE→`SupabaseCustomerDetail`; LOCAL→the existing 832-line `LocalCustomerDetailPage` (unchanged). No conditional-hook hazard (const branch).
+  - Tests: `tests/app/customer-detail.test.tsx` (11) + read regression updated (detail route now connected). Targeted 51 green (detail 11 + read 13 + mutation 10 + gate 3 + loader 9 + supabase-gate 5). typecheck + oxlint clean. Visual: component validated with mocked auth data (structure/RTL/responsive auto-fit → no 1024 overflow); pixel capture at 1024/1280/1440 deferred to A1d2 (needs SUPABASE build/live Auth).
+  - **customers status = `READ_WRITE_DETAIL_CONNECTED_LOCAL_TESTED`** (list+detail read, create/update; NOT LIVE_VALIDATED, NOT CRUD_COMPLETE). Contacts + all other domains NOT_CONNECTED.
+- **Next = S9.2-A1d2: live customer validation + visual acceptance** — first live staging customer read/write + pixel visual acceptance of list/detail at 1024/1280/1440. Still no contacts, no other domains, no migration 015.
 
 ## Frozen facts (recorded once — do NOT re-verify)
 - Backend fully stood up on live `teragon-staging` (`bjvirkmagwpqroakazjj`): 14 migrations, schema verified, RLS 8/8, admin `soundcloudillusion@gmail.com` bootstrapped, deterministic seed. **S7.1/S7.2 PASS.**
