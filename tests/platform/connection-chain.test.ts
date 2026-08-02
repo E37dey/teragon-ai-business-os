@@ -176,7 +176,7 @@ describe("FULL simulated apply chain (fakes only, zero network)", () => {
     const manifest = computeManifest();
     const history = manifest.entries.map((e: { file: string }) => ({ version: /^(\d+)/.exec(e.file)![1] }));
     const supabase = fakeSupabase({ projects: [], createdRef: "chainref01", remoteHistory: history });
-    const netlify = fakeNetlify({ site: { id: "site-1", name: "teragon-os-demo" }, env: { UNRELATED: "keep" } });
+    const netlify = fakeNetlify({ site: { id: "site-1", name: "teragon-os-demo" }, previewEnv: { UNRELATED: "keep" } });
     const { tracker } = memoryStage();
     const cmd = vi.fn(async () => 0);
     const reports: Record<string, unknown> = {};

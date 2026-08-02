@@ -54,12 +54,20 @@ export function createNetlifyAdapter(deps) {
       const s = parseJson(out, {});
       return { id: s?.siteData?.id ?? null, name: s?.siteData?.name ?? null };
     },
-    async listEnv() {
-      const out = await run("netlify", ["env:list", "--json", ...siteArgs()], authEnv());
-      return parseJson(out, {});
+    async listEnv(context) {
+      // Read the vars resolved for a SPECIFIC context (deploy-preview or
+      // production). Only KEYS are consumed by the core — values are never
+      // printed/stored. Context-scoped so the core can verify Production is
+      // untouched separately from Preview.
+      const args = ["env:list", "--json", ...(context ? ["--context", context] : []), ...siteArgs()];
+      return parseJson(await run("netlify", args, authEnv()), {});
     },
-    async setEnv({ key, value, scopes, secret }) {
-      const args = ["env:set", key, value, "--scope", (scopes ?? []).join(","), "--context", "all", ...siteArgs()];
+    async setEnv({ key, value, scopes, secret, context }) {
+      // S7.3A: write to a SINGLE context (default deploy-preview) — NEVER
+      // "--context all", so Production is never modified. This upserts only this
+      // one var in this one context; unrelated vars/contexts are preserved.
+      const ctx = context ?? "deploy-preview";
+      const args = ["env:set", key, value, "--scope", (scopes ?? []).join(","), "--context", ctx, ...siteArgs()];
       if (secret) args.push("--secret");
       await run("netlify", args, authEnv());
     },

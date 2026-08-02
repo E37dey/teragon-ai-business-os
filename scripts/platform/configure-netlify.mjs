@@ -1,16 +1,17 @@
 #!/usr/bin/env node
-// TERAGON AI BUSINESS OS — configure the LINKED Netlify site (Gate S7.0).
+// TERAGON AI BUSINESS OS — configure the LINKED Netlify site, PREVIEW context (S7.3A).
 // =============================================================================
-// Resolves the linked site and verifies it is the EXISTING Teragon site (never
-// creates a second site). Sets variables by context/scope with a hard rule:
-//   • browser-safe (build+runtime): VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY,
-//     VITE_SUPABASE_ORG, and the explicit preview persistence-provider selector
-//     VITE_PERSISTENCE_PROVIDER — these are meant to ship to the client.
-//   • server-only privileged (Functions scope, SECRET, NEVER VITE_-prefixed):
-//     SUPABASE_SERVICE_ROLE_KEY.
-// Unrelated existing vars are PRESERVED (no replace-all — only our known keys
-// are upserted). Names + scopes are verified after setting. Values are never
-// printed; the bundle scanner rejects any privileged-key exposure.
+// Resolves the linked site, verifies it is the EXISTING Teragon site (never
+// creates a second site, never deploys), and sets ONLY browser-safe Supabase
+// vars in the **deploy-preview context** (Production is NEVER touched):
+//   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY (the app's browser-key contract,
+//   holding the PUBLISHABLE/browser-safe key), VITE_SUPABASE_ORG,
+//   VITE_PERSISTENCE_PROVIDER=SUPABASE.
+// No privileged server var is set: no Netlify Function consumes a Supabase
+// server var, so per policy none are configured (the Auth-Admin legacy key stays
+// server-process in-memory only). Unrelated vars + all other contexts are
+// PRESERVED (single-context upsert — no replace-all). Names/scopes/contexts are
+// verified after setting; values are never printed.
 import process from "node:process";
 import { log } from "./shared/log.mjs";
 import { createCredentialProvider, enforceOrExit, describeValidation } from "./shared/credentials.mjs";
@@ -19,35 +20,40 @@ import { createStageTracker } from "./shared/stage.mjs";
 import { resolveMode, assertApplyAllowed, isEntrypoint } from "./shared/runtime.mjs";
 
 const BROWSER = ["builds", "runtime"];
-const FUNCTIONS = ["functions"];
+export const PREVIEW_CONTEXT = "deploy-preview";
+export const PRODUCTION_CONTEXT = "production";
 
 /**
- * PURE variable-scope plan. Given resolved connection values, produce the exact
- * set of vars to upsert with their scopes + secrecy + browser-safety. NEVER
- * assigns a privileged (service-role) value to a VITE_-prefixed key. Values are
- * carried for the adapter but this function is unit-tested on the SHAPE (keys,
- * scopes, browserSafe, secret) — the assertion below proves the invariant.
- * @param {{supabaseUrl?:string, anonKey?:string, org?:string, serviceKey?:string, previewProvider?:string}} v
+ * PURE variable plan. ONLY browser-safe VITE_ vars, all in the Preview
+ * (deploy-preview) context. No privileged/server var (no consumer). NEVER a
+ * VITE_ secret. Unit-tested on the SHAPE (keys, scopes, browserSafe, context).
+ * @param {{supabaseUrl?:string, browserKey?:string, org?:string, previewProvider?:string}} v
  */
 export function buildNetlifyVarPlan(v) {
   const plan = [
-    // --- browser-safe (build+runtime) ---------------------------------------
-    { key: "VITE_SUPABASE_URL", value: v.supabaseUrl ?? "", scopes: BROWSER, secret: false, browserSafe: true },
-    // The app supports VITE_SUPABASE_ANON_KEY; the value is the normalized
-    // browser key (publishable modern OR anon legacy) — kept redacted in output.
-    { key: "VITE_SUPABASE_ANON_KEY", value: v.browserKey ?? "", scopes: BROWSER, secret: false, browserSafe: true },
-    { key: "VITE_SUPABASE_ORG", value: v.org ?? "", scopes: BROWSER, secret: false, browserSafe: true },
-    // explicit preview persistence-provider selector (so the preview really
-    // talks to staging Supabase and the acceptance harness can prove no silent
-    // IndexedDB fallback). Does NOT change the source default (LOCAL_INDEXEDDB).
-    { key: "VITE_PERSISTENCE_PROVIDER", value: v.previewProvider ?? "SUPABASE", scopes: BROWSER, secret: false, browserSafe: true },
-    // --- server-only (Functions scope, NEVER VITE_) -------------------------
-    { key: "SUPABASE_URL", value: v.supabaseUrl ?? "", scopes: FUNCTIONS, secret: false, browserSafe: false },
-    // privileged server key — Functions scope, secret, NEVER VITE_, never browser.
-    { key: "SUPABASE_SERVICE_ROLE_KEY", value: v.serverKey ?? "", scopes: FUNCTIONS, secret: true, browserSafe: false },
+    { key: "VITE_SUPABASE_URL", value: v.supabaseUrl ?? "", scopes: BROWSER, secret: false, browserSafe: true, context: PREVIEW_CONTEXT },
+    // The app's browser contract reads VITE_SUPABASE_ANON_KEY; the value is the
+    // PUBLISHABLE/browser-safe key (kept redacted in output).
+    { key: "VITE_SUPABASE_ANON_KEY", value: v.browserKey ?? "", scopes: BROWSER, secret: false, browserSafe: true, context: PREVIEW_CONTEXT },
+    { key: "VITE_SUPABASE_ORG", value: v.org ?? "", scopes: BROWSER, secret: false, browserSafe: true, context: PREVIEW_CONTEXT },
+    // explicit preview persistence-provider selector (so the Preview talks to
+    // staging Supabase). Does NOT change the source default (LOCAL_INDEXEDDB)
+    // outside Preview — it is set ONLY in the deploy-preview context.
+    { key: "VITE_PERSISTENCE_PROVIDER", value: v.previewProvider ?? "SUPABASE", scopes: BROWSER, secret: false, browserSafe: true, context: PREVIEW_CONTEXT },
   ];
   assertScopeInvariants(plan);
+  assertPreviewOnly(plan);
   return plan;
+}
+
+/** Every var must target the Preview context only — never Production/all. */
+export function assertPreviewOnly(plan) {
+  for (const item of plan) {
+    if (item.context !== PREVIEW_CONTEXT) {
+      throw new Error(`preview invariant: ${item.key} context is "${item.context}", expected "${PREVIEW_CONTEXT}"`);
+    }
+  }
+  return true;
 }
 
 /**
@@ -93,9 +99,9 @@ export async function configureNetlify({ mode, credentials, netlify, stage, vali
     supabaseUrl: credentials.get("SUPABASE_URL"),
     browserKey: credentials.get("SUPABASE_BROWSER_KEY"),
     org: credentials.get("SUPABASE_ORG_ID"),
-    serverKey: credentials.get("SUPABASE_SERVER_KEY"),
     previewProvider: credentials.get("VITE_PERSISTENCE_PROVIDER") ?? "SUPABASE",
   });
+  const ourKeys = varPlan.map((p) => p.key);
   const plan = mode !== "apply";
 
   if (plan) {
@@ -103,12 +109,12 @@ export async function configureNetlify({ mode, credentials, netlify, stage, vali
       ok: true,
       mutated: false,
       action: "plan",
-      vars: varPlan.map((p) => ({ key: p.key, scopes: p.scopes, secret: p.secret, browserSafe: p.browserSafe })),
+      vars: varPlan.map((p) => ({ key: p.key, scopes: p.scopes, secret: p.secret, browserSafe: p.browserSafe, context: p.context })),
       intended: [
-        "verify linked site is the EXISTING Teragon site (no new site)",
-        "read existing env (preserve unrelated vars — no replace-all)",
-        "upsert the known keys at their scopes; SUPABASE_SERVICE_ROLE_KEY Functions-only + secret",
-        "verify names + scopes after setting; never print values",
+        "verify linked site is the EXISTING Teragon site (no new site, no deploy)",
+        `set ONLY browser-safe VITE_ vars in the ${PREVIEW_CONTEXT} context (Production NEVER touched)`,
+        "no privileged/server var (no Function consumer); Auth-Admin legacy key stays in-memory",
+        "preserve unrelated Preview vars; verify names/scopes/context; verify Production unchanged; never print values",
       ],
     };
   }
@@ -122,30 +128,74 @@ export async function configureNetlify({ mode, credentials, netlify, stage, vali
     return { ok: false, mutated: false, reason: `linked site "${site?.name ?? "?"}" is not the expected Teragon site` };
   }
 
-  // Read-before-write: capture the existing var keys so we can prove preservation.
-  const before = await netlify.listEnv();
-  const beforeKeys = envKeys(before);
+  // Read-before-write: capture PRESENCE-only metadata for BOTH contexts.
+  const previewBefore = envKeys(await netlify.listEnv(PREVIEW_CONTEXT));
+  const productionBefore = envKeys(await netlify.listEnv(PRODUCTION_CONTEXT));
 
+  // Set each var — before EACH write verify name + Preview context + scope +
+  // Production excluded, then upsert into the Preview context ONLY.
   for (const item of varPlan) {
-    await netlify.setEnv({ key: item.key, value: item.value, scopes: item.scopes, secret: item.secret });
+    if (item.context !== PREVIEW_CONTEXT || item.context === PRODUCTION_CONTEXT) {
+      stage.fail(`refusing non-preview write for ${item.key}`);
+      return { ok: false, mutated: true, reason: `refused: ${item.key} not targeting ${PREVIEW_CONTEXT}` };
+    }
+    if (!ourKeys.includes(item.key) || item.key.startsWith("VITE_") === false || item.secret) {
+      stage.fail(`refusing unexpected/privileged write for ${item.key}`);
+      return { ok: false, mutated: true, reason: `refused: ${item.key} is not a browser-safe Preview var` };
+    }
+    await netlify.setEnv({ key: item.key, value: item.value, scopes: item.scopes, secret: false, context: PREVIEW_CONTEXT });
   }
 
-  // Verify: our keys now present at expected scopes; unrelated keys preserved.
-  const after = await netlify.listEnv();
-  const afterKeys = envKeys(after);
-  const missingAfter = varPlan.map((p) => p.key).filter((k) => !afterKeys.includes(k));
-  const droppedUnrelated = beforeKeys.filter((k) => !varPlan.some((p) => p.key === k)).filter((k) => !afterKeys.includes(k));
+  // Verify: our keys present in Preview; unrelated Preview vars preserved;
+  // Production context UNCHANGED (same key set before/after).
+  const previewAfter = envKeys(await netlify.listEnv(PREVIEW_CONTEXT));
+  const productionAfter = envKeys(await netlify.listEnv(PRODUCTION_CONTEXT));
+
+  const missingAfter = ourKeys.filter((k) => !previewAfter.includes(k));
+  const droppedPreviewUnrelated = previewBefore.filter((k) => !ourKeys.includes(k)).filter((k) => !previewAfter.includes(k));
+  const productionChanged = symmetricDiff(productionBefore, productionAfter);
   if (missingAfter.length) {
-    stage.fail(`vars not present after set: ${missingAfter.join(", ")}`);
-    return { ok: false, mutated: true, reason: `expected vars missing after set: ${missingAfter.join(", ")}` };
+    stage.fail(`preview vars not present after set: ${missingAfter.join(", ")}`);
+    return { ok: false, mutated: true, reason: `expected preview vars missing after set: ${missingAfter.join(", ")}` };
   }
-  if (droppedUnrelated.length) {
-    stage.fail(`unrelated vars were dropped: ${droppedUnrelated.join(", ")}`);
-    return { ok: false, mutated: true, reason: `unrelated vars dropped (replace-all bug): ${droppedUnrelated.join(", ")}` };
+  if (droppedPreviewUnrelated.length) {
+    stage.fail(`unrelated preview vars dropped: ${droppedPreviewUnrelated.join(", ")}`);
+    return { ok: false, mutated: true, reason: `unrelated preview vars dropped (replace-all bug): ${droppedPreviewUnrelated.join(", ")}` };
+  }
+  if (productionChanged.length) {
+    stage.fail(`PRODUCTION context changed: ${productionChanged.join(", ")}`);
+    return { ok: false, mutated: true, reason: `Production context was modified (must be untouched): ${productionChanged.join(", ")}` };
   }
 
-  stage.markComplete("NETLIFY_CONFIGURED", { netlify: { siteIdMask: null } }, `set ${varPlan.length} vars`);
-  return { ok: true, mutated: true, setKeys: varPlan.map((p) => p.key), preservedUnrelated: droppedUnrelated.length === 0 };
+  stage.markComplete(
+    "NETLIFY_PREVIEW_CONFIGURED",
+    {
+      netlify: {
+        siteIdMask: null,
+        context: PREVIEW_CONTEXT,
+        previewVarNames: ourKeys,
+        scopes: BROWSER,
+        previousConfig: { previewKeyCount: previewBefore.length, productionKeyCount: productionBefore.length },
+      },
+    },
+    `set ${ourKeys.length} preview vars`,
+  );
+  return {
+    ok: true,
+    mutated: true,
+    context: PREVIEW_CONTEXT,
+    setKeys: ourKeys,
+    scopes: BROWSER,
+    preservedUnrelated: droppedPreviewUnrelated.length === 0,
+    productionUnchanged: productionChanged.length === 0,
+  };
+}
+
+/** Keys present in exactly one of the two sets. */
+function symmetricDiff(a, b) {
+  const sa = new Set(a);
+  const sb = new Set(b);
+  return [...new Set([...a, ...b])].filter((k) => sa.has(k) !== sb.has(k));
 }
 
 /** Extract var keys from either an array or a map-shaped env:list result. */
@@ -175,7 +225,7 @@ async function main() {
   const result = await configureNetlify({ mode, credentials, netlify, stage, validation });
 
   if (result.action === "plan") {
-    for (const v of result.vars) log.plain(`  var ${v.key} — scopes=[${v.scopes.join(",")}] secret=${v.secret} browserSafe=${v.browserSafe}`);
+    for (const v of result.vars) log.plain(`  var ${v.key} — context=${v.context} scopes=[${v.scopes.join(",")}] secret=${v.secret} browserSafe=${v.browserSafe}`);
     for (const line of result.intended) log.plain(`  would: ${line}`);
     log.step("configure-netlify PLAN — nothing set or contacted.");
     process.exit(0);
@@ -184,7 +234,7 @@ async function main() {
     log.error(`configure-netlify refused/failed: ${result.reason}`);
     process.exit(2);
   }
-  log.ok(`configure-netlify complete (set ${result.setKeys.length} vars; unrelated preserved).`);
+  log.ok(`configure-netlify complete (set ${result.setKeys.length} Preview vars; unrelated preserved; Production unchanged=${result.productionUnchanged}).`);
   process.exit(0);
 }
 

@@ -38,7 +38,7 @@ const STEPS = [
   { command: "rls-validate", state: "RLS_VALIDATED", run: validateRls },
   { command: "bootstrap-admin", state: "ADMIN_BOOTSTRAPPED", run: bootstrapAdmin },
   { command: "seed-staging", state: "STAGING_SEEDED", run: seedStaging },
-  { command: "configure-netlify", state: "NETLIFY_CONFIGURED", run: configureNetlify },
+  { command: "configure-netlify", state: "NETLIFY_PREVIEW_CONFIGURED", run: configureNetlify },
   { command: "deploy-preview", state: "PREVIEW_DEPLOYED", run: deployPreview },
   { command: "verify-preview", state: null, run: verifyPreview },
 ];

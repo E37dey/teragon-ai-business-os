@@ -1,16 +1,15 @@
-// Gate S7.0 — Netlify configuration: correct scopes, privileged never VITE_,
-// unrelated vars preserved, wrong site rejected.
+// Gate S7.3A — Netlify PREVIEW-context config: only browser-safe VITE_ vars in
+// the deploy-preview context; Production never touched; unrelated vars preserved.
 import { describe, expect, it } from "vitest";
-import { buildNetlifyVarPlan, assertScopeInvariants, isTeragonSite, configureNetlify } from "../../scripts/platform/configure-netlify.mjs";
+import { buildNetlifyVarPlan, assertScopeInvariants, assertPreviewOnly, isTeragonSite, configureNetlify, PREVIEW_CONTEXT } from "../../scripts/platform/configure-netlify.mjs";
 import { createCredentialProvider } from "../../scripts/platform/shared/credentials.mjs";
 import { fakeNetlify, memoryStage } from "./fakes";
 
 const noAuth = async () => ({ ready: false, via: "none" });
 const CONN = {
   SUPABASE_URL: "https://ref.supabase.co",
-  SUPABASE_ANON_KEY: "anon-publishable-key-123456",
-  SUPABASE_SERVICE_ROLE_KEY: "service-role-secret-abcdef",
-  SUPABASE_ORG_ID: "org-1",
+  SUPABASE_ANON_KEY: "anon-publishable-key-123456", // resolves SUPABASE_BROWSER_KEY
+  SUPABASE_ORG_ID: "org-teragon",
   NETLIFY_AUTH_TOKEN: "nf-token",
   NETLIFY_SITE_ID: "site-1",
 };
@@ -18,23 +17,28 @@ function provider(env: Record<string, string>) {
   return createCredentialProvider({ env, fileText: "", authResolver: noAuth });
 }
 
-describe("Netlify var scope mapping", () => {
-  it("browser-safe vars are VITE_ + build/runtime; service-role is Functions-only + secret", () => {
-    const plan = buildNetlifyVarPlan({ supabaseUrl: "u", anonKey: "a", org: "o", serviceKey: "s", previewProvider: "SUPABASE" });
-    const byKey = Object.fromEntries(plan.map((p: { key: string }) => [p.key, p]));
-    expect(byKey.VITE_SUPABASE_URL.browserSafe).toBe(true);
-    expect(byKey.VITE_SUPABASE_URL.scopes).toContain("builds");
-    expect(byKey.VITE_PERSISTENCE_PROVIDER.value).toBe("SUPABASE");
-    const svc = byKey.SUPABASE_SERVICE_ROLE_KEY;
-    expect(svc.secret).toBe(true);
-    expect(svc.scopes).toEqual(["functions"]);
-    expect(svc.key.startsWith("VITE_")).toBe(false);
+describe("Netlify Preview var plan", () => {
+  it("is ONLY the 4 browser-safe VITE_ vars in the deploy-preview context", () => {
+    const plan = buildNetlifyVarPlan({ supabaseUrl: "u", browserKey: "b", org: "org-teragon", previewProvider: "SUPABASE" });
+    const keys = plan.map((p: { key: string }) => p.key);
+    expect(keys).toEqual(["VITE_SUPABASE_URL", "VITE_SUPABASE_ANON_KEY", "VITE_SUPABASE_ORG", "VITE_PERSISTENCE_PROVIDER"]);
+    // no privileged / server / functions var
+    expect(keys.some((k: string) => !k.startsWith("VITE_"))).toBe(false);
+    expect(keys).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
+    expect(keys).not.toContain("SUPABASE_URL");
+    // every var: browser-safe, non-secret, deploy-preview context
+    for (const p of plan) {
+      expect(p.browserSafe).toBe(true);
+      expect(p.secret).toBe(false);
+      expect(p.context).toBe(PREVIEW_CONTEXT);
+    }
+    expect(plan.find((p: { key: string }) => p.key === "VITE_PERSISTENCE_PROVIDER").value).toBe("SUPABASE");
   });
 
-  it("the invariant assertion THROWS if a privileged value is VITE_-prefixed", () => {
-    expect(() =>
-      assertScopeInvariants([{ key: "VITE_SERVICE_ROLE", scopes: ["functions"], secret: true, browserSafe: false }]),
-    ).toThrow(/VITE_/);
+  it("scope + preview invariants throw on violation", () => {
+    expect(() => assertScopeInvariants([{ key: "VITE_SECRET", scopes: ["builds"], secret: true, browserSafe: true }])).toThrow(/VITE_/);
+    expect(() => assertPreviewOnly([{ key: "VITE_X", context: "production" }])).toThrow(/preview invariant/);
+    expect(() => assertPreviewOnly([{ key: "VITE_X", context: "all" }])).toThrow(/preview invariant/);
   });
 });
 
@@ -46,22 +50,43 @@ describe("isTeragonSite", () => {
   });
 });
 
-describe("configureNetlify apply", () => {
-  it("sets known vars at correct scopes and PRESERVES unrelated existing vars", async () => {
-    const netlify = fakeNetlify({ site: { id: "site-1", name: "teragon-os-demo" }, env: { UNRELATED_FLAG: "keep-me", AI_MODEL: "x" } });
+describe("configureNetlify apply (Preview context only)", () => {
+  it("sets the 4 Preview vars, preserves unrelated Preview vars, leaves Production untouched", async () => {
+    const netlify = fakeNetlify({
+      site: { id: "site-1", name: "teragon-os-demo" },
+      previewEnv: { UNRELATED_PREVIEW: "keep" },
+      productionEnv: { PROD_ONLY: "must-not-change", AI_MODEL: "x" },
+    });
     const { tracker } = memoryStage();
     const result = await configureNetlify({ mode: "apply", credentials: provider(CONN), netlify, stage: tracker, validation: { ok: true } });
     expect(result.ok).toBe(true);
+    expect(result.context).toBe("deploy-preview");
+    expect(result.setKeys).toHaveLength(4);
     expect(result.preservedUnrelated).toBe(true);
-    // unrelated vars still present.
-    expect(netlify.state.has("UNRELATED_FLAG")).toBe(true);
-    // service-role set at functions scope + secret.
-    expect(netlify.state.get("SUPABASE_SERVICE_ROLE_KEY")).toEqual({ scopes: ["functions"], secret: true });
-    // never sets a VITE_ service-role var.
-    expect([...netlify.state.keys()].some((k) => k.startsWith("VITE_") && /service/i.test(k))).toBe(false);
+    expect(result.productionUnchanged).toBe(true);
+    // our vars now in the Preview context; unrelated preview var kept.
+    for (const k of result.setKeys) expect(netlify.ctx["deploy-preview"]!.has(k)).toBe(true);
+    expect(netlify.ctx["deploy-preview"]!.has("UNRELATED_PREVIEW")).toBe(true);
+    // Production context NEVER written: same keys as before; all setEnv used deploy-preview.
+    expect([...netlify.ctx.production!.keys()].sort()).toEqual(["AI_MODEL", "PROD_ONLY"]);
+    expect(netlify.calls.filter((c) => c.method === "setEnv").every((c) => (c.args[0] as { context: string }).context === "deploy-preview")).toBe(true);
+    // no VITE_ secret / privileged var written
+    expect(netlify.calls.filter((c) => c.method === "setEnv").some((c) => (c.args[0] as { secret: boolean }).secret)).toBe(false);
+    expect(tracker.completed("NETLIFY_PREVIEW_CONFIGURED")).toBe(true);
   });
 
-  it("rejects when the linked site is NOT the Teragon site", async () => {
+  it("is idempotent on a second run (same 4 keys, Production still unchanged)", async () => {
+    const netlify = fakeNetlify({ site: { id: "site-1", name: "teragon-os-demo" }, productionEnv: { PROD_ONLY: "x" } });
+    const cred = provider(CONN);
+    const r1 = await configureNetlify({ mode: "apply", credentials: cred, netlify, stage: memoryStage().tracker, validation: { ok: true } });
+    const previewCountAfter1 = netlify.ctx["deploy-preview"]!.size;
+    const r2 = await configureNetlify({ mode: "apply", credentials: cred, netlify, stage: memoryStage().tracker, validation: { ok: true } });
+    expect(r1.ok && r2.ok).toBe(true);
+    expect(netlify.ctx["deploy-preview"]!.size).toBe(previewCountAfter1); // no growth
+    expect([...netlify.ctx.production!.keys()]).toEqual(["PROD_ONLY"]);
+  });
+
+  it("rejects when the linked site is NOT the Teragon site (no writes)", async () => {
     const netlify = fakeNetlify({ site: { id: "other", name: "acme-corp-site" } });
     const { tracker } = memoryStage();
     const result = await configureNetlify({ mode: "apply", credentials: provider({ ...CONN, NETLIFY_SITE_ID: "site-1" }), netlify, stage: tracker, validation: { ok: true } });

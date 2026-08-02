@@ -161,7 +161,7 @@ describe("runApply resume — full simulated chain (fakes only)", () => {
         { name: "default", type: "default", api_key: "sb_secret_TEST" },
       ],
     });
-    const netlify = fakeNetlify({ site: { id: "site-1", name: "teragon-os-demo" }, env: { UNRELATED: "keep" } });
+    const netlify = fakeNetlify({ site: { id: "site-1", name: "teragon-os-demo" }, previewEnv: { UNRELATED: "keep" } });
     const { tracker } = resumeStage();
     const cmd = vi.fn(async () => 0);
     const git = { clean: true, branch: "feature/teragon-supabase-platform", commit: "abc123" };

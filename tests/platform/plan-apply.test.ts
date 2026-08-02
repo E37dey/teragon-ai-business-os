@@ -56,13 +56,16 @@ describe("plan mode performs ZERO mutations and calls NO remote adapter", () => 
     expect(result.safety.lineageOk).toBe(true);
   });
 
-  it("configure-netlify plan produces a scoped var plan without setting anything", async () => {
+  it("configure-netlify plan produces a browser-only Preview var plan without setting anything", async () => {
     const netlify = fakeNetlify();
     const { tracker } = memoryStage();
     const result = await configureNetlify({ mode: "plan", credentials: provider(), netlify, stage: tracker, validation: { ok: false } });
     expect(result.mutated).toBe(false);
     expect(netlify.calls.length).toBe(0);
-    expect(result.vars.some((v: { key: string }) => v.key === "SUPABASE_SERVICE_ROLE_KEY")).toBe(true);
+    // browser-only Preview vars; no privileged/server var
+    expect(result.vars.every((v: { key: string; context: string }) => v.key.startsWith("VITE_") && v.context === "deploy-preview")).toBe(true);
+    expect(result.vars.some((v: { key: string }) => v.key === "SUPABASE_SERVICE_ROLE_KEY")).toBe(false);
+    expect(result.vars.some((v: { key: string }) => v.key === "VITE_SUPABASE_ANON_KEY")).toBe(true);
   });
 });
 

@@ -133,7 +133,7 @@ describe("runApply resume from RLS_VALIDATED — bootstrap then seed, stop at ST
     expect(ad.netlify.calls.some((c) => c.method === "deploy")).toBe(false);
     expect(tracker.completed("ADMIN_BOOTSTRAPPED")).toBe(true);
     expect(tracker.completed("STAGING_SEEDED")).toBe(true);
-    expect(tracker.completed("NETLIFY_CONFIGURED")).toBe(false);
+    expect(tracker.completed("NETLIFY_PREVIEW_CONFIGURED")).toBe(false);
   });
 
   it("a seed failure halts before Netlify and preserves ADMIN_BOOTSTRAPPED", async () => {
@@ -154,7 +154,7 @@ describe("runApply resume from RLS_VALIDATED — bootstrap then seed, stop at ST
     const p = provider();
     const ad = adapters();
     const tracker = resumeAtRlsValidated();
-    const verdict = await runApply(p, ad, tracker, { stopAfter: "NETLIFY_CONFIGURED" });
+    const verdict = await runApply(p, ad, tracker, { stopAfter: "NETLIFY_PREVIEW_CONFIGURED" });
     expect(verdict.ok).toBe(true);
     expect(ad.db.calls.filter((c) => c.method === "runScriptFile")).toHaveLength(2); // seed still ran
     expect(ad.netlify.calls.some((c) => c.method === "setEnv")).toBe(true); // proceeded past seed

@@ -185,25 +185,33 @@ export function fakeDb(opts: {
   };
 }
 
-/** A fake Netlify adapter with programmable env + call recording. */
-export function fakeNetlify(opts: { site?: { id: string; name: string }; env?: Record<string, unknown>; deploy?: Record<string, unknown> } = {}) {
+/** A context-aware fake Netlify adapter (S7.3A). Tracks vars PER CONTEXT so a
+ * test can assert Preview writes never touch Production. */
+export function fakeNetlify(
+  opts: { site?: { id: string; name: string }; previewEnv?: Record<string, unknown>; productionEnv?: Record<string, unknown>; deploy?: Record<string, unknown> } = {},
+) {
   const calls: Call[] = [];
-  const state = new Map<string, { scopes: string[]; secret: boolean }>();
-  for (const k of Object.keys(opts.env ?? {})) state.set(k, { scopes: ["builds"], secret: false });
+  type Var = { scopes: string[]; secret: boolean };
+  const ctx: Record<string, Map<string, Var>> = { "deploy-preview": new Map(), production: new Map() };
+  for (const k of Object.keys(opts.previewEnv ?? {})) ctx["deploy-preview"]!.set(k, { scopes: ["builds"], secret: false });
+  for (const k of Object.keys(opts.productionEnv ?? {})) ctx.production!.set(k, { scopes: ["builds"], secret: false });
   return {
     calls,
-    state,
+    ctx,
     async getLinkedSite() {
       calls.push({ method: "getLinkedSite", args: [] });
       return opts.site ?? { id: "site-1", name: "teragon-os-demo" };
     },
-    async listEnv() {
-      calls.push({ method: "listEnv", args: [] });
-      return [...state.entries()].map(([key, v]) => ({ key, scopes: v.scopes }));
+    async listEnv(context: string) {
+      calls.push({ method: "listEnv", args: [context] });
+      const m = ctx[context] ?? new Map<string, Var>();
+      return [...m.entries()].map(([key, v]) => ({ key, scopes: v.scopes }));
     },
-    async setEnv(a: { key: string; value: string; scopes: string[]; secret: boolean }) {
-      calls.push({ method: "setEnv", args: [{ key: a.key, scopes: a.scopes, secret: a.secret }] });
-      state.set(a.key, { scopes: a.scopes, secret: a.secret });
+    async setEnv(a: { key: string; value: string; scopes: string[]; secret: boolean; context: string }) {
+      calls.push({ method: "setEnv", args: [{ key: a.key, scopes: a.scopes, secret: a.secret, context: a.context }] });
+      const c = a.context ?? "deploy-preview";
+      if (!ctx[c]) ctx[c] = new Map<string, Var>();
+      ctx[c]!.set(a.key, { scopes: a.scopes, secret: a.secret });
     },
     async deploy(a: unknown) {
       calls.push({ method: "deploy", args: [a] });

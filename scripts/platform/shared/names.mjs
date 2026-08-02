@@ -184,9 +184,11 @@ export const COMMAND_CREDENTIALS = {
     names: ["TERAGON_ADMIN_EMAIL", "TERAGON_ADMIN_PASSWORD"],
     confirmGate: "TERAGON_ADMIN_EMAIL_CONFIRMED",
   },
+  // S7.3A: configure-netlify sets ONLY browser-safe Preview vars (no Netlify
+  // Function consumes a Supabase server var), so it needs the browser key +
+  // Netlify auth — NOT the privileged server key / service client.
   "configure-netlify": {
     netlifyAuth: true,
-    serviceClient: true,
     names: ["NETLIFY_SITE_ID", "SUPABASE_URL", "SUPABASE_BROWSER_KEY"],
   },
   "deploy-preview": {
