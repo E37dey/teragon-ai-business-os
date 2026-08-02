@@ -77,9 +77,13 @@ export function createNetlifyAdapter(deps) {
       // S7.3A: write to a SINGLE context (default deploy-preview) — NEVER
       // "--context all", so Production is never modified. This upserts only this
       // one var in this one context; unrelated vars/contexts are preserved.
+      // `--scope` and `--context` are VARIADIC (space-separated values), and
+      // `--force` runs non-interactively (the orchestrator captures stdio, so a
+      // confirmation prompt would otherwise hang).
       const ctx = context ?? "deploy-preview";
-      const args = ["env:set", key, value, "--scope", (scopes ?? []).join(","), "--context", ctx, ...siteArgs()];
+      const args = ["env:set", key, value, "--context", ctx, "--scope", ...(scopes ?? []), "--force"];
       if (secret) args.push("--secret");
+      args.push(...siteArgs());
       await run("netlify", args, authEnv());
     },
     async deploy({ dir, prod }) {

@@ -129,5 +129,10 @@ describe("real Netlify adapter — getLinkedSite resolves by site id (not local 
     expect(args).toContain("--context");
     expect(args[args.indexOf("--context") + 1]).toBe("deploy-preview");
     expect(args).not.toContain("all");
+    // scope is variadic (separate values, not comma-joined) + non-interactive --force
+    const si = args.indexOf("--scope");
+    expect(args.slice(si + 1, si + 3)).toEqual(["builds", "runtime"]);
+    expect(args).not.toContain("builds,runtime");
+    expect(args).toContain("--force");
   });
 });
