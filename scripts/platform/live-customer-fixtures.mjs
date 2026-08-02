@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // TERAGON AI BUSINESS OS — Gate S9.2-A1d2a-1A: live customer fixture + cleanup
 // harness (adapter-injected, fail-closed, process.exit-free core).
 // =============================================================================
@@ -143,17 +142,29 @@ export async function cleanupCustomerFixtures({ adapter, handle }) {
   if (!handle) return { ok: true, removed: [], errors: [] };
   const removed = [];
   const errors = [];
-  const attempt = async (label, fn) => {
+  // Delete, then VERIFY absence (when the adapter can probe) — cleanup "ok" must
+  // mean the row is gone, not merely that the delete call did not throw.
+  const attempt = async (label, del, verifyGone) => {
     try {
-      await fn();
+      await del();
+      if (verifyGone && typeof adapter.exists === "function") {
+        const still = await verifyGone();
+        if (still) {
+          errors.push(`${label}: still present after delete`);
+          return;
+        }
+      }
       removed.push(label);
     } catch (err) {
       errors.push(`${label}: ${classifyFixtureError(err)}`);
     }
   };
-  for (const id of handle.customerIds ?? []) await attempt(`customer:${id}`, () => adapter.deleteCustomer(id));
-  if (handle.membershipId) await attempt(`membership:${handle.membershipId}`, () => adapter.deleteMembership(handle.membershipId));
-  if (handle.userId && handle.profile) await attempt(`profile:${handle.userId}`, () => adapter.deleteProfile(handle.userId));
+  for (const id of handle.customerIds ?? [])
+    await attempt(`customer:${id}`, () => adapter.deleteCustomer(id), () => adapter.exists("customers", "id", id));
+  if (handle.membershipId)
+    await attempt(`membership:${handle.membershipId}`, () => adapter.deleteMembership(handle.membershipId), () => adapter.exists("memberships", "id", handle.membershipId));
+  if (handle.userId && handle.profile)
+    await attempt(`profile:${handle.userId}`, () => adapter.deleteProfile(handle.userId), () => adapter.exists("profiles", "id", handle.userId));
   if (handle.userId) await attempt(`user:${handle.userId}`, () => adapter.deleteUser(handle.userId));
   return { ok: errors.length === 0, removed, errors };
 }

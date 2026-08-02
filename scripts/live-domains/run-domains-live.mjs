@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // TERAGON AI BUSINESS OS — Gate S9.2-A1d2a-1B1: fail-closed live customer runner
 // (`npm run test:domains:live`). Pure, injectable preflight + dry-run; thin
 // entrypoint that runs the DEDICATED Playwright config once and enforces the
@@ -6,11 +5,15 @@
 // by the default vitest/playwright commands (non-spec suffix + dedicated config).
 import process from "node:process";
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { createLiveCustomerAdmin } from "../platform/shared/adapters/live-customer-admin.mjs";
+import { withCustomerFixtures } from "../platform/live-customer-fixtures.mjs";
 
 export const STAGING_REF = "bjvirkmagwpqroakazjj";
 export const LIVE_CONFIG = "e2e/live-domains.config.ts";
 export const REPORT_PATH = "e2e/live-domains/_report.json";
+export const PW_JSON_PATH = "e2e/live-domains/_pw.json";
+export const IDB_PATH = "e2e/live-domains/_idb.json";
 export const REQUIRED_ENV = [
   "SUPABASE_URL",
   "SUPABASE_SERVICE_ROLE_KEY",
@@ -112,6 +115,85 @@ export function evaluateReport(rep) {
   return { ok: true, reason: "all required live customer checks passed" };
 }
 
+/** Redact any key/jwt material from a category string. */
+export function safeAuthCategory(err) {
+  const status = err?.status ?? err?.code;
+  const msg = String(err?.message ?? "").toLowerCase();
+  if (msg.includes("invalid") && (msg.includes("credential") || msg.includes("login") || msg.includes("password"))) return "invalid_credentials";
+  if (String(status) === "400" || msg.includes("invalid")) return "invalid_credentials";
+  if (msg.includes("email not confirmed") || msg.includes("not confirmed")) return "email_not_confirmed";
+  if (msg.includes("network") || msg.includes("fetch")) return "network";
+  return "auth_error";
+}
+
+/**
+ * Server-side admin login preflight — the AUTHORITATIVE credential check BEFORE
+ * any browser run. Uses the publishable/anon client only, signs in with the exact
+ * workflow env, then immediately signs out. Never logs email/password/session.
+ * @returns {Promise<{pass:boolean, category:string}>}
+ */
+export async function adminPreflight(env, deps = {}) {
+  const anonKey = env.SUPABASE_ANON_KEY ?? env.SUPABASE_PUBLISHABLE_KEY ?? env.VITE_SUPABASE_ANON_KEY;
+  if (!env.SUPABASE_URL || !anonKey || !env.TERAGON_ADMIN_EMAIL || !env.TERAGON_ADMIN_PASSWORD)
+    return { pass: false, category: "missing_env" };
+  let client;
+  try {
+    if (deps.clientFactory) client = deps.clientFactory();
+    else {
+      const { createClient } = await import("@supabase/supabase-js");
+      client = createClient(env.SUPABASE_URL, anonKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+    }
+    const { data, error } = await client.auth.signInWithPassword({
+      email: String(env.TERAGON_ADMIN_EMAIL).trim(),
+      password: env.TERAGON_ADMIN_PASSWORD,
+    });
+    if (error || !data?.session) return { pass: false, category: safeAuthCategory(error) };
+    try { await client.auth.signOut(); } catch { /* discard */ }
+    return { pass: true, category: "ok" };
+  } catch (e) {
+    return { pass: false, category: safeAuthCategory(e) };
+  }
+}
+
+/** Parse Playwright's JSON reporter into authoritative totals. */
+export function parsePlaywrightTotals(pwJson) {
+  const totals = { files: 0, executed: 0, passed: 0, failed: 0, skipped: 0 };
+  if (!pwJson || !Array.isArray(pwJson.suites)) return totals;
+  const files = new Set();
+  const walk = (suite) => {
+    if (suite.file) files.add(suite.file);
+    for (const spec of suite.specs ?? []) {
+      for (const t of spec.tests ?? []) {
+        totals.executed++;
+        const s = t.status ?? (t.results?.[t.results.length - 1]?.status);
+        if (s === "expected" || s === "passed") totals.passed++;
+        else if (s === "skipped") totals.skipped++;
+        else totals.failed++;
+      }
+    }
+    for (const child of suite.suites ?? []) walk(child);
+  };
+  for (const s of pwJson.suites) walk(s);
+  totals.files = files.size || 1;
+  return totals;
+}
+
+/** Assemble the AUTHORITATIVE report the runner owns (written AFTER cleanup). */
+export function assembleReport({ totals, idb, cleanup, maskedRef, commit, preflight, note }) {
+  const t = totals ?? { files: 1, executed: 0, passed: 0, failed: 0, skipped: 0 };
+  const i = idb ?? { open: 0, read: 0, write: 0 };
+  const rep = {
+    files: t.files, executed: t.executed, passed: t.passed, failed: t.failed, skipped: t.skipped,
+    cleanup, idbOpen: i.open, idbRead: i.read, idbWrite: i.write,
+    observedCommit: commit || "", maskedRef: maskedRef || "-",
+    adminPreflight: preflight ?? "not-run", note: note ?? "",
+    verdict: "FAIL",
+  };
+  const ok = evaluateReport(rep).ok && preflight === "pass";
+  rep.verdict = ok ? "PASS" : "FAIL";
+  return rep;
+}
+
 // --- thin entrypoint ---------------------------------------------------------
 function line(o) {
   return `[domains:live] mode=${o.mode ?? "live"} ok=${o.ok} ref=${o.maskedRef} commit=${(o.commit || "").slice(0, 12)} problems=${(o.problems ?? []).length}`;
@@ -134,19 +216,58 @@ async function main() {
     process.exit(2); // fail BEFORE any mutation
   }
 
-  const run = spawnSync("npx", ["playwright", "test", "-c", LIVE_CONFIG], { stdio: "inherit", shell: true, env: process.env });
-  const rep = readReport();
-  const verdict = evaluateReport(rep);
-  if (rep) {
-    console.log(
-      `[domains:live] files=${rep.files} executed=${rep.executed} passed=${rep.passed} failed=${rep.failed} skipped=${rep.skipped} cleanup=${rep.cleanup} idb(open/read/write)=${rep.idbOpen}/${rep.idbRead}/${rep.idbWrite} ref=${rep.maskedRef} commit=${rep.observedCommit}`,
-    );
-  }
-  if (run.status !== 0 || !verdict.ok) {
-    console.error(`[domains:live] FAIL — ${verdict.reason}`);
+  const write = (rep) => writeFileSync(REPORT_PATH, JSON.stringify(rep, null, 2));
+  const readIdb = () => {
+    try { return JSON.parse(readFileSync(IDB_PATH, "utf8")); } catch { return { open: 0, read: 0, write: 0 }; }
+  };
+  const readPwTotals = () => {
+    try { return parsePlaywrightTotals(JSON.parse(readFileSync(PW_JSON_PATH, "utf8"))); } catch { return null; }
+  };
+
+  // 1. AUTHORITATIVE admin credential check BEFORE any browser run / mutation.
+  const admin = await adminPreflight(env);
+  if (!admin.pass) {
+    // No fixtures were provisioned → nothing to clean. Classify + fail closed;
+    // NEVER auto-mutate the password.
+    const rep = assembleReport({ totals: { files: 1, executed: 0, passed: 0, failed: 0, skipped: 0 }, cleanup: "ok", maskedRef: pf.maskedRef, commit: pf.commit, preflight: "fail", note: `ADMIN_CREDENTIAL_MISMATCH (${admin.category})` });
+    write(rep);
+    console.error(`[domains:live] ADMIN_LOGIN_PREFLIGHT_FAIL — ${rep.note}. Playwright NOT started; no fixtures created.`);
     process.exit(1);
   }
-  console.log(`[domains:live] PASS — ${verdict.reason}`);
+  console.log("[domains:live] ADMIN_LOGIN_PREFLIGHT_PASS");
+
+  // 2. Runner OWNS the fixture lifecycle: provision → run Playwright → ALWAYS
+  //    clean up + verify (in finally). The report is written AFTER cleanup so it
+  //    can never say cleanup=not-run once setup began.
+  const adapter = createLiveCustomerAdmin({ env });
+  const runId = env.ACC_RUN_ID ?? "";
+  let pwStatus = 1;
+  const outcome = await withCustomerFixtures(
+    { adapter, config: { runId, secondOrgId: env.ACC_SECOND_ORG ?? "org-staging-beta", roleId: env.ACC_FIXTURE_ROLE ?? "crole-sales", customerCount: Number(env.ACC_CUSTOMER_COUNT ?? 3) } },
+    async (handle) => {
+      const childEnv = { ...process.env, ACC_FIXTURE_EMAIL: handle.email, ACC_FIXTURE_PASSWORD: handle.password };
+      const run = spawnSync("npx", ["playwright", "test", "-c", LIVE_CONFIG, "--reporter=list,json"], {
+        stdio: "inherit", shell: true, env: { ...childEnv, PLAYWRIGHT_JSON_OUTPUT_NAME: PW_JSON_PATH },
+      });
+      pwStatus = run.status ?? 1;
+      return { pwStatus };
+    },
+  );
+
+  // 3. Cleanup is verified by withCustomerFixtures (ok only if every delete
+  //    succeeded). A cleanup failure OVERRIDES any passing test result.
+  const cleanup = outcome.cleanup?.ok ? "ok" : "failed";
+  const totals = readPwTotals() ?? { files: 1, executed: 0, passed: 0, failed: 0, skipped: 0 };
+  const rep = assembleReport({ totals, idb: readIdb(), cleanup, maskedRef: pf.maskedRef, commit: pf.commit, preflight: "pass", note: outcome.reason ?? "" });
+  write(rep);
+  console.log(
+    `[domains:live] preflight=pass files=${rep.files} executed=${rep.executed} passed=${rep.passed} failed=${rep.failed} skipped=${rep.skipped} cleanup=${rep.cleanup} idb=${rep.idbOpen}/${rep.idbRead}/${rep.idbWrite} ref=${rep.maskedRef} commit=${rep.observedCommit}`,
+  );
+  if (rep.verdict !== "PASS" || pwStatus !== 0) {
+    console.error(`[domains:live] FAIL — ${evaluateReport(rep).reason}${cleanup !== "ok" ? " · cleanup failed (overrides test results)" : ""}`);
+    process.exit(1);
+  }
+  console.log("[domains:live] PASS — all required live customer checks passed + cleanup verified");
   process.exit(0);
 }
 
