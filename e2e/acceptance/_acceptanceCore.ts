@@ -116,6 +116,44 @@ export function scanForPrivileged(text: string): string[] {
   return PRIVILEGED_PATTERNS.filter((re) => re.test(text)).map((re) => re.source);
 }
 
+/**
+ * Decode JWT-shaped tokens in `text` and return a marker for any whose role is
+ * "service_role". The browser-safe ANON/publishable JWT (role "anon") is
+ * legitimately baked into the bundle and is NOT flagged. Never returns the token.
+ */
+export function findServiceRoleJwts(text: string): string[] {
+  const re = /eyJ[A-Za-z0-9_-]{10,}\.([A-Za-z0-9_-]{10,})\.[A-Za-z0-9_-]{6,}/g;
+  const out: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (!m[1]) continue;
+    try {
+      const payload = JSON.parse(Buffer.from(m[1], "base64url").toString("utf8")) as {
+        role?: string;
+      };
+      if (payload.role === "service_role") out.push("service_role_jwt");
+    } catch {
+      /* not a decodable JWT payload */
+    }
+  }
+  return [...new Set(out)];
+}
+
+/**
+ * Scan a served bundle (HTML/JS/CSS) for real SECRET VALUES that must never reach
+ * the browser: a secret key (`sb_secret_…`) or a service_role JWT. It deliberately
+ * does NOT flag identifier strings like "access_token"/"service_role" that appear
+ * as property names / role constants inside vendored library code, nor the
+ * browser-safe anon/publishable key. Comprehensive dist scanning is done by
+ * `npm run scan:secrets`; this is the runtime cross-check.
+ */
+export function scanBundleForSecrets(text: string): string[] {
+  const hits: string[] = [];
+  if (/sb_secret_[A-Za-z0-9]{8,}/.test(text)) hits.push("sb_secret_key");
+  hits.push(...findServiceRoleJwts(text));
+  return [...new Set(hits)];
+}
+
 export function maskRef(ref: string): string {
   return ref.length <= 8 ? ref : `${ref.slice(0, 4)}…${ref.slice(-4)}`;
 }

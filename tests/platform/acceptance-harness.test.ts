@@ -65,7 +65,7 @@ describe("live acceptance spec (S7.3B-PREP) encodes the required guards", () => 
     expect(src).toContain("graphFacadeEnabled");
     expect(src).toContain("graphOperatorAuthEnabled");
     expect(src).toContain("googleFontRequests");
-    expect(src).toContain("scanForPrivileged");
+    expect(src).toContain("scanBundleForSecrets");
   });
 
   it("records missing UI capabilities honestly (never fabricates a domain PASS)", () => {

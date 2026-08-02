@@ -37,8 +37,12 @@ export default defineConfig({
     actionTimeout: 30_000,
     navigationTimeout: 60_000,
   },
+  // ONE project keeps the harness's shared counters + single SAFE report reliable;
+  // the 1024/1280/1440 viewport sweep is performed WITHIN the routing/theme test.
   projects: [
-    { name: "chromium-1920", use: { ...devices["Desktop Chrome"], viewport: { width: 1920, height: 1080 } } },
-    { name: "chromium-1024", use: { ...devices["Desktop Chrome"], viewport: { width: 1024, height: 768 } } },
+    {
+      name: "chromium-1280",
+      use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 900 } },
+    },
   ],
 });

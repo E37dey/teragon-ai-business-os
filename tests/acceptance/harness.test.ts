@@ -12,6 +12,7 @@ import {
   maskRef,
   redactReport,
   scanForPrivileged,
+  scanBundleForSecrets,
   type SafeAcceptanceReport,
 } from "../../e2e/acceptance/_acceptanceCore";
 
@@ -97,6 +98,22 @@ describe("privileged-material detection", () => {
   });
   it("passes clean text", () => {
     expect(scanForPrivileged("org-teragon crole-sysadmin active")).toEqual([]);
+  });
+});
+
+describe("bundle secret scan — real values only (no false positives)", () => {
+  const jwt = (role: string) =>
+    `eyJhbGciOiJIUzI1NiJ9.${Buffer.from(JSON.stringify({ role })).toString("base64url")}.signature123`;
+
+  it("flags a secret key and a service_role JWT", () => {
+    expect(scanBundleForSecrets("x=sb_secret_ABCdef12345678")).toContain("sb_secret_key");
+    expect(scanBundleForSecrets(jwt("service_role"))).toContain("service_role_jwt");
+  });
+  it("does NOT flag the browser-safe anon key or library identifiers", () => {
+    expect(scanBundleForSecrets(jwt("anon"))).toEqual([]);
+    expect(
+      scanBundleForSecrets("const t = session.access_token; const r = 'service_role';"),
+    ).toEqual([]);
   });
 });
 

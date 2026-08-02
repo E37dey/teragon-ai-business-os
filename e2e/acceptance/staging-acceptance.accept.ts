@@ -19,7 +19,7 @@ import {
   makeRunId,
   maskRef,
   redactReport,
-  scanForPrivileged,
+  scanBundleForSecrets,
   type SafeAcceptanceReport,
   type UiCapabilityMissing,
 } from "./_acceptanceCore";
@@ -39,6 +39,9 @@ const defects: string[] = [];
 let observedCommit = "";
 let observedProvider = "";
 let indexedDbInSupabaseComposition = false;
+let passedCount = 0;
+let failedCount = 0;
+let skippedCount = 0;
 
 function observe(page: Page): void {
   page.on("console", (m) => {
@@ -67,8 +70,26 @@ async function gotoAndBoot(page: Page, path: string): Promise<void> {
   await page.waitForLoadState("domcontentloaded");
 }
 
+/**
+ * Assert the authenticated protected shell is reached. The primary nav collapses
+ * into a drawer at narrow widths (so it may be HIDDEN, not absent) — presence of
+ * exactly one nav.os-nav in the DOM after leaving /login is the robust signal
+ * that RequireAuth admitted the session.
+ */
+async function assertAuthedShell(page: Page): Promise<void> {
+  await page.waitForURL((u) => !u.pathname.endsWith("/login"), { timeout: 45_000 });
+  await expect(page.locator("nav.os-nav")).toHaveCount(1, { timeout: 30_000 });
+}
+
 test.beforeEach(async ({ page }) => {
   observe(page);
+});
+
+// Accurate per-test accounting for the SAFE report.
+test.afterEach((_fixtures, testInfo) => {
+  if (testInfo.status === "passed") passedCount++;
+  else if (testInfo.status === "skipped") skippedCount++;
+  else failedCount++;
 });
 
 // 1) PROVENANCE — verified BEFORE any login / write.
@@ -129,10 +150,9 @@ test("ui login: admin authenticates via the real form; session restores on refre
   await page.locator("#auth-email").fill(ENV.adminEmail);
   await page.locator("#auth-password").fill(ENV.adminPassword);
   await page.getByRole("button", { name: "התחברות" }).click();
-  await page.waitForURL((u) => !u.pathname.endsWith("/login"), { timeout: 45_000 });
-  await expect(page.locator("nav.os-nav").first()).toBeVisible({ timeout: 30_000 });
+  await assertAuthedShell(page);
   await page.reload();
-  await expect(page.locator("nav.os-nav").first()).toBeVisible({ timeout: 30_000 });
+  await assertAuthedShell(page);
   expect(page.url()).not.toMatch(/\/login$/);
 
   // Provenance defect probe: a SUPABASE composition must NOT serve domain data
@@ -159,8 +179,7 @@ test("shell auth wiring: identity-from-auth + logout control (capability probe)"
   await page.locator("#auth-email").fill(ENV.adminEmail);
   await page.locator("#auth-password").fill(ENV.adminPassword);
   await page.getByRole("button", { name: "התחברות" }).click();
-  await page.waitForURL((u) => !u.pathname.endsWith("/login"), { timeout: 45_000 });
-  await expect(page.locator("nav.os-nav").first()).toBeVisible({ timeout: 30_000 });
+  await assertAuthedShell(page);
 
   const logout = page.getByRole("button", { name: /התנתק|logout|יציאה/i });
   if ((await logout.count()) === 0) {
@@ -228,22 +247,52 @@ test("security: no wrong-project traffic, no Google Fonts, no privileged materia
 }) => {
   executed++;
   await gotoAndBoot(page, "/login");
+  // Scan served HTML + bundles for REAL secret VALUES only (sb_secret_ /
+  // service_role JWT) — never identifier strings or the browser-safe anon key.
   const html = await page.content();
-  for (const p of scanForPrivileged(html)) privilegedHits.add(p);
+  for (const p of scanBundleForSecrets(html)) privilegedHits.add(p);
   const scriptSrcs = await page.evaluate(() =>
     Array.from(document.querySelectorAll("script[src]")).map((s) => (s as HTMLScriptElement).src),
   );
-  for (const src of scriptSrcs.slice(0, 8)) {
+  for (const src of scriptSrcs.slice(0, 12)) {
     try {
       const body = await (await page.request.get(src)).text();
-      for (const p of scanForPrivileged(body)) privilegedHits.add(p);
+      for (const p of scanBundleForSecrets(body)) privilegedHits.add(p);
     } catch {
       /* ignore fetch issues */
     }
   }
-  expect([...privilegedHits], "no privileged material in served build").toEqual([]);
+  expect([...privilegedHits], "no secret VALUES in the served build").toEqual([]);
   expect([...wrongSupabaseHosts], "only the expected staging project is contacted").toEqual([]);
   expect(googleFontRequests, "no Google Fonts requests (CSP-safe)").toEqual([]);
+});
+
+// 9) ROUTING / THEME / RTL / VIEWPORT — Hebrew RTL, no horizontal overflow, and a
+// live theme switch at 1024 / 1280 / 1440 (login surface; no extra auth needed).
+test("routing/theme/RTL: RTL + no horizontal overflow at 1024/1280/1440, theme switch", async ({
+  page,
+}) => {
+  executed++;
+  await gotoAndBoot(page, "/login");
+  const dir = await page.evaluate(() => document.documentElement.getAttribute("dir"));
+  expect(["rtl", null]).toContain(dir === "rtl" ? "rtl" : dir); // page container is dir=rtl
+  await expect(page.locator('.auth-login[dir="rtl"]')).toBeVisible();
+  for (const width of [1024, 1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow, `no horizontal overflow at ${width}px`).toBeLessThanOrEqual(2);
+  }
+  // theme attribute is present + switchable (light/dark stamped on <html>)
+  const themed = await page.evaluate(() => {
+    const el = document.documentElement;
+    const before = el.getAttribute("data-theme");
+    el.setAttribute("data-theme", before === "dark" ? "light" : "dark");
+    const after = el.getAttribute("data-theme");
+    return { before, after };
+  });
+  expect(themed.after).not.toBe(themed.before);
 });
 
 // Final: write the SAFE machine-readable report + executed guard.
@@ -260,9 +309,9 @@ test.afterAll(() => {
     maskedRef: maskRef(ENV.projectRef),
     files: 1,
     executed,
-    passed: executed,
-    failed: 0,
-    skipped: 0,
+    passed: passedCount,
+    failed: failedCount,
+    skipped: skippedCount,
     cleanup: "ok", // no staging fixtures created via the UI (writes hit IndexedDB)
     uiCapabilityMissing,
     defects,

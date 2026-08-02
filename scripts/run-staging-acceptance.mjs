@@ -35,8 +35,8 @@ console.log(
 );
 
 // Fail-hard: zero executed, any real test failure, or any skip.
-if (rep.executed === 0 || rep.skipped > 0 || run.status !== 0) {
-  console.error("[acceptance] FAIL — zero executed / skips present / unexpected test failure.");
+if (rep.executed === 0 || rep.failed > 0 || rep.skipped > 0 || run.status !== 0) {
+  console.error("[acceptance] FAIL — zero executed / test failure / skips present.");
   process.exit(1);
 }
 // A PARTIAL verdict (UI_CAPABILITY_MISSING / blocking defect) is an HONEST result,
