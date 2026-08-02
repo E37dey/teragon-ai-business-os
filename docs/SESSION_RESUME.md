@@ -10,8 +10,9 @@
 
 ## Authorized scope (per session — ONE bounded checkpoint)
 - **S9.1-A DONE:** legacy `getRepository` hard-gate + IndexedDB boot shutdown in SUPABASE mode (commit `93611cc`).
-- **S9.1-B1 DONE (this session):** central `DomainNotConnectedGate` mounted around the page `Outlet` in `OsShell` (SUPABASE → Hebrew internal-preview notice, page never mounts, no mutation controls; LOCAL unchanged) + gate tests.
-- **Next = S9.1-B2:** shell/header wired to `useAuth` — safe identity display + logout that invalidates repo access + targeted tests, THEN the once-only full Checkpoint-A gate.
+- **S9.1-B1 DONE:** central `DomainNotConnectedGate` mounted around the page `Outlet` in `OsShell` (commit `566ce74`).
+- **S9.1-B2 DONE + CHECKPOINT-A COMPLETE (this session):** shell/header wired to `useAuth` — safe identity (name · role · org, no tokens), logout via real `signOut` (routes to `/login` replace; composition returns `AUTH_REQUIRED` after — repo access invalidated). SUPABASE never shows the static `CANONICAL_USER`; LOCAL unchanged. Full Checkpoint-A gate PASS (vitest 2498/0-skipped, build, build:preview, oxlint, typecheck×2, scan:secrets CLEAN, representative Playwright 3/3).
+- **Next = S9.2-A1: customers only** (connect the customer UI to the authenticated Supabase repo via the composition; live CRUD/isolation/pagination/idempotency). Add `customers` to `SUPABASE_CONNECTED_DOMAINS`.
 
 ## Frozen facts (recorded once — do NOT re-verify)
 - Backend fully stood up on live `teragon-staging` (`bjvirkmagwpqroakazjj`): 14 migrations, schema verified, RLS 8/8, admin `soundcloudillusion@gmail.com` bootstrapped, deterministic seed. **S7.1/S7.2 PASS.**

@@ -16,6 +16,9 @@ import type { RankedSearchHit } from "@/domain/selectors";
 import { APP_ROUTES } from "./routes";
 import { CANONICAL_USER } from "./identity";
 import { DomainNotConnectedGate } from "@/persistence/composition/DomainNotConnectedGate";
+import { useAuth } from "@/auth/useAuth";
+import { resolveShellUser } from "./shellAccount";
+import { ShellLogoutButton } from "./ShellLogoutButton";
 import { MODE_LABEL, useAppMode } from "./mode";
 import { NAV_GROUPS, activeItemForPath, groupOfPath } from "./nav/navGroups";
 import { useNavBadges } from "./nav/useNavBadges";
@@ -103,6 +106,11 @@ function NavCopilotCard(): ReactElement {
 function OsShellInner(): ReactElement {
   const location = useLocation();
   const navigate = useNavigate();
+
+  // ── canonical identity (S9.1-B2) ── SUPABASE shows the real server-resolved
+  // user (never the static CANONICAL_USER); LOCAL keeps the approved local user.
+  const { mode, status, identity } = useAuth();
+  const shellUser = resolveShellUser(mode, status, identity, CANONICAL_USER);
 
   // ── persisted shell state (nav groups + rail) ──
   const [shellState, setShellState] = useState<ShellState>(() => loadShellState());
@@ -231,7 +239,7 @@ function OsShellInner(): ReactElement {
         onToggleGroup={toggleGroup}
         activeNavId={activeId}
         activeRoute={location.pathname}
-        user={CANONICAL_USER}
+        user={shellUser}
         renderLink={renderLink}
         headerProps={{
           onQuickAdd: () => setQuickCreate({ view: "menu" }),
@@ -242,6 +250,7 @@ function OsShellInner(): ReactElement {
           actions: (
             <>
               <ThemeSelect />
+              <ShellLogoutButton />
               <button
                 type="button"
                 className="os-header__iconbtn os-header__hamburger"
