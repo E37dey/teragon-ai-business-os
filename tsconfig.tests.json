@@ -1,4 +1,4 @@
 {
   "extends": "./tsconfig.app.json",
-  "include": ["src", "netlify", "tests"]
+  "include": ["src", "netlify", "tests", "evals", "e2e/acceptance/_acceptanceCore.ts"]
 }
