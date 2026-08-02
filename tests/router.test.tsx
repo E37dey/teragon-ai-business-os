@@ -6,6 +6,7 @@ import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { appRouteObjects } from "@/app/router";
 import { APP_ROUTES } from "@/app/routes";
+import { AuthProvider } from "@/auth/AuthProvider";
 
 afterEach(cleanup);
 
@@ -13,9 +14,13 @@ function mount(path: string) {
   const router = createMemoryRouter(appRouteObjects, { initialEntries: [path] });
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
-    <QueryClientProvider client={qc}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
+    // Mount as the app does: AuthProvider resolves to LOCAL in tests, so the
+    // RequireAuth gate around OsShell is a pass-through and every route renders.
+    <AuthProvider>
+      <QueryClientProvider client={qc}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    </AuthProvider>,
   );
   return router;
 }

@@ -49,7 +49,7 @@ export default defineConfig({
     // Live Supabase integration tests are a SEPARATE discovery path (their own
     // config + `npm run test:supabase:live`). They must never appear in the
     // default suite — so the default gate reports 0 skipped, never a skip.
-    exclude: [...configDefaults.exclude, "tests/supabase/live/**"],
+    exclude: [...configDefaults.exclude, "tests/supabase/live/**", "tests/staging-auth/live/**"],
     globals: false,
   },
 });
