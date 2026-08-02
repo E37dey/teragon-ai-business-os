@@ -1,31 +1,40 @@
-// S9.1-B1 — targeted tests for the central DomainNotConnectedGate. Deterministic
-// (prop-driven provider; no auth backend, no full shell). Explicit cleanup because
-// this project runs Vitest with globals:false (RTL auto-cleanup is not registered).
+// S9.1-B1 / S9.2-A1b — targeted tests for the pure, route-aware gate decision
+// (DomainNotConnectedGateView). Deterministic (prop-driven provider + pathname;
+// no auth backend, no Router, no full shell). Explicit cleanup because this
+// project runs Vitest with globals:false (RTL auto-cleanup is not registered).
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
-import { DomainNotConnectedGate } from "@/persistence/composition/DomainNotConnectedGate";
+import { DomainNotConnectedGateView } from "@/persistence/composition/DomainNotConnectedGate";
 
 afterEach(cleanup);
 
-describe("S9.1-B1 · DomainNotConnectedGate", () => {
-  it("SUPABASE mode: the page never mounts — shows the Hebrew internal-preview notice", () => {
+describe("S9.2-A1b · DomainNotConnectedGateView", () => {
+  it("SUPABASE + unconnected route: the page never mounts — Hebrew notice + typed marker", () => {
     render(
-      <DomainNotConnectedGate provider="SUPABASE">
+      <DomainNotConnectedGateView provider="SUPABASE" pathname="/leads">
         <div data-testid="page">PAGE</div>
-      </DomainNotConnectedGate>,
+      </DomainNotConnectedGateView>,
     );
-    // legacy page (and any mutation controls it carries) is absent
     expect(screen.queryByTestId("page")).toBeNull();
-    // clear Hebrew notice + the typed marker are shown instead
     expect(screen.getByText("תצוגה מקדימה פנימית")).toBeTruthy();
     expect(screen.getByText("DOMAIN_NOT_CONNECTED")).toBeTruthy();
   });
 
-  it("LOCAL mode: the page renders unchanged (no notice)", () => {
+  it("SUPABASE + connected customer LIST route: the page renders (no notice)", () => {
     render(
-      <DomainNotConnectedGate provider="LOCAL_INDEXEDDB">
+      <DomainNotConnectedGateView provider="SUPABASE" pathname="/customers">
         <div data-testid="page">PAGE</div>
-      </DomainNotConnectedGate>,
+      </DomainNotConnectedGateView>,
+    );
+    expect(screen.getByTestId("page")).toBeTruthy();
+    expect(screen.queryByText("DOMAIN_NOT_CONNECTED")).toBeNull();
+  });
+
+  it("LOCAL mode: the page renders unchanged on any route (no notice)", () => {
+    render(
+      <DomainNotConnectedGateView provider="LOCAL_INDEXEDDB" pathname="/leads">
+        <div data-testid="page">PAGE</div>
+      </DomainNotConnectedGateView>,
     );
     expect(screen.getByTestId("page")).toBeTruthy();
     expect(screen.queryByText("DOMAIN_NOT_CONNECTED")).toBeNull();

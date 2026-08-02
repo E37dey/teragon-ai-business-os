@@ -13,7 +13,8 @@ import {
   useToast,
 } from "@/design-system";
 import { PageRail } from "@/app/rail";
-import { useCollection } from "@/app/data/hooks";
+import { useDomainCollection, domainReadMessage } from "@/app/data/useDomainCollection";
+import { PERSISTENCE_PROVIDER } from "@/persistence/provider";
 import type { Customer, CustomerType } from "@/domain/types";
 import { totalRevenue } from "@/domain/selectors";
 import {
@@ -53,7 +54,10 @@ function contactChip(state: Customer["contactState"]): ReactElement {
 export default function CustomersPage(): ReactElement {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const customersQ = useCollection<Customer>("customers");
+  // Read through the composition boundary: LOCAL → IndexedDB (unchanged);
+  // SUPABASE → authenticated remote read, no local fallback (S9.2-A1b).
+  const isSupabase = PERSISTENCE_PROVIDER === "SUPABASE";
+  const customersQ = useDomainCollection<Customer>("customers");
   const customers = useMemo(() => customersQ.data ?? [], [customersQ.data]);
 
   const [type, setType] = useState<CustomerType | "הכול">("הכול");
@@ -110,18 +114,24 @@ export default function CustomersPage(): ReactElement {
   };
 
   if (customersQ.isError) {
+    const safe = domainReadMessage(customersQ.error);
     return (
       <EmptyState
         icon="alert"
         title="טעינת הלקוחות נכשלה"
-        reason="קריאת הנתונים מ-IndexedDB המקומי נכשלה. רעננו את הדף."
+        reason={
+          safe ??
+          (isSupabase
+            ? "קריאת הלקוחות מהשרת נכשלה. רעננו את הדף או התחברו מחדש."
+            : "קריאת הנתונים מ-IndexedDB המקומי נכשלה. רעננו את הדף.")
+        }
       />
     );
   }
   if (customersQ.isLoading) {
     return (
       <div style={{ padding: "var(--os-space-6)", color: "var(--os-text-2)" }} role="status">
-        טוען לקוחות מהמאגר המקומי…
+        {isSupabase ? "טוען לקוחות מהשרת…" : "טוען לקוחות מהמאגר המקומי…"}
       </div>
     );
   }
@@ -171,9 +181,23 @@ export default function CustomersPage(): ReactElement {
         }}
       >
         <h1 style={{ margin: 0, fontSize: "var(--os-text-xl, 20px)" }}>לקוחות</h1>
-        <OsButton icon="plus" onClick={() => setCreateOpen(true)}>
-          לקוח חדש
-        </OsButton>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--os-space-2)" }}>
+          <OsButton variant="ghost" icon="clock" onClick={() => void customersQ.refetch()}>
+            {customersQ.isFetching ? "מרענן…" : "רענון"}
+          </OsButton>
+          {isSupabase ? (
+            <span
+              style={{ fontSize: "var(--os-text-sm, 13px)", color: "var(--os-text-muted)" }}
+              role="note"
+            >
+              יצירת לקוח עדיין אינה זמינה בסביבת התצוגה
+            </span>
+          ) : (
+            <OsButton icon="plus" onClick={() => setCreateOpen(true)}>
+              לקוח חדש
+            </OsButton>
+          )}
+        </div>
       </div>
 
       <div
@@ -247,7 +271,7 @@ export default function CustomersPage(): ReactElement {
         />
       </Panel>
 
-      {createOpen && (
+      {!isSupabase && createOpen && (
         <Modal open onClose={() => setCreateOpen(false)} title="לקוח חדש">
           <form
             className="os-qc-form"

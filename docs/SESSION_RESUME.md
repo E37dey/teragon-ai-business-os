@@ -5,7 +5,7 @@
 
 ## Current position
 - **Branch:** `feature/teragon-supabase-domain-integration` (Draft PR #3 → base `feature/teragon-supabase-app-auth`)
-- **HEAD after this session:** the `feat(persistence): block local storage initialization in Supabase mode` commit (S9.1-A). Prior: `d799f13` (composition foundation module) ← `9e11d20` (S9.0 domain map, docs only).
+- **HEAD after this session:** the `feat(customers): connect customer list and read views to Supabase composition` commit (S9.2-A1b). Prior: `372a7b1` (S9.2-A1a async loader seam).
 - **Tree:** clean.
 
 ## Authorized scope (per session — ONE bounded checkpoint)
@@ -13,7 +13,15 @@
 - **S9.1-B1 DONE:** central `DomainNotConnectedGate` mounted around the page `Outlet` in `OsShell` (commit `566ce74`).
 - **S9.1-B2 DONE + CHECKPOINT-A COMPLETE (this session):** shell/header wired to `useAuth` — safe identity (name · role · org, no tokens), logout via real `signOut` (routes to `/login` replace; composition returns `AUTH_REQUIRED` after — repo access invalidated). SUPABASE never shows the static `CANONICAL_USER`; LOCAL unchanged. Full Checkpoint-A gate PASS (vitest 2498/0-skipped, build, build:preview, oxlint, typecheck×2, scan:secrets CLEAN, representative Playwright 3/3).
 - **S9.2-A1a DONE:** authenticated async Supabase domain seam `src/persistence/composition/loadSupabaseDomainRepository.ts` — fail-closed (provider→session→canonical identity→allow-list→lazy import), org from `identity.organizationId` (never VITE_SUPABASE_ORG/browser), typed errors (AUTH_REQUIRED / IDENTITY_INVALID / DOMAIN_NOT_CONNECTED / REMOTE_REPOSITORY_LOAD_FAILED / PROVIDER_BYPASS_FORBIDDEN), no IndexedDB/fallback. `SUPABASE_CONNECTED_DOMAINS=["customers"]` (IMPLEMENTATION_READY; NOT route-mounted / NOT in the domain map). Gate still not route-aware, so SUPABASE mode still shows the notice for all pages.
-- **Next = S9.2-A1b: route-aware customer list/read integration** — make DomainNotConnectedGate route-aware (customers renders, others notice), add a composition-aware read hook (`useDomainCollection`) that calls the loader for customers, wire `CustomersPage` list/read (NOT create/update yet). Then live customer read validation.
+- **S9.2-A1b DONE (LIST read-connected; DETAIL deferred → PARTIAL):**
+  - `src/app/data/routeDomain.ts` — route→domain map; `/customers`→`customers`, `/customers/:id`→`null` (detail deferred), else `null`. Connected decision stays central (`isSupabaseConnectedDomain`), no routing allow-list.
+  - `DomainNotConnectedGate.tsx` — split into pure `DomainNotConnectedGateView({provider,pathname})` (route-aware) + `DomainNotConnectedGate` wrapper (`useLocation` + `PERSISTENCE_PROVIDER`). SUPABASE mounts a route only when its domain is connected; `/customers` renders, `/customers/:id` + all others show the notice (their IndexedDB pages never mount).
+  - `src/app/data/useDomainCollection.ts` — composition read hook. LOCAL = byte-for-byte `useCollection` (shared key+queryFn → invalidation intact). SUPABASE = `enabled:authed`, `retry:false`, reads via `loadSupabaseDomainRepository`→`listSafe()`; non-ok throws typed `DomainReadError` (safe Hebrew msg, no leak); never `getRepository`, never local fallback. Query key = `["domain-collection","SUPABASE",collection,userId,orgId]` (no tokens/sessions); on loss of auth it cancels+removes cached protected rows.
+  - `CustomersPage.tsx` — uses `useDomainCollection`; provider-aware loading/typed-error states; refresh; SUPABASE hides the IndexedDB create button + modal, shows Hebrew notice "יצירת לקוח עדיין אינה זמינה בסביבת התצוגה".
+  - **DETAIL (`/customers/:id`) intentionally left blocked** — the 832-line 13-collection Customer-360 page is a broad rewrite (12 domains still NOT_CONNECTED); deferred to keep the commit bounded + the tree clean.
+  - Tests: `tests/app/customer-read.test.tsx` (13) + rewired `tests/app/domain-not-connected-gate.test.tsx` (3). Targeted vitest 46-adjacent green, typecheck clean, oxlint clean. No full/live suite, no build:preview, no screenshots (SUPABASE list needs a live session → visual gate belongs with live validation).
+  - **customers status = `READ_CONNECTED_LOCAL_TESTED`** (list only; detail NOT connected; every other domain NOT_CONNECTED).
+- **Next = S9.2-A1c: customer create/update + idempotency** — mutation seam through the composition boundary (still no contacts, no migration 015). Then customer DETAIL read wiring, then live customer read validation.
 
 ## Frozen facts (recorded once — do NOT re-verify)
 - Backend fully stood up on live `teragon-staging` (`bjvirkmagwpqroakazjj`): 14 migrations, schema verified, RLS 8/8, admin `soundcloudillusion@gmail.com` bootstrapped, deterministic seed. **S7.1/S7.2 PASS.**

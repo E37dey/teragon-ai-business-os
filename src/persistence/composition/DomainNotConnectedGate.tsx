@@ -8,9 +8,12 @@
 // navigation (the shell chrome) is preserved. LOCAL mode renders children
 // unchanged.
 import type { ReactElement, ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 import { readSafeProvenance } from "@/runtime/provenance";
 import { PERSISTENCE_PROVIDER, type PersistenceProvider } from "@/persistence/provider";
+import { routeDomain } from "@/app/data/routeDomain";
 import { useDomainComposition } from "./DomainRepositoryProvider";
+import { isSupabaseConnectedDomain } from "./domainComposition";
 
 export function DomainNotConnectedNotice(): ReactElement {
   return (
@@ -47,19 +50,39 @@ export function DomainNotConnectedNotice(): ReactElement {
 }
 
 /**
- * Central gate. In SUPABASE mode every domain is not connected this checkpoint,
- * so the notice replaces the routed page content; otherwise children render.
+ * Pure, route-aware gate decision (no hooks — directly testable). In SUPABASE
+ * mode the routed page renders ONLY when its route maps to a domain the central
+ * contract (SUPABASE_CONNECTED_DOMAINS via isSupabaseConnectedDomain) reports as
+ * connected; every other route shows the notice, so its IndexedDB-backed page
+ * never mounts. There is no independent allow-list here — the connected set lives
+ * in domainComposition. LOCAL mode always renders children unchanged.
  */
-export function DomainNotConnectedGate({
+export function DomainNotConnectedGateView({
   children,
-  provider = PERSISTENCE_PROVIDER,
+  provider,
+  pathname,
 }: {
   children: ReactNode;
-  /** defaults to the build-resolved provider; overridable for targeted tests. */
-  provider?: PersistenceProvider;
+  provider: PersistenceProvider;
+  pathname: string;
 }): ReactElement {
-  if (provider === "SUPABASE") return <DomainNotConnectedNotice />;
-  return <>{children}</>;
+  if (provider !== "SUPABASE") return <>{children}</>;
+  const domain = routeDomain(pathname);
+  const connected = domain !== null && isSupabaseConnectedDomain(domain);
+  return connected ? <>{children}</> : <DomainNotConnectedNotice />;
+}
+
+/**
+ * Central gate mounted once around the routed page `Outlet`. Reads the live route
+ * + the build-resolved provider and delegates to the pure view.
+ */
+export function DomainNotConnectedGate({ children }: { children: ReactNode }): ReactElement {
+  const { pathname } = useLocation();
+  return (
+    <DomainNotConnectedGateView provider={PERSISTENCE_PROVIDER} pathname={pathname}>
+      {children}
+    </DomainNotConnectedGateView>
+  );
 }
 
 /** Dev-only SAFE provider diagnostic — no keys/tokens/sessions, masked ref only. */
