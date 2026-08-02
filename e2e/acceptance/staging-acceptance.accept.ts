@@ -86,9 +86,10 @@ test.beforeEach(async ({ page }) => {
 });
 
 // Accurate per-test accounting for the SAFE report.
-test.afterEach((_fixtures, testInfo) => {
-  if (testInfo.status === "passed") passedCount++;
-  else if (testInfo.status === "skipped") skippedCount++;
+test.afterEach(() => {
+  const status = test.info().status;
+  if (status === "passed") passedCount++;
+  else if (status === "skipped") skippedCount++;
   else failedCount++;
 });
 

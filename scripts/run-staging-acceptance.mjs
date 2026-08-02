@@ -7,7 +7,7 @@
 // ui-missing / defects — no credentials). Never discovered by the default
 // vitest or Playwright suites.
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 
 if (process.env.STAGING_ACCEPTANCE_LIVE !== "1") {
   console.error("[acceptance] STAGING_ACCEPTANCE_LIVE=1 is required — this harness never skips.");
@@ -18,13 +18,20 @@ if (!process.env.ACCEPTANCE_BASE_URL) {
   process.exit(1);
 }
 
+const REPORT = "ci-artifacts/acceptance-report.json";
+// Never trust a stale report from a previous run.
+try {
+  rmSync(REPORT, { force: true });
+} catch {
+  /* ignore */
+}
+
 const run = spawnSync("npx playwright test -c e2e/acceptance.config.ts", {
   stdio: "inherit",
   shell: true,
   env: process.env,
 });
 
-const REPORT = "ci-artifacts/acceptance-report.json";
 if (!existsSync(REPORT)) {
   console.error(`[acceptance] FAIL — no machine-readable report at ${REPORT}.`);
   process.exit(run.status || 1);
