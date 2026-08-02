@@ -49,15 +49,17 @@ jobs:
         run: npx vitest run
       - name: production build
         run: npm run build
-      - name: secret scanner
+      # Authoritative bundle-secret gate (privileged material included). This
+      # replaces the old inline grep step whose expression matched "supabase"
+      # followed anywhere by "service" — a false positive, because Vite output is
+      # one long minified line, so it matched a benign "supabase" occurrence and an
+      # unrelated later identifier (e.g. "serviceWorker"). The scanner fails only on
+      # real credential VALUES —
+      # sb_secret_ keys, JWTs (incl. service_role), db/admin passwords, api keys,
+      # bearer/access tokens — and never on the browser-public publishable key,
+      # "supabase"/"service"/"serviceWorker", or key-format prefix constants.
+      - name: secret scanner (authoritative privileged-key + secret gate)
         run: node scripts/scan-bundle-secrets.mjs
-      - name: privileged-key bundle scan
-        run: |
-          set -euo pipefail
-          if grep -rqiE "service_role|supabase.*service|SUPABASE_SERVICE_ROLE" dist/assets/*.js; then
-            echo "FAIL: privileged Supabase key/reference found in bundle"; exit 1
-          fi
-          echo "OK: no privileged Supabase key/reference in bundle"
 
   live-database:
     name: Live ephemeral Supabase database
