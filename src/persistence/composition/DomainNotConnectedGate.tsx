@@ -9,7 +9,7 @@
 // unchanged.
 import type { ReactElement, ReactNode } from "react";
 import { readSafeProvenance } from "@/runtime/provenance";
-import { PERSISTENCE_PROVIDER } from "@/persistence/provider";
+import { PERSISTENCE_PROVIDER, type PersistenceProvider } from "@/persistence/provider";
 import { useDomainComposition } from "./DomainRepositoryProvider";
 
 export function DomainNotConnectedNotice(): ReactElement {
@@ -50,8 +50,15 @@ export function DomainNotConnectedNotice(): ReactElement {
  * Central gate. In SUPABASE mode every domain is not connected this checkpoint,
  * so the notice replaces the routed page content; otherwise children render.
  */
-export function DomainNotConnectedGate({ children }: { children: ReactNode }): ReactElement {
-  if (PERSISTENCE_PROVIDER === "SUPABASE") return <DomainNotConnectedNotice />;
+export function DomainNotConnectedGate({
+  children,
+  provider = PERSISTENCE_PROVIDER,
+}: {
+  children: ReactNode;
+  /** defaults to the build-resolved provider; overridable for targeted tests. */
+  provider?: PersistenceProvider;
+}): ReactElement {
+  if (provider === "SUPABASE") return <DomainNotConnectedNotice />;
   return <>{children}</>;
 }
 

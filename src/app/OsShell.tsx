@@ -15,6 +15,7 @@ import { Drawer, OsIcon, ToastProvider } from "@/design-system";
 import type { RankedSearchHit } from "@/domain/selectors";
 import { APP_ROUTES } from "./routes";
 import { CANONICAL_USER } from "./identity";
+import { DomainNotConnectedGate } from "@/persistence/composition/DomainNotConnectedGate";
 import { MODE_LABEL, useAppMode } from "./mode";
 import { NAV_GROUPS, activeItemForPath, groupOfPath } from "./nav/navGroups";
 import { useNavBadges } from "./nav/useNavBadges";
@@ -267,7 +268,12 @@ function OsShellInner(): ReactElement {
           )
         }
       >
-        <Outlet />
+        {/* S9.1-B: in SUPABASE mode legacy IndexedDB-backed pages never mount —
+            the central gate shows the Hebrew internal-preview notice instead. The
+            shell chrome (nav/header) is preserved. LOCAL renders the page as before. */}
+        <DomainNotConnectedGate>
+          <Outlet />
+        </DomainNotConnectedGate>
       </AppShell>
 
       {/* tablet: primary nav as an RTL drawer */}

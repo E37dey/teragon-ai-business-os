@@ -9,8 +9,9 @@
 - **Tree:** clean.
 
 ## Authorized scope (per session — ONE bounded checkpoint)
-- **This session was S9.1-A:** legacy `getRepository` hard-gate + IndexedDB boot shutdown in SUPABASE mode + targeted tests. **DONE.**
-- **Next session = S9.1-B:** unconnected-domain wrapper + shell Auth identity/logout + targeted tests + full Checkpoint-A gate.
+- **S9.1-A DONE:** legacy `getRepository` hard-gate + IndexedDB boot shutdown in SUPABASE mode (commit `93611cc`).
+- **S9.1-B1 DONE (this session):** central `DomainNotConnectedGate` mounted around the page `Outlet` in `OsShell` (SUPABASE → Hebrew internal-preview notice, page never mounts, no mutation controls; LOCAL unchanged) + gate tests.
+- **Next = S9.1-B2:** shell/header wired to `useAuth` — safe identity display + logout that invalidates repo access + targeted tests, THEN the once-only full Checkpoint-A gate.
 
 ## Frozen facts (recorded once — do NOT re-verify)
 - Backend fully stood up on live `teragon-staging` (`bjvirkmagwpqroakazjj`): 14 migrations, schema verified, RLS 8/8, admin `soundcloudillusion@gmail.com` bootstrapped, deterministic seed. **S7.1/S7.2 PASS.**
