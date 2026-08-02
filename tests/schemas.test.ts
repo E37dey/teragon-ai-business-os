@@ -150,3 +150,43 @@ describe("zod round-trip over the deterministic seed", () => {
     expect(() => agentSchema.parse({ ...AGENTS[0], status: "לא סטטוס אמיתי" })).toThrow();
   });
 });
+
+describe("Phase 9 additive fields — backward compatibility", () => {
+  const legacyTicket = {
+    id: "st-legacy", customerName: "לקוח", customerId: null, printer: "Ender 3",
+    issue: "שכבה ראשונה", description: "", priority: "גבוהה" as const, status: "חדש" as const,
+    openedAt: "2026-07-01", ownerId: "u-1", solution: "",
+    createdAt: "2026-07-01", updatedAt: "2026-07-01",
+  };
+  const legacyTask = {
+    id: "task-legacy", title: "משימה", description: "", status: "פתוחה" as const,
+    priority: "בינונית" as const, due: "2026-07-01", ownerId: "u-1", relatedRef: null,
+    createdAt: "2026-07-01", updatedAt: "2026-07-01",
+  };
+
+  it("a legacy ServiceTicket WITHOUT customerPrinterId/faultCategory still parses + round-trips", () => {
+    const parsed = serviceTicketSchema.parse(legacyTicket);
+    expect(parsed).toEqual(legacyTicket);
+    expect("customerPrinterId" in parsed).toBe(false);
+    expect("faultCategory" in parsed).toBe(false);
+  });
+
+  it("a Phase-9 ServiceTicket WITH the new fields parses + round-trips; a bad faultCategory is rejected", () => {
+    const modern = { ...legacyTicket, id: "st-modern", customerPrinterId: "cp-1", faultCategory: "כיול" as const };
+    expect(serviceTicketSchema.parse(modern)).toEqual(modern);
+    expect(() => serviceTicketSchema.parse({ ...modern, faultCategory: "לא-קטגוריה-אמיתית" })).toThrow();
+    // null is an explicit "uncategorized / unlinked" value.
+    expect(serviceTicketSchema.parse({ ...legacyTicket, customerPrinterId: null, faultCategory: null }).faultCategory).toBeNull();
+  });
+
+  it("a legacy Task WITHOUT sourceRecommendationId still parses + round-trips", () => {
+    const parsed = taskSchema.parse(legacyTask);
+    expect(parsed).toEqual(legacyTask);
+    expect("sourceRecommendationId" in parsed).toBe(false);
+  });
+
+  it("a Phase-9 Task WITH sourceRecommendationId parses + round-trips", () => {
+    const modern = { ...legacyTask, id: "task-modern", sourceRecommendationId: "rec-1" };
+    expect(taskSchema.parse(modern)).toEqual(modern);
+  });
+});

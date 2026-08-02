@@ -2,7 +2,7 @@
 // state, the auditor rail, and the protected-prompt contract (the protected
 // text NEVER reaches the DOM — checksum + label only).
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RailProvider } from "@/app/rail";
 import { ToastProvider } from "@/design-system";
@@ -136,5 +136,65 @@ describe("GovernanceAuditorRail (rail content)", () => {
     );
     expect(screen.getByTestId("finding-unresolved-critical-risk")).toBeTruthy();
     expect(screen.getByText("חמור")).toBeTruthy();
+  });
+
+  it("collapses detailed findings into a disclosure that is collapsed by default, expandable, with nothing removed", () => {
+    render(
+      <GovernanceAuditorRail
+        findings={[
+          {
+            id: "gf-1",
+            kind: "unresolved-critical-risk",
+            severityHe: "חמור",
+            titleHe: "סיכון קריטי פתוח",
+            detailHe: "פרטי הסיכון הקריטי",
+            refs: ["governance-risk:gr-x"],
+          },
+          {
+            id: "gf-2",
+            kind: "prompt-version-without-approval",
+            severityHe: "אזהרה",
+            titleHe: "גרסת פרומפט ללא אישור",
+            detailHe: "גרסת פרומפט ממתינה",
+            refs: ["prompt-version:pv-1"],
+          },
+        ]}
+      />,
+    );
+    const details = screen.getByTestId("governance-auditor-details") as HTMLDetailsElement;
+    expect(details.tagName).toBe("DETAILS");
+    // collapsed by default — no `open` attribute
+    expect(details.hasAttribute("open")).toBe(false);
+    expect(details.open).toBe(false);
+    // a visible summary line (findings count) is always shown
+    expect(screen.getByText(/2 ממצאים פתוחים/)).toBeTruthy();
+    // ALL prior per-finding content is still present (nothing removed, just disclosed)
+    expect(screen.getByTestId("finding-unresolved-critical-risk")).toBeTruthy();
+    expect(screen.getByTestId("finding-prompt-version-without-approval")).toBeTruthy();
+    expect(screen.getByText("סיכון קריטי פתוח")).toBeTruthy();
+    expect(screen.getByText("גרסת פרומפט ללא אישור")).toBeTruthy();
+    // evidence/prompt-version refs preserved
+    expect(screen.getByText("governance-risk:gr-x")).toBeTruthy();
+    expect(screen.getByText("prompt-version:pv-1")).toBeTruthy();
+    // and it can be expanded
+    details.open = true;
+    expect(details.open).toBe(true);
+  });
+});
+
+describe("GovernancePage boundaries region", () => {
+  it("renders all four human-AI boundary category headings intact", async () => {
+    __resetRepositoriesForTests();
+    mountPage();
+    await screen.findByTestId("governance-page");
+    const boundaries = screen.getByTestId("zone-boundaries");
+    for (const heading of [
+      "אוטונומי — קריאה וטיוטה בלבד",
+      "טעון אישור אנושי — 12 הפעולות הקנוניות",
+      "אסור לסוכנים — בשום מצב",
+      "אנושי בלבד — סמכויות שמורות",
+    ]) {
+      expect(within(boundaries).getAllByText(heading).length, heading).toBeGreaterThan(0);
+    }
   });
 });

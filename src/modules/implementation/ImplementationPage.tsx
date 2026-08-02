@@ -21,7 +21,7 @@ import {
   Tabs,
   type OsStatus,
 } from "@/design-system";
-import type { AuditEvent, User } from "@/domain/types";
+import type { AuditEvent, ISODate, User } from "@/domain/types";
 import type {
   AdoptionStage,
   AdoptionStageStatus,
@@ -340,7 +340,19 @@ function StageDrawer({
 // page
 // ---------------------------------------------------------------------------
 
-export default function ImplementationPage(): ReactElement {
+export interface ImplementationPageProps {
+  /**
+   * Deterministic "today" for wall-clock-derived status (overdue milestones).
+   * Injected by tests as a fixed value; production omits it, and the real
+   * current date is resolved ONCE here at the application boundary. Must be
+   * date-granularity (YYYY-MM-DD) so status stays timezone-independent — the
+   * overdue rule is a pure string compare `dueDate < asOf` (see
+   * domain/adoption/selectors.overdueMilestones).
+   */
+  asOf?: ISODate;
+}
+
+export default function ImplementationPage({ asOf }: ImplementationPageProps = {}): ReactElement {
   const invalidate = useInvalidateCollections();
   const programmesQ = useCollection<ImplementationProgramme>("implementationProgrammes");
   const milestonesQ = useCollection<ImplementationMilestone>("implementationMilestones");
@@ -407,7 +419,8 @@ export default function ImplementationPage(): ReactElement {
   const pilotResults = pilotResultsQ.data ?? [];
 
   const health = programme ? programmeHealth(programme, resolved, risks, decisions) : null;
-  const todayISO = new Date().toISOString().slice(0, 10);
+  // Real-clock access is confined to this single boundary; tests inject `asOf`.
+  const todayISO = asOf ?? new Date().toISOString().slice(0, 10);
   const overdue = overdueMilestones(milestones, todayISO);
   const nextDec = nextDecision(decisions);
   const blocking = blockingRisk(risks);

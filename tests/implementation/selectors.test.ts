@@ -14,7 +14,11 @@ import {
   stageGoNoGo,
 } from "@/domain/adoption/selectors";
 import { resolveEvidence } from "@/domain/adoption/decisions";
-import type { PilotResult } from "@/domain/adoption/types";
+import type {
+  ImplementationMilestone,
+  MilestoneStatus,
+  PilotResult,
+} from "@/domain/adoption/types";
 import { freshBootstrapped, NOW, TODAY } from "./helpers";
 
 async function bootstrappedView() {
@@ -125,5 +129,59 @@ describe("programmeHealth + roadmap derivations", () => {
   it("nextRequiredAction comes from the current stage", async () => {
     const v = await bootstrappedView();
     expect(nextRequiredAction(v.programme)).toContain("פיילוט");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// overdueMilestones — explicit deadline/timezone boundary semantics.
+// The rule is a pure date-string compare `dueDate < asOf` over YYYY-MM-DD
+// values, so it is deterministic and timezone-independent (no Date/TZ math).
+// A milestone is overdue only when it is still open (מתוכננת/בתהליך) AND its
+// due date is STRICTLY before `asOf` — i.e. the due date itself is a grace day.
+// ---------------------------------------------------------------------------
+describe("overdueMilestones — deadline boundary", () => {
+  function milestone(
+    dueDate: string,
+    status: MilestoneStatus,
+    completedAt: string | null = null,
+  ): ImplementationMilestone {
+    return {
+      id: "im-x",
+      createdAt: "2026-01-01",
+      updatedAt: "2026-01-01",
+      programmeId: "iprog-teragon",
+      stageId: "as-1",
+      title: "boundary milestone",
+      dueDate,
+      ownerId: "u-1",
+      status,
+      completedAt,
+    };
+  }
+  const DUE = "2026-06-10";
+
+  it("one day BEFORE the due date → not overdue", () => {
+    expect(overdueMilestones([milestone(DUE, "מתוכננת")], "2026-06-09")).toEqual([]);
+  });
+
+  it("EXACTLY at the due date → not overdue (the deadline day is a grace day)", () => {
+    expect(overdueMilestones([milestone(DUE, "מתוכננת")], DUE)).toEqual([]);
+  });
+
+  it("one day AFTER the due date → overdue", () => {
+    expect(overdueMilestones([milestone(DUE, "בתהליך")], "2026-06-11")).toHaveLength(1);
+  });
+
+  it("completed / cancelled milestones are never overdue, even long past due", () => {
+    expect(overdueMilestones([milestone(DUE, "הושלמה", "2026-06-05")], "2027-01-01")).toEqual([]);
+    expect(overdueMilestones([milestone(DUE, "בוטלה")], "2027-01-01")).toEqual([]);
+  });
+
+  it("is timezone-independent — date-granularity strings compare identically", () => {
+    // The same calendar day expressed for any locale resolves to the same
+    // YYYY-MM-DD `asOf`, so the verdict does not depend on the runner's TZ.
+    const open = milestone(DUE, "מתוכננת");
+    expect(overdueMilestones([open], "2026-06-10")).toEqual([]); // on the day → not overdue
+    expect(overdueMilestones([open], "2026-06-11")).toHaveLength(1); // next day → overdue
   });
 });

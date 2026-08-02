@@ -1,0 +1,220 @@
+name: Supabase Live Validation
+
+# Ephemeral, LOCAL-only Supabase validation inside CI. It provisions a throwaway
+# Postgres via the Supabase CLI, applies every migration + the staging-safe seed,
+# lints, generates types, and runs the RLS isolation tests against the live local
+# database. It NEVER links to or contacts a remote Supabase project and requires
+# NO remote credential (no SUPABASE_ACCESS_TOKEN / PROJECT_REF / DB_PASSWORD).
+# LOCAL_INDEXEDDB remains the app's runtime default.
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - "supabase/**"
+      - "src/persistence/**"
+      - "scripts/platform/**"
+      - "tests/persistence/**"
+      - "tests/supabase/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/supabase-live-validation.yml"
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+  # Default local Supabase Postgres connection (CLI-managed, ephemeral, non-secret).
+  LOCAL_DB_URL: "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+
+jobs:
+  static-gate:
+    name: Static application gate (no Supabase)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: oxlint
+        run: npx oxlint src tests e2e
+      - name: TypeScript strict
+        run: npm run typecheck
+      - name: typecheck:tests
+        run: npm run typecheck:tests
+      - name: full Vitest
+        run: npx vitest run
+      - name: production build
+        run: npm run build
+      - name: secret scanner
+        run: node scripts/scan-bundle-secrets.mjs
+      - name: privileged-key bundle scan
+        run: |
+          set -euo pipefail
+          if grep -rqiE "service_role|supabase.*service|SUPABASE_SERVICE_ROLE" dist/assets/*.js; then
+            echo "FAIL: privileged Supabase key/reference found in bundle"; exit 1
+          fi
+          echo "OK: no privileged Supabase key/reference in bundle"
+
+  live-database:
+    name: Live ephemeral Supabase database
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+
+      - name: Safe diagnostics
+        run: |
+          set -euo pipefail
+          mkdir -p ci-artifacts
+          {
+            echo "docker version: $(docker --version 2>&1 || echo n/a)"
+            echo "docker daemon:  $(docker info --format '{{.ServerVersion}}' 2>&1 || echo unavailable)"
+            echo "RAM:            $(free -h | awk '/Mem:/{print $2" total, "$7" available"}')"
+            echo "disk:           $(df -h / | awk 'NR==2{print $4" free"}')"
+            echo "supabase CLI:   $(npx --no-install supabase --version 2>&1)"
+          } | tee ci-artifacts/diagnostics.txt
+
+      - name: Start local Supabase stack (ephemeral, no remote — full stack for Auth/REST)
+        run: npx supabase start 2>&1 | tee ci-artifacts/db-start.log
+
+      - name: Database lint
+        run: npx supabase db lint 2>&1 | tee ci-artifacts/db-lint.log
+
+      - name: Apply all migrations + staging seed from empty (deterministic)
+        run: npx supabase db reset --local 2>&1 | tee ci-artifacts/db-reset.log
+
+      - name: Verify schema (47 tables, indexes, constraints)
+        run: |
+          set -euo pipefail
+          psql "$LOCAL_DB_URL" -v ON_ERROR_STOP=1 -At \
+            -c "select count(*) from information_schema.tables where table_schema='public';" \
+            | tee ci-artifacts/table-count.txt
+          T=$(psql "$LOCAL_DB_URL" -At -c "select count(*) from information_schema.tables where table_schema='public';")
+          echo "public tables: $T (expected 47)"
+          test "$T" -eq 47
+          psql "$LOCAL_DB_URL" -At -c "select count(*) from pg_indexes where schemaname='public';" | tee ci-artifacts/index-count.txt
+          psql "$LOCAL_DB_URL" -At -c "select count(*) from pg_constraint c join pg_namespace n on n.oid=c.connamespace where n.nspname='public' and c.contype in ('f','c');" | tee ci-artifacts/constraint-count.txt
+          # every RLS-protected table must have rowsecurity=true
+          psql "$LOCAL_DB_URL" -v ON_ERROR_STOP=1 -c "do \$\$ declare n int; begin select count(*) into n from pg_tables where schemaname='public' and rowsecurity=false; if n>0 then raise exception 'RLS not enabled on % public tables', n; end if; end \$\$;"
+
+      - name: RLS isolation tests (live, against local Postgres)
+        run: |
+          set -euo pipefail
+          : > ci-artifacts/rls-report.txt
+          for f in supabase/tests/0*.sql; do
+            echo "=== $f ===" | tee -a ci-artifacts/rls-report.txt
+            psql "$LOCAL_DB_URL" -v ON_ERROR_STOP=1 -f "$f" 2>&1 | tee -a ci-artifacts/rls-report.txt
+          done
+          echo "ALL RLS TESTS PASSED" | tee -a ci-artifacts/rls-report.txt
+
+      - name: Seed idempotency (re-apply staging seed → no duplication)
+        run: |
+          set -euo pipefail
+          psql "$LOCAL_DB_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/014_staging_seed.sql 2>&1 | tee ci-artifacts/seed-idempotency.log
+          echo "seed re-applied without error (ON CONFLICT DO NOTHING)"
+
+      - name: Generate TypeScript database types (local)
+        run: |
+          set -euo pipefail
+          npx supabase gen types typescript --local > ci-artifacts/database.types.ts
+          test -s ci-artifacts/database.types.ts
+          echo "generated types: $(wc -l < ci-artifacts/database.types.ts) lines" | tee ci-artifacts/gen-types.txt
+
+      - name: Repository adapter contract tests (mock)
+        run: npx vitest run tests/persistence 2>&1 | tee ci-artifacts/persistence-tests.log
+
+      - name: Export live Supabase env (MASKED — never printed/uploaded)
+        run: |
+          set -euo pipefail
+          npx supabase status -o env > /tmp/sbenv 2>/dev/null
+          API_URL=$(grep -E '^(API_URL|SUPABASE_URL)=' /tmp/sbenv | head -1 | cut -d'"' -f2)
+          ANON=$(grep -E '^(ANON_KEY|SUPABASE_ANON_KEY)=' /tmp/sbenv | head -1 | cut -d'"' -f2)
+          SR=$(grep -E '^(SERVICE_ROLE_KEY|SUPABASE_SERVICE_ROLE_KEY)=' /tmp/sbenv | head -1 | cut -d'"' -f2)
+          # Mask secret values in ALL subsequent logs, then pass via GITHUB_ENV (not echoed).
+          echo "::add-mask::$ANON"
+          echo "::add-mask::$SR"
+          {
+            echo "SUPABASE_URL=$API_URL"
+            echo "SUPABASE_ANON_KEY=$ANON"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SR"
+            echo "PERSISTENCE_PROVIDER=SUPABASE"
+            echo "SUPABASE_LIVE_TESTS=1"
+          } >> "$GITHUB_ENV"
+          rm -f /tmp/sbenv
+          test -n "$API_URL" || { echo "FAIL: no local Supabase URL from supabase status"; exit 1; }
+          test -n "$ANON" -a -n "$SR" || { echo "FAIL: missing local Supabase keys"; exit 1; }
+          echo "live Supabase env exported (url set; keys masked; SUPABASE_LIVE_TESTS=1)"
+
+      - name: Assert LOCAL_INDEXEDDB remains the application default
+        run: |
+          set -euo pipefail
+          grep -qE 'DEFAULT_PERSISTENCE_PROVIDER[^=]*=\s*"LOCAL_INDEXEDDB"' src/persistence/provider.ts \
+            || { echo "FAIL: LOCAL_INDEXEDDB is not the default provider"; exit 1; }
+          echo "OK: LOCAL_INDEXEDDB is the default provider (SUPABASE selected only in test composition)"
+
+      - name: Live repository-adapter tests (dedicated config; SUPABASE_LIVE_TESTS=1; real adapters vs live Supabase)
+        run: |
+          set -euo pipefail
+          # keys arrive via the masked GITHUB_ENV from the previous step; not printed here.
+          test "${SUPABASE_LIVE_TESTS:-}" = "1" || { echo "FAIL: SUPABASE_LIVE_TESTS is not 1"; exit 1; }
+          npm run test:supabase:live 2>&1 | tee ci-artifacts/supabase-integration.log
+          test -f ci-artifacts/live-report.json || { echo "FAIL: no live-report.json produced (suite did not run)"; exit 1; }
+          node -e '
+            const r = require("./ci-artifacts/live-report.json");
+            const files   = r.numTotalTestSuites ?? 0;
+            const passed  = r.numPassedTests ?? 0;
+            const failed  = r.numFailedTests ?? 0;
+            const skipped = r.numPendingTests ?? 0;
+            const executed = passed + failed;
+            const line = `live-adapter: files=${files} executed=${executed} passed=${passed} failed=${failed} skipped=${skipped}`;
+            require("fs").writeFileSync("ci-artifacts/live-adapter-counts.txt", line + "\n");
+            console.log(line);
+            if (files   < 1) { console.error("FAIL: 0 live test files discovered"); process.exit(1); }
+            if (executed< 1) { console.error("FAIL: 0 live tests executed (must not silently skip)"); process.exit(1); }
+            if (failed  > 0) { console.error("FAIL: " + failed + " live tests failed"); process.exit(1); }
+            if (skipped > 0) { console.error("FAIL: " + skipped + " live tests skipped (must be 0)"); process.exit(1); }
+          '
+
+      - name: S5 validation summary
+        if: always()
+        run: |
+          {
+            echo "commit: ${{ github.sha }}"
+            echo "ref:    ${{ github.ref }}"
+            echo "runner: ubuntu-latest"
+            echo "supabase CLI: $(npx --no-install supabase --version 2>&1)"
+          } | tee ci-artifacts/s5-summary.txt
+
+      - name: Cleanup ephemeral stack (always)
+        if: always()
+        run: npx supabase stop --no-backup 2>&1 | tee ci-artifacts/db-stop.log || true
+
+      - name: Upload safe artifacts (no volumes/secrets)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-s5-reports
+          path: |
+            ci-artifacts/diagnostics.txt
+            ci-artifacts/db-lint.log
+            ci-artifacts/db-reset.log
+            ci-artifacts/table-count.txt
+            ci-artifacts/index-count.txt
+            ci-artifacts/constraint-count.txt
+            ci-artifacts/rls-report.txt
+            ci-artifacts/seed-idempotency.log
+            ci-artifacts/gen-types.txt
+            ci-artifacts/persistence-tests.log
+            ci-artifacts/supabase-integration.log
+            ci-artifacts/live-adapter-counts.txt
+            ci-artifacts/live-report.json
+            ci-artifacts/s5-summary.txt
+          if-no-files-found: warn

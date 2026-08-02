@@ -53,11 +53,13 @@
     #                                 the built dist/index.html contains only a
     #                                 <script type="module" src="/assets/…"> — no
     #                                 inline script and no inline event handlers.
-    #   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com
-    #                                 — 'unsafe-inline' is REQUIRED (see below);
-    #                                 the Google Fonts stylesheet is loaded from
-    #                                 fonts.googleapis.com by index.html.
-    #   font-src  'self' https://fonts.gstatic.com  — Google Fonts webfonts.
+    #   style-src 'self' 'unsafe-inline'
+    #                                 — 'unsafe-inline' is REQUIRED for dynamic
+    #                                 inline styles (see below). NO external font
+    #                                 origin: the app uses a system Hebrew stack
+    #                                 (tokens.css --os-font: "Segoe UI",
+    #                                 "Arial Hebrew", Arial) and requests NO webfont.
+    #   font-src  'self'            — system fonts only; no external webfonts.
     #   img-src   'self' data:      — inline data: URIs (SVG icons, canvas/chart
     #                                 exports) plus same-origin assets.
     #   connect-src 'self'          — the app only calls same-origin
@@ -78,7 +80,7 @@
     #   custom properties (style={{'--w': x}} + a static class) and adopt a
     #   nonce/hash strategy for the print <style>, then drop 'unsafe-inline' from
     #   style-src. Tracked in docs/integration-requests-w9d.md.
-    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 
 # --- Cache headers -----------------------------------------------------------
 # Hashed, content-addressed build assets are immutable — cache for a year.
@@ -99,3 +101,16 @@
   for = "/favicon.svg"
   [headers.values]
     Cache-Control = "public, max-age=3600"
+
+# --- Deploy-Preview Supabase env (S7.3A / Option B) --------------------------
+# BROWSER-PUBLIC build-time values for the deploy-preview context ONLY. These
+# ship in the client bundle (that is expected). Production / global
+# [build.environment] / branch / dev / Functions NEVER inherit them, so the
+# app default stays LOCAL_INDEXEDDB when this Preview override is absent.
+# NO privileged key here: only the public project URL, the PUBLISHABLE
+# (browser-safe) key, the org, and the provider selector.
+[context.deploy-preview.environment]
+  VITE_SUPABASE_URL = "https://bjvirkmagwpqroakazjj.supabase.co"
+  VITE_SUPABASE_ANON_KEY = "sb_publishable_yy-AzXfN8JeZmNDNFiDlPw_XONeKH_6"
+  VITE_SUPABASE_ORG = "org-teragon"
+  VITE_PERSISTENCE_PROVIDER = "SUPABASE"

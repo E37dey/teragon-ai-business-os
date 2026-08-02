@@ -5,8 +5,22 @@ dist-ssr
 .env
 .env.*
 !.env.example
+!.env.deploy.example
+!.env.staging.local.example
+# S6.1 automated credential bootstrap output — NEVER commit (also matched by
+# *.local and .env.* above; listed explicitly as a hard guard).
+.env.staging.local
+.teragon-staging-recovery.*
+# S7.0 staging stage tracker — safe masked metadata only, still never committed.
+.teragon-staging-state.json
 .netlify
 playwright-report
 test-results
 *.tsbuildinfo
 .claude/
+
+# Supabase local/ephemeral state (config.toml + migrations + tests ARE tracked)
+supabase/.temp/
+supabase/.branches/
+supabase/.env
+.supabase/

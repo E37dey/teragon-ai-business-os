@@ -1995,6 +1995,9 @@ export const SERVICE_TICKETS: ServiceTicket[] = [
     openedAt: d(-4),
     ownerId: "u-ran",
     solution: "הוזמן גלגל שיניים חלופי לאקסטרודר.",
+    // Phase 9 — canonical printer link + typed fault category.
+    customerPrinterId: "cp-2",
+    faultCategory: "סתימת אקסטרודר",
     ...meta(-4, -2),
   },
   {
@@ -2009,6 +2012,9 @@ export const SERVICE_TICKETS: ServiceTicket[] = [
     openedAt: d(-8),
     ownerId: "u-ran",
     solution: "בוצע כיול E-step ו-Flow, המידות תקינות.",
+    // Phase 9 — canonical printer link + typed fault category.
+    customerPrinterId: "cp-6",
+    faultCategory: "כיול",
     ...meta(-8, -6),
   },
   {
@@ -2141,6 +2147,8 @@ export const TASKS: Task[] = [
     due: d(0),
     ownerId: "u-maya",
     relatedRef: "lead:l-10",
+    // Phase 9 — canonical link to the recommendation that generated this task.
+    sourceRecommendationId: "rec-1",
     ...meta(-2, -1),
   },
   {

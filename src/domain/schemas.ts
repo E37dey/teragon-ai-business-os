@@ -86,6 +86,16 @@ export const ticketStatusSchema = z.enum([
 ]);
 export const ticketPrioritySchema = z.enum(["גבוהה", "בינונית", "נמוכה"]);
 export const taskStatusSchema = z.enum(["פתוחה", "בתהליך", "הושלמה", "בוטלה"]);
+/** Phase 9 — closed fault-category taxonomy (typed, canonical, never inferred). */
+export const serviceFaultCategorySchema = z.enum([
+  "הידבקות שכבה ראשונה",
+  "סתימת אקסטרודר",
+  "כיול",
+  "תקלת חשמל",
+  "תוכנה",
+  "מכני",
+  "אחר",
+]);
 export const courseStatusSchema = z.enum(["פעיל", "פתוח להרשמה", "הסתיים", "מלא"]);
 export const agentStatusSchema = z.enum(["פעיל", "ממתין", "דורש אישור", "חסום", "מושבת"]);
 export const agentTaskStatusSchema = z.enum([
@@ -287,6 +297,9 @@ export const serviceTicketSchema = z.object({
   openedAt: isoDate,
   ownerId: z.string().min(1),
   solution: z.string(),
+  // Phase 9 (additive, optional) — backward compatible: legacy tickets omit both.
+  customerPrinterId: z.string().nullable().optional(),
+  faultCategory: serviceFaultCategorySchema.nullable().optional(),
 }) satisfies z.ZodType<ServiceTicket>;
 
 export const taskSchema = z.object({
@@ -298,6 +311,8 @@ export const taskSchema = z.object({
   due: isoDate,
   ownerId: z.string().min(1),
   relatedRef: z.string().nullable(),
+  // Phase 9 (additive, optional) — backward compatible: legacy tasks omit it.
+  sourceRecommendationId: z.string().nullable().optional(),
 }) satisfies z.ZodType<Task>;
 
 export const meetingSchema = z.object({
