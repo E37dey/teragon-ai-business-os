@@ -21,6 +21,8 @@ ci-artifacts/
 e2e/live-domains/_report.json
 e2e/live-domains/_pw.json
 e2e/live-domains/_idb.json
+e2e/pilot/_cross-browser.json
+e2e/e2e/
 *.tsbuildinfo
 .claude/
 
