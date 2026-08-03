@@ -162,9 +162,26 @@ claims), counts only:
 
 ---
 
-## 8. Cleanup
+## 8. Cleanup — executed and verified
 
-Recorded in §9 after disposal (appended post-PR, per runbook §8).
+Performed `2026-08-03T17:41:15Z` (client UTC), after the evidence commit and
+Draft PR #9, per runbook §8.
+
+| Action | Result |
+|---|---|
+| `DELETE /v1/projects/fftyy…myuqp` | **HTTP 200** |
+| Disposal verified by **absence** in `GET /v1/projects` | `drillProjectStillExists=false` |
+| Staging still present and healthy | `stagingPresent=true`, `ACTIVE_HEALTHY` |
+| Local credential file removed | `.env.restore-drill.local` → removed (`true`) |
+| Dump artifacts | none were ever produced (path B not performed) |
+
+Deletion was guarded in code: the script refuses any ref equal to staging **and**
+any project whose name does not begin `teragon-restoredrill-`. Disposal is proven
+by the project's absence from the account listing, not by the delete call's
+status alone.
+
+The drill left **no** residue: no project, no credential file, no dump, and no
+fixtures (§6 audit returned zeros before disposal).
 
 ---
 
