@@ -69,6 +69,12 @@
 - App browser env contract var: `VITE_SUPABASE_ANON_KEY` (holds the publishable key), read in `src/persistence/supabase/client.ts`.
 - Composition foundation (`d799f13`): `src/persistence/composition/{domainComposition.ts, DomainRepositoryProvider.tsx, DomainNotConnectedGate.tsx}` — pure fail-closed boundary, `SUPABASE_CONNECTED_DOMAINS = []` in Checkpoint A, `useDomainRepository`, central not-connected gate + safe `ProviderDiagnostic`.
 
+## PR #3 merge-readiness (audited at `524f0db`)
+- Mergeable, **no conflicts**; base `feature/teragon-supabase-app-auth`; still **Draft**; no reviews, zero unresolved review threads; diff = 39 files, all in S9 scope; no env/secret file tracked (`.env.staging.local` untracked; only the *scanner* `scripts/scan-bundle-secrets.mjs` matches "secret").
+- **MERGE BLOCKED — `Static application gate (no Supabase)` is RED:** `npm run typecheck:tests` exits 2 with **42 errors** in PR-introduced test files — `customer-mutation.test.tsx` (23), `customer-detail.test.tsx` (12), `customer-read.test.tsx` (5), `live-customer-fixtures.test.ts` (1), `supabase-domain-loader.test.ts` (1). Mostly `TS2345` mock-arg `never` (untyped `vi.fn()` needing explicit generics) plus a widened `type: string` vs the `"פרטי"|"עסק"|"בית ספר"|"ארגון"` union.
+- **Pre-existing, NOT caused by the live-acceptance work:** this gate has failed on every commit of the branch (`d47013f`, `e2a2201`, … ) — introduced by `2b54cfe` / `7f5a93a` / `e5d5c17` / `372a7b1`. `npm run typecheck` (app) is clean; the live-acceptance evidence is unaffected.
+- Live evidence still valid at HEAD: `65363ba..524f0db` is docs + a **comment-only** edit to `domainComposition.ts` — zero behavior change, so preflight `30809789015` and full run `30809944248` still describe this tree.
+
 ## Current blocker / gating
 - **Migration 015 (`approve_and_create_task` RPC) is NOT authorized** — required later for S9.2.B (approval→task atomicity), excluded from S9.x.A. Do not create it.
 - Domain data layer not yet consumed by UI (root of `TA-B1`) — being wired incrementally: composition (d799f13) → hard-gate + boot shutdown (this commit) → wrapper + shell (S9.1-B) → CRM (S9.2.A).
