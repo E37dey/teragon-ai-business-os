@@ -42,6 +42,14 @@ import { redactSecrets, selectExportRecords, recordToMarkdown } from "@/memory/e
 import type { MemoryRecordV2 } from "@/domain/memory";
 import { LocalRulesProvider, repositoryDataAccess } from "@/ai/providers/LocalRulesProvider";
 import { RemoteAIProvider } from "@/ai/providers/RemoteAIProvider";
+import {
+  probeSupabaseReachability,
+  probeSupabaseRlsRead,
+  type SupabaseProbeEnv,
+  type SupabaseProbeResult,
+  type SupabaseProbeState,
+} from "./supabaseProbes";
+import { productionSupabaseProbeEnv } from "./supabaseProbeEnv";
 
 // ---------------------------------------------------------------------------
 // env seam
@@ -78,6 +86,13 @@ export interface HealthCheckEnv {
   perf: () => number;
   /** timeout for the functions probe (ms) */
   functionsTimeoutMs: number;
+  /**
+   * S10.0-D2: injectable IO for the Supabase probes. OPTIONAL on purpose — an
+   * env that omits it (every pre-existing construction, including tests) simply
+   * reports "טרם נבדק" for the two remote components instead of inventing a
+   * state, and every other check is unaffected.
+   */
+  supabaseProbe?: SupabaseProbeEnv | null;
 }
 
 export function productionHealthCheckEnv(): HealthCheckEnv {
@@ -115,6 +130,9 @@ export function productionHealthCheckEnv(): HealthCheckEnv {
         ? performance.now()
         : Date.now(),
     functionsTimeoutMs: 3_000,
+    // Real IO for the two remote probes. They run ONLY when a check executes —
+    // there is no polling loop and no render-triggered request.
+    supabaseProbe: productionSupabaseProbeEnv(),
   };
 }
 
@@ -135,6 +153,8 @@ export const CHECK_METHODS_HE: Record<HealthComponentId, string> = {
   "search-index": "הרצת rankedSearch אמיתית מעל נתוני האוספים (שאילתת עשן + אימות דטרמיניזם + שאילתה ריקה ⇒ ריק)",
   "export-engine": "הרצה יבשה בזיכרון: בדיקת redactSecrets עצמית + בחירת רשומות ייצוא (selectExportRecords) וסריאליזציית markdown לרשומה הראשונה — ללא כתיבה וללא הורדה",
   "storage-estimate": "קריאת navigator.storage.estimate() כשה-API קיים",
+  "supabase-reachability": "בדיקת הגדרה (כתובת + מפתח ציבורי) וקריאת סטטוס HTTP אחת מול שרת האימות — ללא נתוני לקוח וללא כתיבה",
+  "supabase-rls-read": "קריאה חסומה אחת (select id · limit 1) בהרשאות המשתמש המחובר בלבד — תוצאה ריקה נחשבת תקינה",
 };
 
 // ---------------------------------------------------------------------------
@@ -689,6 +709,61 @@ export async function collectMigrationHealth(env: HealthCheckEnv): Promise<Migra
 // run everything
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// S10.0-D2 — Supabase probe adapters
+// ---------------------------------------------------------------------------
+
+/** Map a provider-neutral probe state onto the canonical Hebrew component state. */
+export function componentStateForProbe(state: SupabaseProbeState): ComponentState {
+  switch (state) {
+    case "healthy": return "תקין";
+    case "degraded": return "מוגבל";
+    case "unavailable": return "לא זמין";
+    case "unauthorized": return "דורש תשומת לב";
+    case "misconfigured": return "לא הוגדר";
+  }
+}
+
+const PROBE_DETAIL_HE: Record<SupabaseProbeState, string> = {
+  healthy: "הבדיקה הצליחה",
+  degraded: "הבקשה הצליחה אך החזירה מצב חריג",
+  unavailable: "לא ניתן היה להגיע לשרת",
+  unauthorized: "הגישה נדחתה עבור המשתמש המחובר",
+  misconfigured: "החיבור המרוחק אינו מוגדר בבנייה זו",
+};
+
+/**
+ * Smallest possible adapter: run the PROVEN probe, map its state, and surface
+ * ONLY its safe code. No url, session, id, row, header, token or error message
+ * ever reaches the aggregate. `runCheck` already contains a throw, so a failing
+ * probe can never stop the remaining checks.
+ */
+async function runProbeAdapter(
+  id: HealthComponentId,
+  env: HealthCheckEnv,
+  probe: (p: SupabaseProbeEnv) => Promise<SupabaseProbeResult>,
+): Promise<SystemComponentHealth> {
+  const probeEnv = env.supabaseProbe;
+  if (!probeEnv) return uncheckedComponent(id); // honest: never ran ⇒ "טרם נבדק"
+  return runCheck(id, env, async () => {
+    const res = await probe(probeEnv);
+    return {
+      state: componentStateForProbe(res.state),
+      detailHe: res.code ? `${PROBE_DETAIL_HE[res.state]} (${res.code})` : PROBE_DETAIL_HE[res.state],
+      recommendedActionHe:
+        res.state === "healthy" ? null : "בדקו את הגדרות החיבור המרוחק ואת הרשאות המשתמש",
+    };
+  });
+}
+
+export function checkSupabaseReachability(env: HealthCheckEnv): Promise<SystemComponentHealth> {
+  return runProbeAdapter("supabase-reachability", env, probeSupabaseReachability);
+}
+
+export function checkSupabaseRlsRead(env: HealthCheckEnv): Promise<SystemComponentHealth> {
+  return runProbeAdapter("supabase-rls-read", env, probeSupabaseRlsRead);
+}
+
 export const ALL_CHECKS: readonly {
   id: HealthComponentId;
   run: (env: HealthCheckEnv) => Promise<SystemComponentHealth>;
@@ -708,6 +783,8 @@ export const ALL_CHECKS: readonly {
   { id: "search-index", run: checkSearchIndex },
   { id: "export-engine", run: checkExportEngine },
   { id: "storage-estimate", run: checkStorageEstimate },
+  { id: "supabase-reachability", run: checkSupabaseReachability },
+  { id: "supabase-rls-read", run: checkSupabaseRlsRead },
 ];
 
 /** Run all 15 checks sequentially (repository IO is cheap; order is stable). */

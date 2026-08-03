@@ -40,12 +40,21 @@ describe("honesty baseline — unchecked components", () => {
     }
   });
 
-  it("runAllChecks returns exactly the 15 components in registry order", async () => {
+  it("runAllChecks returns exactly the registry components in registry order", async () => {
     const env = await makeEnv();
     const results = await runAllChecks(env);
     expect(results.map((r) => r.componentId)).toEqual([...HEALTH_COMPONENT_IDS]);
+    // S10.0-D2: without an injected Supabase probe env the two REMOTE components
+    // stay honestly "טרם נבדק" (no invented state, no network); every LOCAL check
+    // still ran and measured.
+    const remote = new Set(["supabase-reachability", "supabase-rls-read"]);
     for (const r of results) {
-      expect(r.lastCheck).toBe(T0);
+      if (remote.has(r.componentId)) {
+        expect(r.state).toBe("טרם נבדק");
+        expect(r.lastCheck).toBeNull();
+      } else {
+        expect(r.lastCheck).toBe(T0);
+      }
     }
   });
 });
