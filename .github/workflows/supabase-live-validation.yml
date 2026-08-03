@@ -97,6 +97,27 @@ jobs:
       - name: secret scanner (authoritative privileged-key + secret gate)
         run: node scripts/scan-bundle-secrets.mjs
 
+  accessibility-gate:
+    name: Accessibility gate (Demo Pilot, synthetic)
+    # Required for EVERY pull request (no needs / no if), like the static gate.
+    # Synthetic LOCAL build only: no Supabase, no service-role, no live data.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      # Chromium is sufficient for the a11y gate — the cross-browser matrix
+      # (separate config) covers engine parity and is not duplicated here.
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build LOCAL synthetic-data app
+        run: npm run build
+      - name: axe + keyboard/landmark/label a11y gate (chromium × 1440/390)
+        run: npx playwright test -c e2e/a11y.config.ts
+
   live-database:
     name: Live ephemeral Supabase database
     # Runs ONLY when persistence/Supabase paths changed, or on any non-PR event
