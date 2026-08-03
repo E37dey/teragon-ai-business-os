@@ -6,6 +6,7 @@ import { queryClient } from "./app/queryClient";
 import { createAppRouter } from "./app/router";
 import { AuthProvider } from "./auth/AuthProvider";
 import { RootErrorBoundary } from "./app/RootErrorBoundary";
+import { DemoModeBanner } from "./app/DemoModeBanner";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { installProvenance } from "./runtime/provenance";
 import { bootLocalPersistence } from "./app/bootPersistence";
@@ -32,6 +33,9 @@ async function boot() {
           it, so its fallback deliberately uses no provider-backed component. */}
       <RootErrorBoundary>
         <ThemeProvider>
+          {/* Above the router on purpose: the demo notice must be visible on
+              EVERY route, including /login, and must not depend on auth. */}
+          <DemoModeBanner />
           <AuthProvider>
             <QueryClientProvider client={queryClient}>
               <RouterProvider router={createAppRouter()} />

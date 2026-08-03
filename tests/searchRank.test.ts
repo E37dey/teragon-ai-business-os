@@ -67,7 +67,9 @@ describe("rankedSearch — field matching", () => {
   });
 
   it("finds an email", () => {
-    const hits = rankedSearch(DATA, "info@dagesh.co");
+    // S10.3: demo seed emails are all @example.com (non-routable) — search still
+    // matches on the email field.
+    const hits = rankedSearch(DATA, "info@example.com");
     expect(hits.some((h) => h.matchedField === "אימייל")).toBe(true);
   });
 
