@@ -38,10 +38,11 @@ export class DomainCompositionError extends Error {
  * **LIVE_VALIDATED** — the 12-test live customer acceptance passed 12/12 against
  * live `teragon-staging` on the GitHub-hosted runner, with verified fixture
  * cleanup and a zero-orphan audit.
- * S9.3-B: `contacts` is READ-connected (list only). Its table/RLS/mapping already
- * existed (003/010/012 + domains/crm.ts); this checkpoint only mounts the read
- * route. Contacts is NOT LIVE_VALIDATED and has no create/update/delete or detail
- * route yet. Every other domain is still NOT_CONNECTED.
+ * S9.3-E: `contacts` is now **LIVE_VALIDATED** too — list read, customer-scoped
+ * read, create and update passed 12/12 against live `teragon-staging` on the
+ * GitHub-hosted runner, with verified cleanup and a zero-orphan audit. Contacts
+ * still has NO delete and NO detail route. Every other domain is NOT_CONNECTED
+ * and MUST stay that way until separately validated.
  */
 export const SUPABASE_CONNECTED_DOMAINS: readonly CollectionKey[] = ["customers", "contacts"];
 
