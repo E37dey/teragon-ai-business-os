@@ -12,12 +12,18 @@ import { APP_ROUTES } from "@/app/routes";
 import { CANONICAL_ROLE_IDS } from "@/domain/administration";
 
 describe("W9-B — route coverage", () => {
-  it("every one of the 31 canonical routes has an explicit guard entry", () => {
-    expect(APP_ROUTES.length).toBe(31);
+  it("every one of the 32 canonical routes has an explicit guard entry", () => {
+    expect(APP_ROUTES.length).toBe(32); // +1: /contacts (S9.3)
     for (const r of APP_ROUTES) {
       expect(Object.prototype.hasOwnProperty.call(ROUTE_PERMISSIONS, r.path)).toBe(true);
     }
-    expect(GUARDED_ROUTE_PATHS.length).toBe(31);
+    expect(GUARDED_ROUTE_PATHS.length).toBe(32);
+  });
+
+  // A connected domain route must be gated by the SAME capability as its RLS
+  // policy — contacts SELECT is granted on customer.read (012_rls_policies.sql).
+  it("/contacts requires customer.read", () => {
+    expect(routePermission("/contacts")).toBe("customer.read");
   });
 
   it("does not gate on any permission outside the canonical vocabulary", () => {
