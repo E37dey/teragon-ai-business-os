@@ -10,6 +10,8 @@ import type { ResolvedIdentity } from "@/auth/types";
 import type { Customer } from "@/domain/types";
 import type { RepoResult } from "@/persistence/result";
 import { safeError } from "@/persistence/result";
+import type { CollectionKey } from "@/repositories/collections";
+import type { DomainLoadContext } from "@/persistence/composition/loadSupabaseDomainRepository";
 
 const IDENTITY: ResolvedIdentity = {
   userId: "u1", profileId: "u1", name: "אבי", email: "a@b.co",
@@ -30,10 +32,14 @@ vi.mock("@/persistence/provider", async (orig) => {
   return { ...actual, get PERSISTENCE_PROVIDER() { return providerValue; } };
 });
 
-const listSafe = vi.fn<[], Promise<RepoResult<Customer[]>>>();
-const loadRepo = vi.fn(async () => ({ listSafe }));
+// vi.fn takes ONE function-type generic; the legacy <Args, Return> pair silently
+// resolved to `never`, which is what cascaded into the TS2345 mock errors.
+const listSafe = vi.fn<() => Promise<RepoResult<Customer[]>>>();
+// Mirrors loadSupabaseDomainRepository(collection, ctx) so `mock.calls` carries
+// the real tuple type and the context can be asserted without a cast.
+const loadRepo = vi.fn(async (_collection: CollectionKey, _ctx: DomainLoadContext) => ({ listSafe }));
 vi.mock("@/persistence/composition/loadSupabaseDomainRepository", () => ({
-  loadSupabaseDomainRepository: (...a: unknown[]) => loadRepo(...(a as [])),
+  loadSupabaseDomainRepository: (...a: Parameters<typeof loadRepo>) => loadRepo(...a),
 }));
 
 const localList = vi.fn(async () => [{ id: "cu-local", name: "מקומי" }] as Customer[]);
@@ -128,8 +134,8 @@ describe("S9.2-A1b · useDomainCollection (composition read hook)", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.[0]?.id).toBe("cu-1");
     expect(loadRepo).toHaveBeenCalledTimes(1);
-    const ctx = loadRepo.mock.calls[0]?.[1] as { identity: ResolvedIdentity } | undefined;
-    expect(ctx?.identity.organizationId).toBe("org-teragon");
+    const ctx = loadRepo.mock.calls[0]![1];
+    expect(ctx.identity?.organizationId).toBe("org-teragon");
   });
 
   it("SUPABASE + NOT authenticated → query disabled, loader never called (no leak)", async () => {

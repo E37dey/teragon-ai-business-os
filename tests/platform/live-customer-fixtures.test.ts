@@ -112,7 +112,9 @@ describe("S9.2-A1d2a-1A · withCustomerFixtures (always-cleanup)", () => {
   it("runs the body then cleans up; overall ok", async () => {
     const adapter = fakeAdmin();
     const seen: string[] = [];
-    const run = await withCustomerFixtures({ adapter, config: CONFIG, deps: DETERMINISTIC }, async (h) => {
+    // The harness is a .mjs module, so the body param has no inferred type;
+    // annotate the one field this assertion reads instead of widening to any.
+    const run = await withCustomerFixtures({ adapter, config: CONFIG, deps: DETERMINISTIC }, async (h: { userId: string }) => {
       seen.push(h.userId);
       return "body-done";
     });

@@ -11,6 +11,7 @@ import { DomainCompositionError } from "@/persistence/composition/domainComposit
 import type { PersistenceRepository } from "@/persistence/boundary";
 import type { BaseEntity } from "@/domain/types";
 import type { ResolvedIdentity } from "@/auth/types";
+import type { CollectionKey } from "@/repositories/collections";
 
 const IDENTITY: ResolvedIdentity = {
   userId: "u1", profileId: "u1", name: "A", email: "a@b.co",
@@ -19,7 +20,10 @@ const IDENTITY: ResolvedIdentity = {
 };
 
 const fakeRepo = () => ({ collection: "customers" }) as unknown as PersistenceRepository<BaseEntity>;
-function fakeModule(create = vi.fn(fakeRepo)): { mod: SupabaseModuleLike; create: typeof create } {
+// Mirror createSupabaseRepository's real parameter list so `mock.calls` is a
+// typed tuple and the call can be destructured without an assertion.
+const fakeCreate = (_collection: CollectionKey, _client?: unknown, _organizationId?: string) => fakeRepo();
+function fakeModule(create = vi.fn(fakeCreate)): { mod: SupabaseModuleLike; create: typeof create } {
   return { mod: { createSupabaseRepository: create as unknown as SupabaseModuleLike["createSupabaseRepository"] }, create };
 }
 function ctx(over: Partial<DomainLoadContext> = {}): DomainLoadContext {
@@ -40,7 +44,7 @@ describe("S9.2-A1a · loadSupabaseDomainRepository", () => {
   it("uses the CANONICAL identity organization — never VITE_SUPABASE_ORG / a browser org", async () => {
     const { mod, create } = fakeModule();
     await loadSupabaseDomainRepository("customers", ctx(), { loadSupabase: async () => mod });
-    const [coll, client, org] = create.mock.calls[0] as [string, unknown, string];
+    const [coll, client, org] = create.mock.calls[0]!;
     expect(coll).toBe("customers");
     expect(org).toBe("org-teragon"); // from identity.organizationId
     expect(client).toBeUndefined();  // authenticated client bound internally; not browser-supplied

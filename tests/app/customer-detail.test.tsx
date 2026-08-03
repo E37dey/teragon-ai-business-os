@@ -10,6 +10,8 @@ import type { ResolvedIdentity } from "@/auth/types";
 import type { Customer } from "@/domain/types";
 import type { RepoResult } from "@/persistence/result";
 import { safeError } from "@/persistence/result";
+import type { CollectionKey } from "@/repositories/collections";
+import type { DomainLoadContext } from "@/persistence/composition/loadSupabaseDomainRepository";
 
 const IDENTITY: ResolvedIdentity = {
   userId: "u1", profileId: "u1", name: "אבי", email: "a@b.co",
@@ -37,11 +39,15 @@ vi.mock("react-router-dom", async (o) => {
   return { ...a, useParams: () => ({ id: paramId }) };
 });
 
-const getSafe = vi.fn<[string], Promise<RepoResult<Customer | undefined>>>();
-const updateSafe = vi.fn<[string, Partial<Customer>], Promise<RepoResult<Customer>>>();
-const loadRepo = vi.fn(async () => ({ getSafe, updateSafe }));
+// vi.fn takes ONE function-type generic; the legacy <Args, Return> pair silently
+// resolved to `never`, which is what cascaded into the TS2345 mock errors.
+const getSafe = vi.fn<(id: string) => Promise<RepoResult<Customer | undefined>>>();
+const updateSafe = vi.fn<(id: string, patch: Partial<Customer>) => Promise<RepoResult<Customer>>>();
+// Mirrors loadSupabaseDomainRepository(collection, ctx) so `mock.calls` carries
+// the real tuple type and the context can be asserted without a cast.
+const loadRepo = vi.fn(async (_collection: CollectionKey, _ctx: DomainLoadContext) => ({ getSafe, updateSafe }));
 vi.mock("@/persistence/composition/loadSupabaseDomainRepository", () => ({
-  loadSupabaseDomainRepository: (...a: unknown[]) => loadRepo(...(a as [])),
+  loadSupabaseDomainRepository: (...a: Parameters<typeof loadRepo>) => loadRepo(...a),
 }));
 vi.mock("@/repositories", async (o) => {
   const a = await o<typeof import("@/repositories")>();
@@ -108,8 +114,8 @@ describe("S9.2-A1d1 · SupabaseCustomerDetail read", () => {
     expect(screen.getByText("רמי לוי")).toBeTruthy();
     expect(screen.getByText("r@l.co")).toBeTruthy();
     expect(getSafe).toHaveBeenCalledWith("cu-1");
-    const ctx = loadRepo.mock.calls[0]?.[1] as { identity: ResolvedIdentity };
-    expect(ctx.identity.organizationId).toBe("org-teragon");
+    const ctx = loadRepo.mock.calls[0]![1];
+    expect(ctx.identity?.organizationId).toBe("org-teragon");
     expect(getRepository).not.toHaveBeenCalled(); // no IndexedDB / no fallback
   });
 

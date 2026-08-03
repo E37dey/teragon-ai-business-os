@@ -10,13 +10,18 @@ import type { ResolvedIdentity } from "@/auth/types";
 import type { Customer } from "@/domain/types";
 import type { PersistenceProvider } from "@/persistence/provider";
 import type { RepoResult } from "@/persistence/result";
+import type { CustomerInput } from "@/app/quick-create/actions";
+import type { CollectionKey } from "@/repositories/collections";
+import type { DomainLoadContext } from "@/persistence/composition/loadSupabaseDomainRepository";
 
 const IDENTITY: ResolvedIdentity = {
   userId: "u1", profileId: "u1", name: "אבי", email: "a@b.co",
   organizationId: "org-teragon", organizationName: "טרגון",
   roleId: "crole-sysadmin", roleLabel: "מנהל", capabilities: [], membershipId: "m1",
 };
-const INPUT = { name: "רמי לוי", type: "עסק", phone: "050", email: "r@l.co", city: "תל אביב" };
+// Typed as the real CustomerInput so `type` keeps its literal union instead of
+// widening to string — the fixture must satisfy the same contract as the UI.
+const INPUT: CustomerInput = { name: "רמי לוי", type: "עסק", phone: "050", email: "r@l.co", city: "תל אביב" };
 const record = (over: Partial<Customer> = {}): Customer =>
   ({ id: "cu-x", name: "רמי לוי", type: "עסק", phone: "050", email: "r@l.co", city: "תל אביב",
      organizationId: null, printerSummary: "", courseNames: [], revenue: 0,
@@ -35,12 +40,16 @@ vi.mock("@/persistence/provider", async (orig) => {
   return { ...actual, get PERSISTENCE_PROVIDER() { return providerValue; } };
 });
 
-const upsertSafe = vi.fn<[Customer], Promise<RepoResult<Customer>>>();
-const updateSafe = vi.fn<[string, Partial<Customer>], Promise<RepoResult<Customer>>>();
+// vi.fn takes ONE function-type generic; the legacy <Args, Return> pair silently
+// resolved to `never`, which is what cascaded into the TS2345 mock errors.
+const upsertSafe = vi.fn<(entity: Customer) => Promise<RepoResult<Customer>>>();
+const updateSafe = vi.fn<(id: string, patch: Partial<Customer>) => Promise<RepoResult<Customer>>>();
 const listSafe = vi.fn(async (): Promise<RepoResult<Customer[]>> => ({ ok: true, data: [record()] }));
-const loadRepo = vi.fn(async () => ({ upsertSafe, updateSafe, listSafe }));
+// Mirrors loadSupabaseDomainRepository(collection, ctx) so `mock.calls` carries
+// the real tuple type and the context can be asserted without a cast.
+const loadRepo = vi.fn(async (_collection: CollectionKey, _ctx: DomainLoadContext) => ({ upsertSafe, updateSafe, listSafe }));
 vi.mock("@/persistence/composition/loadSupabaseDomainRepository", () => ({
-  loadSupabaseDomainRepository: (...a: unknown[]) => loadRepo(...(a as [])),
+  loadSupabaseDomainRepository: (...a: Parameters<typeof loadRepo>) => loadRepo(...a),
 }));
 
 const createCustomerSpy = vi.fn(async (input: typeof INPUT) => record({ id: "cu-local", name: input.name }));
@@ -92,8 +101,8 @@ describe("S9.2-A1c · customer WRITE seam — SUPABASE create", () => {
     await act(async () => { res = await result.current.create(INPUT, "cu-x"); });
     expect(res.ok).toBe(true);
     expect(loadRepo).toHaveBeenCalledTimes(1);
-    const ctx = loadRepo.mock.calls[0]?.[1] as { identity: ResolvedIdentity };
-    expect(ctx.identity.organizationId).toBe("org-teragon");
+    const ctx = loadRepo.mock.calls[0]![1];
+    expect(ctx.identity?.organizationId).toBe("org-teragon");
     // verified remote record added to the scoped customer query cache
     expect((qc.getQueryData(SCOPED_KEY) as Customer[])[0]?.id).toBe("cu-x");
   });
@@ -104,7 +113,7 @@ describe("S9.2-A1c · customer WRITE seam — SUPABASE create", () => {
     await act(async () => {
       await result.current.create({ ...INPUT, organization_id: "attacker-org", organizationId: "attacker-org" } as typeof INPUT, "cu-x");
     });
-    const written = upsertSafe.mock.calls[0]?.[0] as Customer;
+    const written = upsertSafe.mock.calls[0]![0];
     expect(written.organizationId).toBeNull(); // owning-org null; tenant org is repo/RLS-injected
     expect(JSON.stringify(written)).not.toContain("attacker-org");
   });
