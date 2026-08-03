@@ -21,6 +21,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # Single source of truth for the runner's Node major (see setup-node below).
+  NODE_VERSION: "22"
+
 concurrency:
   group: customer-live-acceptance
   cancel-in-progress: false
@@ -51,9 +55,13 @@ jobs:
             exit 1
           fi
 
+      # MUST satisfy @supabase/supabase-js `engines: node>=22`. `npm ci` does not
+      # enforce engines, so Node 20 installed cleanly and then failed at call
+      # time inside the SDK — indistinguishable from a bad credential in the
+      # report. Matches NODE_VERSION in supabase-live-validation.yml.
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
       - name: Install locked dependencies

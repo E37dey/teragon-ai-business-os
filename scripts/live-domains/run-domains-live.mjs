@@ -138,6 +138,18 @@ export function safeAuthCategory(err) {
 }
 
 /**
+ * The error's CLASS only — never its message. Stripped to letters so no value,
+ * path or token fragment can ride along. Distinguishes a real credential
+ * rejection (`AuthApiError`) from a runtime/environment fault (`TypeError`),
+ * which `safeAuthCategory` alone flattens into an indistinguishable
+ * `auth_error`.
+ */
+export function safeErrorName(e) {
+  const n = String(e?.name ?? e?.constructor?.name ?? "").replace(/[^A-Za-z]/g, "");
+  return n ? n.slice(0, 40) : "unknown";
+}
+
+/**
  * Server-side admin login preflight — the AUTHORITATIVE credential check BEFORE
  * any browser run. Uses the publishable/anon client only, signs in with the exact
  * workflow env, then immediately signs out. Never logs email/password/session.
@@ -269,6 +281,11 @@ export async function diagnose(env, deps = {}) {
     anonKey: classifyKey(anon, "anon", nowMs),
     serviceKey: classifyKey(svcKey, "service_role", nowMs),
     emailValid: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim()),
+    // Runtime provenance. @supabase/supabase-js declares engines node>=22 and
+    // `npm ci` does NOT enforce engines, so an under-floor runner installs
+    // cleanly and only fails at call time — the exact shape that makes a
+    // GitHub-vs-local divergence look like a credential problem.
+    runtime: { nodeMajor: Number(String(process.versions?.node ?? "0").split(".")[0]) || 0 },
     net: {},
   };
   const cleanUrl = normalizeCred(url);
@@ -284,14 +301,15 @@ export async function diagnose(env, deps = {}) {
     const svc = deps.serviceFactory ? deps.serviceFactory() : (await import("@supabase/supabase-js")).createClient(cleanUrl, normalizeCred(svcKey), { auth: { persistSession: false } });
     const { error } = await svc.auth.admin.listUsers({ page: 1, perPage: 1 });
     out.net.serviceRole = error ? `fail:${error.status ?? safeAuthCategory(error)}` : "pass";
-  } catch (e) { out.net.serviceRole = `fail:${safeAuthCategory(e)}`; }
+    if (error) out.net.serviceRoleErr = safeErrorName(error);
+  } catch (e) { out.net.serviceRole = `fail:${safeAuthCategory(e)}`; out.net.serviceRoleErr = safeErrorName(e); }
   // E. admin signInWithPassword (normalized url + anon; password RAW to detect its contamination)
   try {
     const an = deps.anonFactory ? deps.anonFactory() : (await import("@supabase/supabase-js")).createClient(cleanUrl, normalizeCred(anon), { auth: { persistSession: false } });
     const { data, error } = await an.auth.signInWithPassword({ email: email.trim(), password: env.TERAGON_ADMIN_PASSWORD });
     if (!error && data?.session) { out.net.passwordAuth = "pass"; try { await an.auth.signOut(); } catch { /* discard */ } }
-    else out.net.passwordAuth = `fail:${error?.status ?? safeAuthCategory(error)}`;
-  } catch (e) { out.net.passwordAuth = `fail:${safeAuthCategory(e)}`; }
+    else { out.net.passwordAuth = `fail:${error?.status ?? safeAuthCategory(error)}`; out.net.passwordAuthErr = safeErrorName(error); }
+  } catch (e) { out.net.passwordAuth = `fail:${safeAuthCategory(e)}`; out.net.passwordAuthErr = safeErrorName(e); }
   // Diagnostic ONLY (does not alter the real flow): would a whitespace-trimmed
   // password authenticate? A "pass" here proves the password SECRET is merely
   // whitespace-contaminated, so the operator only needs to re-paste it cleanly.
@@ -393,6 +411,7 @@ async function main() {
     console.log(`[domains:live] github-preflight target=${rep.targetProjectVerified} adminFound=${rep.adminUserFound} emailConfirmed=${rep.emailConfirmed} serviceRole=${rep.serviceRoleAdminAccess} passwordAuth=${rep.adminPasswordAuth} verdict=${rep.verdict}`);
     console.log(`[domains:live] diag url=${diag.urlClass} anon=${diag.anonKey.klass}/roleOk=${diag.anonKey.roleOk ?? "-"}/refOk=${diag.anonKey.refExpected ?? "-"}/exp=${diag.anonKey.expired ?? "-"} svc=${diag.serviceKey.klass}/roleOk=${diag.serviceKey.roleOk ?? "-"}/refOk=${diag.serviceKey.refExpected ?? "-"}/exp=${diag.serviceKey.expired ?? "-"} emailValid=${diag.emailValid}`);
     console.log(`[domains:live] net dns=${diag.net.dns} tls=${diag.net.tls} authSettings=${diag.net.authSettingsStatus} serviceRole=${diag.net.serviceRole} passwordAuth=${diag.net.passwordAuth}`);
+    console.log(`[domains:live] runtime nodeMajor=${diag.runtime.nodeMajor} sdkFloor=22 errClass svc=${diag.net.serviceRoleErr ?? "-"} pw=${diag.net.passwordAuthErr ?? "-"}`);
     const s = diag.structural;
     console.log(`[domains:live] struct newline/CR/ws/quotes URL=${s.SUPABASE_URL.hasNewline}/${s.SUPABASE_URL.hasCR}/${s.SUPABASE_URL.leadingTrailingWs}/${s.SUPABASE_URL.surroundingQuotes} ANON=${s.SUPABASE_ANON_KEY.hasNewline}/${s.SUPABASE_ANON_KEY.hasCR}/${s.SUPABASE_ANON_KEY.leadingTrailingWs}/${s.SUPABASE_ANON_KEY.surroundingQuotes} SVC=${s.SUPABASE_SERVICE_ROLE_KEY.hasNewline}/${s.SUPABASE_SERVICE_ROLE_KEY.hasCR}/${s.SUPABASE_SERVICE_ROLE_KEY.leadingTrailingWs}/${s.SUPABASE_SERVICE_ROLE_KEY.surroundingQuotes}`);
     process.exit(pass ? 0 : 1);
