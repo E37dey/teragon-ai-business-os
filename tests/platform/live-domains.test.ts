@@ -22,6 +22,7 @@ import {
   structural,
   classifyUrl,
   classifyKey,
+  normalizeCred,
 } from "../../scripts/live-domains/run-domains-live.mjs";
 import {
   provisionCustomerFixtures,
@@ -297,5 +298,10 @@ describe("S9.2-A1d2a · credential forensics classifiers (no content revealed)",
     expect(classifyKey("sb_secret_x", "service_role", NOW).klass).toBe("modern_secret_key");
     expect(classifyKey("sb_publishable_x", "anon", NOW).klass).toBe("publishable_key");
     expect(classifyKey("garbage", "anon", NOW).klass).toBe("unknown");
+  });
+  it("normalizeCred strips newline/CR/space contamination from URLs/keys (repairs paste damage)", () => {
+    expect(normalizeCred(`https://${REF}.supabase.co\n`)).toBe(`https://${REF}.supabase.co`);
+    expect(normalizeCred(" eyJ\r\nabc ")).toBe("eyJabc");
+    expect(classifyUrl(normalizeCred(`  https://${REF}.supabase.co\n`))).toBe("expected_project_host");
   });
 });

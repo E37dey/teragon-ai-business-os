@@ -28,6 +28,17 @@ export function refFromUrl(url) {
   const m = /https:\/\/([a-z0-9]+)\.supabase\.co/i.exec(String(url ?? ""));
   return m ? m[1] : "";
 }
+
+/**
+ * Normalize a NON-PASSWORD credential by stripping ALL whitespace. URLs and
+ * Supabase keys (JWT / sb_*) never contain legitimate whitespace, so this safely
+ * repairs newline/CR/space contamination introduced when a secret is pasted into
+ * the GitHub UI. NEVER applied to the admin password (which may contain spaces
+ * and must not be altered).
+ */
+export function normalizeCred(v) {
+  return String(v ?? "").replace(/\s+/g, "");
+}
 export function maskRef(ref) {
   return !ref ? "-" : ref.length <= 8 ? ref : `${ref.slice(0, 4)}…${ref.slice(-4)}`;
 }
@@ -133,19 +144,20 @@ export function safeAuthCategory(err) {
  * @returns {Promise<{pass:boolean, category:string}>}
  */
 export async function adminPreflight(env, deps = {}) {
-  const anonKey = env.SUPABASE_ANON_KEY ?? env.SUPABASE_PUBLISHABLE_KEY ?? env.VITE_SUPABASE_ANON_KEY;
-  if (!env.SUPABASE_URL || !anonKey || !env.TERAGON_ADMIN_EMAIL || !env.TERAGON_ADMIN_PASSWORD)
+  const url = normalizeCred(env.SUPABASE_URL);
+  const anonKey = normalizeCred(env.SUPABASE_ANON_KEY ?? env.SUPABASE_PUBLISHABLE_KEY ?? env.VITE_SUPABASE_ANON_KEY);
+  if (!url || !anonKey || !env.TERAGON_ADMIN_EMAIL || !env.TERAGON_ADMIN_PASSWORD)
     return { pass: false, category: "missing_env" };
   let client;
   try {
     if (deps.clientFactory) client = deps.clientFactory();
     else {
       const { createClient } = await import("@supabase/supabase-js");
-      client = createClient(env.SUPABASE_URL, anonKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+      client = createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
     }
     const { data, error } = await client.auth.signInWithPassword({
       email: String(env.TERAGON_ADMIN_EMAIL).trim(),
-      password: env.TERAGON_ADMIN_PASSWORD,
+      password: env.TERAGON_ADMIN_PASSWORD, // NEVER trimmed/altered
     });
     if (error || !data?.session) return { pass: false, category: safeAuthCategory(error) };
     try { await client.auth.signOut(); } catch { /* discard */ }
@@ -164,14 +176,14 @@ export async function adminPreflight(env, deps = {}) {
  */
 export async function fullPreflight(env, deps = {}) {
   const out = { targetVerified: false, adminFound: false, emailConfirmed: false, serviceRoleAccess: false, passwordAuth: false, category: "" };
-  out.targetVerified = refFromUrl(env.SUPABASE_URL) === STAGING_REF;
+  out.targetVerified = refFromUrl(normalizeCred(env.SUPABASE_URL)) === STAGING_REF;
   if (!out.targetVerified) { out.category = "ref_mismatch"; return out; }
   const email = String(env.TERAGON_ADMIN_EMAIL ?? "").trim();
   try {
     let svc = deps.serviceFactory ? deps.serviceFactory() : null;
     if (!svc) {
       const { createClient } = await import("@supabase/supabase-js");
-      svc = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+      svc = createClient(normalizeCred(env.SUPABASE_URL), normalizeCred(env.SUPABASE_SERVICE_ROLE_KEY), { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
     }
     let user = null;
     for (let p = 1; p <= 25; p++) {
@@ -259,27 +271,42 @@ export async function diagnose(env, deps = {}) {
     emailValid: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim()),
     net: {},
   };
-  const cleanUrl = (url ?? "").trim();
+  const cleanUrl = normalizeCred(url);
   // A. DNS
   try { const { lookup } = await import("node:dns/promises"); await lookup(new URL(cleanUrl).host); out.net.dns = "resolved"; } catch { out.net.dns = "dns_fail"; }
   // B/C. TLS + anon key accepted by the auth server (/auth/v1/settings)
   try {
-    const r = await doFetch(`${cleanUrl}/auth/v1/settings`, { headers: { apikey: (anon ?? "").trim() } });
+    const r = await doFetch(`${cleanUrl}/auth/v1/settings`, { headers: { apikey: normalizeCred(anon) } });
     out.net.tls = "reached"; out.net.authSettingsStatus = r.status;
   } catch (e) { out.net.tls = "unreachable"; out.net.authSettingsStatus = 0; out.net.tlsCategory = safeAuthCategory(e); }
-  // D. service-role listUsers
+  // D. service-role listUsers (normalized url + key)
   try {
-    const svc = deps.serviceFactory ? deps.serviceFactory() : (await import("@supabase/supabase-js")).createClient(cleanUrl, (svcKey ?? "").trim(), { auth: { persistSession: false } });
+    const svc = deps.serviceFactory ? deps.serviceFactory() : (await import("@supabase/supabase-js")).createClient(cleanUrl, normalizeCred(svcKey), { auth: { persistSession: false } });
     const { error } = await svc.auth.admin.listUsers({ page: 1, perPage: 1 });
     out.net.serviceRole = error ? `fail:${error.status ?? safeAuthCategory(error)}` : "pass";
   } catch (e) { out.net.serviceRole = `fail:${safeAuthCategory(e)}`; }
-  // E. admin signInWithPassword
+  // E. admin signInWithPassword (normalized url + anon; password RAW to detect its contamination)
   try {
-    const an = deps.anonFactory ? deps.anonFactory() : (await import("@supabase/supabase-js")).createClient(cleanUrl, (anon ?? "").trim(), { auth: { persistSession: false } });
+    const an = deps.anonFactory ? deps.anonFactory() : (await import("@supabase/supabase-js")).createClient(cleanUrl, normalizeCred(anon), { auth: { persistSession: false } });
     const { data, error } = await an.auth.signInWithPassword({ email: email.trim(), password: env.TERAGON_ADMIN_PASSWORD });
     if (!error && data?.session) { out.net.passwordAuth = "pass"; try { await an.auth.signOut(); } catch { /* discard */ } }
     else out.net.passwordAuth = `fail:${error?.status ?? safeAuthCategory(error)}`;
   } catch (e) { out.net.passwordAuth = `fail:${safeAuthCategory(e)}`; }
+  // Diagnostic ONLY (does not alter the real flow): would a whitespace-trimmed
+  // password authenticate? A "pass" here proves the password SECRET is merely
+  // whitespace-contaminated, so the operator only needs to re-paste it cleanly.
+  try {
+    const raw = env.TERAGON_ADMIN_PASSWORD ?? "";
+    const trimmed = String(raw).trim();
+    if (trimmed !== raw && out.net.passwordAuth !== "pass") {
+      const an2 = deps.anonFactory ? deps.anonFactory() : (await import("@supabase/supabase-js")).createClient(cleanUrl, normalizeCred(anon), { auth: { persistSession: false } });
+      const { data, error } = await an2.auth.signInWithPassword({ email: email.trim(), password: trimmed });
+      out.net.passwordAuthTrimmed = !error && data?.session ? "pass" : "fail";
+      if (!error && data?.session) { try { await an2.auth.signOut(); } catch { /* discard */ } }
+    } else {
+      out.net.passwordAuthTrimmed = "n/a";
+    }
+  } catch { out.net.passwordAuthTrimmed = "error"; }
   return out;
 }
 

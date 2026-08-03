@@ -39,8 +39,10 @@ export function createLiveCustomerAdmin({ env = process.env, clientFactory } = {
   const guard = assertNoServiceRoleInViteEnv(env);
   if (!guard.ok) throw new Error(`service-role key must never be VITE_-exposed: ${guard.leaked.join(",")}`);
 
-  const url = env.SUPABASE_URL;
-  const key = env.SUPABASE_SERVICE_ROLE_KEY; // server-only — never logged
+  // Strip whitespace (newline/CR contamination from secret ingestion) — URLs and
+  // keys never contain legitimate whitespace. The admin password is never touched.
+  const url = String(env.SUPABASE_URL ?? "").replace(/\s+/g, "");
+  const key = String(env.SUPABASE_SERVICE_ROLE_KEY ?? "").replace(/\s+/g, ""); // server-only — never logged
   let cached = null;
 
   async function client() {
