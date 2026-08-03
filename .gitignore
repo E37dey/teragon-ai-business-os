@@ -18,6 +18,9 @@ playwright-report
 test-results
 # Live-suite machine-readable reports (safe counts, but ephemeral — never committed).
 ci-artifacts/
+e2e/live-domains/_report.json
+e2e/live-domains/_pw.json
+e2e/live-domains/_idb.json
 *.tsbuildinfo
 .claude/
 

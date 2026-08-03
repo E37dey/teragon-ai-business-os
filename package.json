@@ -15,6 +15,7 @@
     "test:staging:auth:live": "node scripts/run-auth-live.mjs",
     "build:preview": "node scripts/preview-build.mjs",
     "test:staging:acceptance": "node scripts/run-staging-acceptance.mjs",
+    "test:domains:live": "node scripts/live-domains/run-domains-live.mjs",
     "evals:trusted-ai": "node scripts/run-trusted-ai.mjs",
     "test:e2e": "playwright test",
     "format": "prettier --write .",
