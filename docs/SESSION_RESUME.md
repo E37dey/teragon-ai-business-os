@@ -4,7 +4,7 @@
 > the full S7/S8/S9 history or re-verify frozen facts unless a command contradicts them.
 
 ## Current position
-- **Branch:** `feature/teragon-supabase-domain-integration` (Draft PR #3 → base `feature/teragon-supabase-app-auth`)
+- **Branch:** `feature/teragon-supabase-app-auth` @ `0159e97`. **PR #3 is MERGED** (merge commit `0159e971b902e171487568c842376342449f4d6d`, source `722824c`, both gates green). The source branch `feature/teragon-supabase-domain-integration` is preserved. `main` is untouched at `4d4c9dc`.
 - **HEAD after this session:** `65363ba` (`test(customers): validate live Supabase customer integration`). Prior: `0c9c369` (CI Node floor), `2403b2b` (preflight determinism), `e2a2201` (forensics record).
 - **Tree:** clean.
 - **customers status = `LIVE_VALIDATED`** — 12/12 live acceptance green against `teragon-staging` on the GitHub-hosted runner, cleanup verified, orphan audit 0. Contacts and every other domain remain `NOT_CONNECTED`. `AI_REMOTE_ENABLED` stays **false**. Migrations remain **14** (no 015).
@@ -69,7 +69,7 @@
 - App browser env contract var: `VITE_SUPABASE_ANON_KEY` (holds the publishable key), read in `src/persistence/supabase/client.ts`.
 - Composition foundation (`d799f13`): `src/persistence/composition/{domainComposition.ts, DomainRepositoryProvider.tsx, DomainNotConnectedGate.tsx}` — pure fail-closed boundary, `SUPABASE_CONNECTED_DOMAINS = []` in Checkpoint A, `useDomainRepository`, central not-connected gate + safe `ProviderDiagnostic`.
 
-## PR #3 merge-readiness (audited at `524f0db`)
+## PR #3 — MERGED into `feature/teragon-supabase-app-auth` (was: merge-readiness audit at `524f0db`)
 - Mergeable, **no conflicts**; base `feature/teragon-supabase-app-auth`; still **Draft**; no reviews, zero unresolved review threads; diff = 39 files, all in S9 scope; no env/secret file tracked (`.env.staging.local` untracked; only the *scanner* `scripts/scan-bundle-secrets.mjs` matches "secret").
 - ✅ **`Static application gate (no Supabase)` is GREEN at `5183c6b`** (both PR checks pass). It had been RED on **every** prior commit of the branch (`d47013f`, `e2a2201`, …) — introduced by `2b54cfe` / `7f5a93a` / `e5d5c17` / `372a7b1`, never by the live-acceptance work.
 - **Fix (`5183c6b`, tests only):** `typecheck:tests` went 42 → **0**. Root cause: `vi.fn` takes **one** function-type generic in Vitest 4, but these mocks used the legacy `<Args, Return>` pair, which resolved to `never` and cascaded into the TS2345/TS2493/TS2352 failures. Corrections: single-generic `vi.fn<(a: A) => R>()`; `loadRepo` mirrors `loadSupabaseDomainRepository(collection, ctx)` so `mock.calls` is a real tuple (the `{ identity }` casts became redundant and were removed); `INPUT` typed as the exported `CustomerInput` so `type` keeps its literal union; `fakeCreate` mirrors `createSupabaseRepository`'s parameters; the `.mjs` fixture-harness body param annotated to the one field it reads. No `any`, no `@ts-ignore`/`@ts-expect-error`, no weakened assertions, **no production code touched** — so the live-acceptance evidence still stands.
