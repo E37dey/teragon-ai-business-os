@@ -36,6 +36,21 @@ jobs:
         with:
           ref: ${{ inputs.commit }}
 
+      # Provenance gate: prove the tree under test IS the requested commit. Without
+      # this the logs never show the ACTUAL checkout SHA, so a workflow-definition /
+      # branch-HEAD / requested-commit divergence is unfalsifiable after the fact.
+      - name: Verify checked-out SHA matches the requested commit
+        run: |
+          ACTUAL="$(git rev-parse HEAD)"
+          echo "requested_commit=${{ inputs.commit }}"
+          echo "actual_checkout_sha=${ACTUAL}"
+          echo "workflow_definition_sha=${{ github.sha }}"
+          echo "preflight_only=${{ inputs.preflight_only }}"
+          if [ "${ACTUAL}" != "${{ inputs.commit }}" ]; then
+            echo "::error::checkout SHA ${ACTUAL} != requested ${{ inputs.commit }}"
+            exit 1
+          fi
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -53,10 +68,14 @@ jobs:
       - name: Scan bundle for secrets (no service_role in dist)
         run: npm run scan:secrets
 
+      # Browser tooling is for the FULL suite only. A preflight-only run is
+      # non-mutating and headless by contract: no Playwright, no served dist.
       - name: Install Playwright chromium
+        if: ${{ !inputs.preflight_only }}
         run: npx playwright install --with-deps chromium
 
       - name: Serve the exact dist locally
+        if: ${{ !inputs.preflight_only }}
         run: |
           npx --yes serve -s dist -l 4173 &
           npx --yes wait-on http://localhost:4173
