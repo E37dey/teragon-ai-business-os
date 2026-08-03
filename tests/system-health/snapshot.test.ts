@@ -12,7 +12,11 @@ describe("tallyComponents — honest, no invented aggregate score", () => {
   it("counts each state family correctly", () => {
     const components = HEALTH_COMPONENT_IDS.map((id) => uncheckedComponent(id));
     const t = tallyComponents(components);
-    expect(t).toEqual({ okCount: 0, attentionCount: 0, unavailableCount: 0, uncheckedCount: 15 });
+    // derived from the registry so adding a component cannot silently drift
+    expect(t).toEqual({
+      okCount: 0, attentionCount: 0, unavailableCount: 0,
+      uncheckedCount: HEALTH_COMPONENT_IDS.length,
+    });
   });
 
   it("mixed states land in the right buckets", () => {
@@ -23,11 +27,11 @@ describe("tallyComponents — honest, no invented aggregate score", () => {
 });
 
 describe("snapshot build + persistence", () => {
-  it("buildHealthSnapshot passes the zod schema and carries all 15 components", async () => {
+  it("buildHealthSnapshot passes the zod schema and carries every component", async () => {
     const env = await makeEnv({ probe: { version: 6, storeCount: 100 } });
     const snapshot = await buildHealthSnapshot(env, []);
     expect(() => systemHealthSnapshotSchema.parse(snapshot)).not.toThrow();
-    expect(snapshot.components).toHaveLength(15);
+    expect(snapshot.components).toHaveLength(HEALTH_COMPONENT_IDS.length);
     expect(snapshot.takenAt).toBe(snapshot.createdAt);
   });
 

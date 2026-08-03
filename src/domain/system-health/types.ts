@@ -40,6 +40,10 @@ export const HEALTH_COMPONENT_IDS = [
   "search-index",
   "export-engine",
   "storage-estimate",
+  // S10.0-D2: remote read-path components. Appended (never reordered) — the
+  // canonical runner asserts ALL_CHECKS matches this list positionally.
+  "supabase-reachability",
+  "supabase-rls-read",
 ] as const;
 
 export type HealthComponentId = (typeof HEALTH_COMPONENT_IDS)[number];
@@ -60,6 +64,8 @@ export const HEALTH_COMPONENT_NAMES_HE: Record<HealthComponentId, string> = {
   "search-index": "אינדקס החיפוש",
   "export-engine": "מנוע הייצוא",
   "storage-estimate": "אומדן שטח אחסון",
+  "supabase-reachability": "זמינות Supabase (הגדרה ותקשורת)",
+  "supabase-rls-read": "נתיב קריאה מאובטח (RLS)",
 };
 
 // ---------------------------------------------------------------------------
