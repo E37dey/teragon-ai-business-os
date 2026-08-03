@@ -96,6 +96,19 @@ export function CompactTopHeader({
       </div>
 
       <div className="os-header__actions">
+        {/* Explicit mobile search control. The full-width inline search below is
+            hidden at ≤640px (it cannot shrink under its own min-content); this
+            button opens the SAME global search overlay, keyboard-accessible. */}
+        <button
+          type="button"
+          className="os-header__iconbtn os-header__search-btn"
+          onClick={onSearchOpen}
+          disabled={!onSearchOpen}
+          aria-label="חיפוש גלובלי"
+          title="חיפוש גלובלי"
+        >
+          <OsIcon name="search" size={15} />
+        </button>
         <button
           type="button"
           className="os-header__iconbtn"

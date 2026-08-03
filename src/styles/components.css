@@ -1865,9 +1865,60 @@
 }
 
 .os-header__search {
-  flex: 1;
+  /* flex-basis 0 + min-inline-size 0 lets the search shrink BELOW its content
+     min-width instead of forcing the header wider than the viewport. Without the
+     min-inline-size:0 the input's intrinsic width overflowed ~20px at 390px in
+     RTL (S10.3-C1 finding). */
+  flex: 1 1 0;
+  min-inline-size: 0;
   display: flex;
   justify-content: center;
+}
+
+/* Header row + user block must also be allowed to shrink, or a flex child's
+   default min-width:auto reintroduces the overflow. */
+.os-header {
+  min-inline-size: 0;
+}
+.os-header__user {
+  min-inline-size: 0;
+  flex-shrink: 1;
+}
+
+/* The mobile search control shows ONLY below the breakpoint (see media query). */
+.os-header__search-btn {
+  display: none;
+}
+
+/* Narrow viewports (≤640px): the full-width inline search cannot shrink below its
+   own min-content (~46px of icon+padding), so it is replaced by an explicit
+   search icon button that opens the same overlay — search stays accessible, the
+   header no longer overflows, and nothing is clipped. The theme selector also
+   compacts to glyphs to reclaim width. */
+@media (max-width: 640px) {
+  .os-header {
+    gap: var(--os-space-3);
+    padding-inline: var(--os-space-4);
+  }
+  .os-header__actions {
+    gap: var(--os-space-2, 6px);
+  }
+  .os-header__search {
+    display: none;
+  }
+  .os-header__search-btn {
+    display: inline-flex;
+  }
+  /* compact theme selector: glyph-only, words hidden (frees ~60px). */
+  .os-theme-select__glyph {
+    display: inline;
+  }
+  .os-theme-select__label {
+    display: none;
+  }
+  .os-theme-select__opt {
+    padding-inline: 7px;
+  }
 }
 
 .os-header__meta {

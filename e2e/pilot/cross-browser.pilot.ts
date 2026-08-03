@@ -93,24 +93,35 @@ for (const route of ROUTES) {
 
 for (const route of ROUTES) {
   test(`${route.id} — no horizontal overflow`, async ({ page }, testInfo) => {
-    const width = testInfo.project.use.viewport?.width ?? 1440;
-    // KNOWN PRODUCT DEFECT (B4, tracked for S10.3-C2): at 390px the header global
-    // search box (.os-header__search) does not collapse and extends ~20px past
-    // the RTL (left) edge, so every route that renders the shell header overflows.
-    // Marked expected-failure — NOT loosened: the strict ≤2px assertion below still
-    // runs, and if the defect is fixed this test "unexpectedly passes" and flips to
-    // failing, forcing the marker's removal. `login` has no shell header, so it is
-    // unaffected.
-    const knownMobileHeaderOverflow = width < 768 && route.id !== "login";
-    if (knownMobileHeaderOverflow) {
-      test.fail(true, "B4: header search overflows ~20px at 390px (S10.3-C2)");
-    }
+    // S10.3-C2: the 390px header overflow is FIXED — the inline search collapses
+    // to an explicit search icon button below 640px. This assertion is strict at
+    // every viewport, including mobile; there is no expected-failure marker.
     await page.goto(route.path, { waitUntil: "domcontentloaded" });
     await expect(page.locator(route.anchor()).first()).toBeVisible({ timeout: 30_000 });
     const overflow = await horizontalOverflowPx(page);
     expect(overflow, `${route.id} @ ${testInfo.project.name} horizontal overflow`).toBeLessThanOrEqual(2);
   });
 }
+
+test("search stays accessible at the current viewport (inline ≥768px, icon button <640px)", async ({ page }, testInfo) => {
+  const width = testInfo.project.use.viewport?.width ?? 1440;
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("header.os-header").first()).toBeVisible({ timeout: 30_000 });
+
+  const inlineSearch = page.getByRole("searchbox", { name: /חיפוש גלובלי/ }).first();
+  const searchBtn = page.getByRole("button", { name: /חיפוש גלובלי/ }).first();
+
+  if (width >= 768) {
+    // desktop/tablet: the inline search input is the accessible control.
+    await expect(inlineSearch).toBeVisible();
+  } else {
+    // mobile: an explicit search icon button replaces it and is keyboard-reachable.
+    await expect(searchBtn).toBeVisible();
+    await expect(inlineSearch).toBeHidden();
+    await searchBtn.focus();
+    await expect(searchBtn).toBeFocused(); // visible focus + keyboard reachable
+  }
+});
 
 test("quick-create dialog fits inside the viewport", async ({ page }, testInfo) => {
   await page.goto("/", { waitUntil: "domcontentloaded" });
