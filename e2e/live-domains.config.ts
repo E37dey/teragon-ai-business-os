@@ -5,9 +5,17 @@
 // run-domains-live.mjs) preflights, then the operator/CI builds + serves the
 // exact Preview dist at ACCEPTANCE_BASE_URL first. The suite FAILS (never skips)
 // when misconfigured or when zero tests execute.
+import { resolve } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
 const BASE_URL = (process.env.ACCEPTANCE_BASE_URL ?? "").replace(/\/$/, "");
+
+// The runner reads PW_JSON_PATH as a cwd-relative path, so resolve the reporter's
+// target the SAME way. Owning the json reporter here (instead of passing
+// `--reporter=list,json`, which OVERRIDES this list) is what makes the totals
+// deterministic: the CLI override wrote no file, so the runner fell back to
+// executed=0 and reported "zero tests executed" even when the suite had run.
+const PW_JSON = resolve(process.cwd(), "e2e/live-domains/_pw.json");
 
 export default defineConfig({
   testDir: "./live-domains",
@@ -16,7 +24,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0, // a flaky live result is a finding, never hidden
-  reporter: [["list"]],
+  reporter: [["list"], ["json", { outputFile: PW_JSON }]],
   use: {
     baseURL: BASE_URL,
     trace: "retain-on-failure",

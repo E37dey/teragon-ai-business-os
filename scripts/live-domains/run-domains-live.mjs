@@ -445,8 +445,11 @@ async function main() {
     { adapter, config: { runId, secondOrgId: env.ACC_SECOND_ORG ?? "org-staging-beta", roleId: env.ACC_FIXTURE_ROLE ?? "crole-sales", customerCount: Number(env.ACC_CUSTOMER_COUNT ?? 3) } },
     async (handle) => {
       const childEnv = { ...process.env, ACC_FIXTURE_EMAIL: handle.email, ACC_FIXTURE_PASSWORD: handle.password };
-      const run = spawnSync("npx", ["playwright", "test", "-c", LIVE_CONFIG, "--reporter=list,json"], {
-        stdio: "inherit", shell: true, env: { ...childEnv, PLAYWRIGHT_JSON_OUTPUT_NAME: PW_JSON_PATH },
+      // No `--reporter=` here on purpose: a CLI reporter list REPLACES the
+      // config's, which silently discarded the json reporter and left the
+      // authoritative totals at executed=0. The config owns list+json.
+      const run = spawnSync("npx", ["playwright", "test", "-c", LIVE_CONFIG], {
+        stdio: "inherit", shell: true, env: childEnv,
       });
       pwStatus = run.status ?? 1;
       return { pwStatus };

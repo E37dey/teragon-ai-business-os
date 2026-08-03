@@ -71,14 +71,26 @@ const loginFixtureUser = (page: Page) =>
   login(page, process.env.ACC_FIXTURE_EMAIL ?? "", process.env.ACC_FIXTURE_PASSWORD ?? "");
 
 // ---- the authoritative 12-item inventory ------------------------------------
+// The authenticated shell renders the resolved identity in the compact header:
+// `.os-header__name` = user name, `.os-header__role` = "<role> · <org>". Assert
+// those elements directly. A bare getByText(/טרגון|Teragon/) matched BOTH spans
+// (strict-mode violation) while /טרגון/ matched neither — the org renders as the
+// Latin "Teragon". Element-scoped assertions are exact and cannot go ambiguous.
 test("1 · primary administrator login", async ({ page }) => {
   await loginAdmin(page);
-  await expect(page.getByText(/טרגון|Teragon/)).toBeVisible();
+  const name = page.locator(".os-header__name");
+  await expect(name).toBeVisible();
+  await expect(name).not.toBeEmpty();
 });
 
 test("2 · canonical identity verification (org-teragon / crole-sysadmin / active)", async ({ page }) => {
   await loginAdmin(page);
-  await expect(page.getByText(/טרגון/)).toBeVisible();
+  // crole-sysadmin's canonical label (src/domain/administration/types.ts) beside
+  // the org — proves the session resolved to the sysadmin role in org-teragon.
+  const role = page.locator(".os-header__role");
+  await expect(role).toBeVisible();
+  await expect(role).toHaveText(/מנהל מערכת/);
+  await expect(role).toHaveText(/Teragon/);
 });
 
 test("3 · temporary second-org user login (runner-provisioned)", async ({ page }) => {
