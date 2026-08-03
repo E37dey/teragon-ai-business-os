@@ -48,6 +48,8 @@ vi.mock("@/repositories", async (orig) => {
 });
 
 const { CustomerContactsPanel } = await import("@/modules/contacts/CustomerContactsPanel");
+// S9.3-D: the panel now offers create/edit, so it consumes useToast.
+const { ToastProvider } = await import("@/design-system");
 
 beforeEach(() => {
   authState = { status: "AUTHENTICATED", identity: IDENTITY };
@@ -62,7 +64,9 @@ function wrapper(): (p: { children: ReactNode }) => ReactElement {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   return ({ children }) => (
     <QueryClientProvider client={qc}>
-      <MemoryRouter>{children}</MemoryRouter>
+      <MemoryRouter>
+        <ToastProvider>{children}</ToastProvider>
+      </MemoryRouter>
     </QueryClientProvider>
   );
 }
