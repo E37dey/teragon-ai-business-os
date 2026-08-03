@@ -5,6 +5,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./app/queryClient";
 import { createAppRouter } from "./app/router";
 import { AuthProvider } from "./auth/AuthProvider";
+import { RootErrorBoundary } from "./app/RootErrorBoundary";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { installProvenance } from "./runtime/provenance";
 import { bootLocalPersistence } from "./app/bootPersistence";
@@ -27,13 +28,17 @@ async function boot() {
   if (!rootEl) throw new Error("#root element missing in index.html");
   createRoot(rootEl).render(
     <StrictMode>
-      <ThemeProvider>
-        <AuthProvider>
-          <QueryClientProvider client={queryClient}>
-            <RouterProvider router={createAppRouter()} />
-          </QueryClientProvider>
-        </AuthProvider>
-      </ThemeProvider>
+      {/* Outermost on purpose: it must survive a failure in ANY provider below
+          it, so its fallback deliberately uses no provider-backed component. */}
+      <RootErrorBoundary>
+        <ThemeProvider>
+          <AuthProvider>
+            <QueryClientProvider client={queryClient}>
+              <RouterProvider router={createAppRouter()} />
+            </QueryClientProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </RootErrorBoundary>
     </StrictMode>,
   );
 }
