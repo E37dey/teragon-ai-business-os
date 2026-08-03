@@ -19,6 +19,9 @@ import {
   parsePlaywrightTotals,
   assembleReport,
   fullPreflight,
+  structural,
+  classifyUrl,
+  classifyKey,
 } from "../../scripts/live-domains/run-domains-live.mjs";
 import {
   provisionCustomerFixtures,
@@ -262,5 +265,37 @@ describe("S9.2-A1d2a-1B4 · fullPreflight (non-mutating, 5 booleans)", () => {
     const fp = await fullPreflight({ ...VALID_ENV, SUPABASE_URL: "https://other0000000000000.supabase.co" }, { serviceFactory: () => { built = true; return svcFake(null); } });
     expect(fp.targetVerified).toBe(false);
     expect(built).toBe(false);
+  });
+});
+
+describe("S9.2-A1d2a · credential forensics classifiers (no content revealed)", () => {
+  const b64u = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  const jwt = (p: object) => `eyJhbGciOiJIUzI1NiJ9.${b64u(p)}.sig`;
+  const REF = "bjvirkmagwpqroakazjj";
+  const NOW = 1_700_000_000_000;
+
+  it("structural detects newline/CR/whitespace/quotes contamination", () => {
+    expect(structural("clean").hasNewline).toBe(false);
+    expect(structural("bad\n").hasNewline).toBe(true);
+    expect(structural("bad\r").hasCR).toBe(true);
+    expect(structural(" x ").leadingTrailingWs).toBe(true);
+    expect(structural('"quoted"').surroundingQuotes).toBe(true);
+    expect(structural("").present).toBe(false);
+  });
+  it("classifyUrl reports the expected project host", () => {
+    expect(classifyUrl(`https://${REF}.supabase.co`)).toBe("expected_project_host");
+    expect(classifyUrl(`https://other0000.supabase.co`)).toBe("unexpected_project");
+    expect(classifyUrl("http://x")).toBe("not_https");
+  });
+  it("classifyKey reports legacy JWT role/ref/expiry + modern key classes (no value)", () => {
+    const anon = classifyKey(jwt({ role: "anon", ref: REF, exp: 9_999_999_999 }), "anon", NOW);
+    expect(anon).toMatchObject({ klass: "legacy_anon_jwt", roleOk: true, refExpected: true, expired: false });
+    const svc = classifyKey(jwt({ role: "service_role", ref: REF, exp: 1 }), "service_role", NOW);
+    expect(svc).toMatchObject({ klass: "legacy_service_role_jwt", roleOk: true, expired: true });
+    const wrongRef = classifyKey(jwt({ role: "anon", ref: "elsewhere", exp: 9_999_999_999 }), "anon", NOW);
+    expect(wrongRef.refExpected).toBe(false);
+    expect(classifyKey("sb_secret_x", "service_role", NOW).klass).toBe("modern_secret_key");
+    expect(classifyKey("sb_publishable_x", "anon", NOW).klass).toBe("publishable_key");
+    expect(classifyKey("garbage", "anon", NOW).klass).toBe("unknown");
   });
 });

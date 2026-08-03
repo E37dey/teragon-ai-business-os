@@ -194,6 +194,95 @@ export async function fullPreflight(env, deps = {}) {
   return out;
 }
 
+// --- S9.2-A1d2a GitHub-hosted credential forensics (safe: no secret content) --
+/** Structural contamination booleans for a raw value — reveals NO content. */
+export function structural(raw) {
+  const v = raw == null ? "" : String(raw);
+  return {
+    present: v.length > 0,
+    nonEmpty: v.trim().length > 0,
+    hasNewline: /\n/.test(v),
+    hasCR: /\r/.test(v),
+    leadingTrailingWs: v.length !== v.trim().length,
+    surroundingQuotes: /^["'][\s\S]*["']$/.test(v),
+    looksLikeAssignment: /^[A-Z_][A-Z0-9_]*=/.test(v.trim()),
+  };
+}
+
+/** Expected-format class for the URL (no content revealed). */
+export function classifyUrl(u) {
+  const v = (u ?? "").trim();
+  if (!/^https:\/\//i.test(v)) return "not_https";
+  const m = /^https:\/\/([a-z0-9]+)\.supabase\.co\/?$/i.exec(v);
+  if (!m) return "unexpected_host_format";
+  return m[1] === STAGING_REF ? "expected_project_host" : "unexpected_project";
+}
+
+/** Decode a JWT's UNVERIFIED claims — reports only role/ref-match/expired. */
+function jwtClaims(v, nowMs) {
+  try {
+    const json = JSON.parse(Buffer.from(v.split(".")[1], "base64url").toString("utf8"));
+    return { claimedRole: json.role ?? null, refExpected: (json.ref ?? "") === STAGING_REF, expired: typeof json.exp === "number" ? json.exp * 1000 < nowMs : null };
+  } catch { return { claimedRole: null, refExpected: null, expired: null }; }
+}
+
+/** Key class + safe claims (no value/prefix/length revealed). */
+export function classifyKey(k, expectRole, nowMs) {
+  const v = (k ?? "").trim();
+  if (/^sb_publishable_/.test(v)) return { klass: "publishable_key", roleOk: expectRole === "anon" };
+  if (/^sb_secret_/.test(v)) return { klass: "modern_secret_key", roleOk: expectRole === "service_role" };
+  if (/^eyJ/.test(v)) {
+    const c = jwtClaims(v, nowMs);
+    return { klass: expectRole === "anon" ? "legacy_anon_jwt" : "legacy_service_role_jwt", claimedRole: c.claimedRole, refExpected: c.refExpected, expired: c.expired, roleOk: c.claimedRole === expectRole };
+  }
+  return { klass: "unknown" };
+}
+
+/**
+ * NON-MUTATING structural + network forensics. Reports only booleans, format
+ * classes, and HTTP status/category — never any secret content. Identical code
+ * runs locally and in CI so the FIRST divergence is provable.
+ */
+export async function diagnose(env, deps = {}) {
+  const nowMs = deps.nowMs ?? Date.now();
+  const url = env.SUPABASE_URL, anon = env.SUPABASE_ANON_KEY ?? env.SUPABASE_PUBLISHABLE_KEY ?? env.VITE_SUPABASE_ANON_KEY;
+  const svcKey = env.SUPABASE_SERVICE_ROLE_KEY, email = String(env.TERAGON_ADMIN_EMAIL ?? "");
+  const doFetch = deps.fetch ?? (typeof fetch !== "undefined" ? fetch : null);
+  const out = {
+    structural: {
+      SUPABASE_URL: structural(url), SUPABASE_ANON_KEY: structural(anon), SUPABASE_SERVICE_ROLE_KEY: structural(svcKey),
+      TERAGON_ADMIN_EMAIL: structural(email), TERAGON_ADMIN_PASSWORD: structural(env.TERAGON_ADMIN_PASSWORD),
+    },
+    urlClass: classifyUrl(url),
+    anonKey: classifyKey(anon, "anon", nowMs),
+    serviceKey: classifyKey(svcKey, "service_role", nowMs),
+    emailValid: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim()),
+    net: {},
+  };
+  const cleanUrl = (url ?? "").trim();
+  // A. DNS
+  try { const { lookup } = await import("node:dns/promises"); await lookup(new URL(cleanUrl).host); out.net.dns = "resolved"; } catch { out.net.dns = "dns_fail"; }
+  // B/C. TLS + anon key accepted by the auth server (/auth/v1/settings)
+  try {
+    const r = await doFetch(`${cleanUrl}/auth/v1/settings`, { headers: { apikey: (anon ?? "").trim() } });
+    out.net.tls = "reached"; out.net.authSettingsStatus = r.status;
+  } catch (e) { out.net.tls = "unreachable"; out.net.authSettingsStatus = 0; out.net.tlsCategory = safeAuthCategory(e); }
+  // D. service-role listUsers
+  try {
+    const svc = deps.serviceFactory ? deps.serviceFactory() : (await import("@supabase/supabase-js")).createClient(cleanUrl, (svcKey ?? "").trim(), { auth: { persistSession: false } });
+    const { error } = await svc.auth.admin.listUsers({ page: 1, perPage: 1 });
+    out.net.serviceRole = error ? `fail:${error.status ?? safeAuthCategory(error)}` : "pass";
+  } catch (e) { out.net.serviceRole = `fail:${safeAuthCategory(e)}`; }
+  // E. admin signInWithPassword
+  try {
+    const an = deps.anonFactory ? deps.anonFactory() : (await import("@supabase/supabase-js")).createClient(cleanUrl, (anon ?? "").trim(), { auth: { persistSession: false } });
+    const { data, error } = await an.auth.signInWithPassword({ email: email.trim(), password: env.TERAGON_ADMIN_PASSWORD });
+    if (!error && data?.session) { out.net.passwordAuth = "pass"; try { await an.auth.signOut(); } catch { /* discard */ } }
+    else out.net.passwordAuth = `fail:${error?.status ?? safeAuthCategory(error)}`;
+  } catch (e) { out.net.passwordAuth = `fail:${safeAuthCategory(e)}`; }
+  return out;
+}
+
 /** Parse Playwright's JSON reporter into authoritative totals. */
 export function parsePlaywrightTotals(pwJson) {
   const totals = { files: 0, executed: 0, passed: 0, failed: 0, skipped: 0 };
@@ -261,6 +350,7 @@ async function main() {
   // no records, no Playwright.
   if (env.STAGING_DOMAINS_PREFLIGHT_ONLY === "1") {
     const fp = await fullPreflight(env);
+    const diag = await diagnose(env); // safe structural + network forensics (no content)
     const pass = fp.targetVerified && fp.serviceRoleAccess && fp.adminFound && fp.emailConfirmed && fp.passwordAuth;
     const rep = {
       mode: "github-preflight",
@@ -270,9 +360,14 @@ async function main() {
       serviceRoleAdminAccess: fp.serviceRoleAccess ? "pass" : "fail",
       adminPasswordAuth: fp.passwordAuth ? "pass" : "fail",
       maskedRef: pf.maskedRef, observedCommit: pf.commit, note: fp.category, verdict: pass ? "PASS" : "FAIL",
+      diagnostics: diag,
     };
     write(rep);
     console.log(`[domains:live] github-preflight target=${rep.targetProjectVerified} adminFound=${rep.adminUserFound} emailConfirmed=${rep.emailConfirmed} serviceRole=${rep.serviceRoleAdminAccess} passwordAuth=${rep.adminPasswordAuth} verdict=${rep.verdict}`);
+    console.log(`[domains:live] diag url=${diag.urlClass} anon=${diag.anonKey.klass}/roleOk=${diag.anonKey.roleOk ?? "-"}/refOk=${diag.anonKey.refExpected ?? "-"}/exp=${diag.anonKey.expired ?? "-"} svc=${diag.serviceKey.klass}/roleOk=${diag.serviceKey.roleOk ?? "-"}/refOk=${diag.serviceKey.refExpected ?? "-"}/exp=${diag.serviceKey.expired ?? "-"} emailValid=${diag.emailValid}`);
+    console.log(`[domains:live] net dns=${diag.net.dns} tls=${diag.net.tls} authSettings=${diag.net.authSettingsStatus} serviceRole=${diag.net.serviceRole} passwordAuth=${diag.net.passwordAuth}`);
+    const s = diag.structural;
+    console.log(`[domains:live] struct newline/CR/ws/quotes URL=${s.SUPABASE_URL.hasNewline}/${s.SUPABASE_URL.hasCR}/${s.SUPABASE_URL.leadingTrailingWs}/${s.SUPABASE_URL.surroundingQuotes} ANON=${s.SUPABASE_ANON_KEY.hasNewline}/${s.SUPABASE_ANON_KEY.hasCR}/${s.SUPABASE_ANON_KEY.leadingTrailingWs}/${s.SUPABASE_ANON_KEY.surroundingQuotes} SVC=${s.SUPABASE_SERVICE_ROLE_KEY.hasNewline}/${s.SUPABASE_SERVICE_ROLE_KEY.hasCR}/${s.SUPABASE_SERVICE_ROLE_KEY.leadingTrailingWs}/${s.SUPABASE_SERVICE_ROLE_KEY.surroundingQuotes}`);
     process.exit(pass ? 0 : 1);
   }
   const readIdb = () => {
