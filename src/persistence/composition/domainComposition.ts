@@ -37,10 +37,13 @@ export class DomainCompositionError extends Error {
  * S9.2-A1d2a-1B2: `customers` is route-mounted (list + detail) and now
  * **LIVE_VALIDATED** — the 12-test live customer acceptance passed 12/12 against
  * live `teragon-staging` on the GitHub-hosted runner, with verified fixture
- * cleanup and a zero-orphan audit. Every other domain (contacts included) is
- * still NOT_CONNECTED and MUST stay that way until separately validated.
+ * cleanup and a zero-orphan audit.
+ * S9.3-B: `contacts` is READ-connected (list only). Its table/RLS/mapping already
+ * existed (003/010/012 + domains/crm.ts); this checkpoint only mounts the read
+ * route. Contacts is NOT LIVE_VALIDATED and has no create/update/delete or detail
+ * route yet. Every other domain is still NOT_CONNECTED.
  */
-export const SUPABASE_CONNECTED_DOMAINS: readonly CollectionKey[] = ["customers"];
+export const SUPABASE_CONNECTED_DOMAINS: readonly CollectionKey[] = ["customers", "contacts"];
 
 export function isSupabaseConnectedDomain(collection: CollectionKey): boolean {
   return SUPABASE_CONNECTED_DOMAINS.includes(collection);
