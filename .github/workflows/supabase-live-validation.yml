@@ -118,6 +118,26 @@ jobs:
       - name: axe + keyboard/landmark/label a11y gate (chromium × 1440/390)
         run: npx playwright test -c e2e/a11y.config.ts
 
+  network-resilience-gate:
+    name: Network resilience gate (Demo Pilot, synthetic)
+    # Required for EVERY pull request (no needs / no if), like the other gates.
+    # Synthetic LOCAL build + offline simulation only: no Supabase, no
+    # service-role, no live data, no customer/contact acceptance.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build LOCAL synthetic-data app
+        run: npm run build
+      - name: offline UI-resilience gate (chromium × 1440/390)
+        run: npx playwright test -c e2e/network.config.ts
+
   live-database:
     name: Live ephemeral Supabase database
     # Runs ONLY when persistence/Supabase paths changed, or on any non-PR event
