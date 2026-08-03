@@ -13,9 +13,14 @@ name: Supabase Live Validation
 # validated by a manual workflow_dispatch. The static gate must never be
 # path-conditional; only the expensive live-database job is, and that decision now
 # lives at the JOB level (see the `changes` job below).
+# Scoped to the feature base with the NATIVE branch filter — a `branches` filter
+# selects the PR's TARGET branch, so every PR merging into the feature base is
+# gated, regardless of which paths it touches. workflow_dispatch is unrestricted.
 on:
+  pull_request:
+    branches:
+      - feature/teragon-supabase-app-auth
   workflow_dispatch: {}
-  pull_request: {}
 
 permissions:
   contents: read
