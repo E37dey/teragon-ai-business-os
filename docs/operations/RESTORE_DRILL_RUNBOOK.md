@@ -1,8 +1,24 @@
 # Restore Drill Runbook — isolated, disposable, evidence-producing
 
-> **Status:** DEFINITION ONLY. No drill has been executed. `docs/trusted-ai/OPERATIONS_READINESS.md`
-> records backup/recovery as **Untested**, and that claim stands until a drill completes
-> against this runbook and its evidence checklist is filled in.
+> **Status (updated 2026-08-03):** a drill HAS been executed —
+> `docs/operations/evidence/RESTORE_DRILL_2026-08-03.md`, verdict **PARTIAL**.
+>
+> It proved two different things must be tracked separately:
+> - **Schema reconstruction — TESTED.** Migrations 001–014 rebuild a fully
+>   isolated database (47 tables, RLS 47/47, 185 policies, isolation 8/8, RTO 4 m 17 s).
+> - **Data backup restore — NOT AVAILABLE.** Staging reports `pitr_enabled: false`
+>   and `backups: []`; there is no recovery point, so **RPO is undefined**.
+>
+> §4 (snapshot selection) and §7 (RPO) below are therefore **not executable today** —
+> not for lack of permission, but because no backup artifact exists.
+>
+> Native backup/PITR is unavailable on the free plan and **no paid upgrade is
+> planned** (operator decision, 2026-08-03). The mitigation is a zero-cost
+> logical backup that is **planned, not built**:
+> `docs/operations/ZERO_COST_BACKUP_PLAN.md`. Once it produces real artifacts,
+> §4 selects an artifact instead of a PITR timestamp and §7's RPO becomes the
+> backup interval (≤ 24 h) rather than undefined. Backup/recovery stays
+> **NOT AVAILABLE** until then.
 
 Backups that have never been restored are an assumption, not a capability. This runbook
 exists so the first restore Teragon performs is a rehearsal, not an incident.
