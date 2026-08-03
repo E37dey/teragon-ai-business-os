@@ -4,7 +4,8 @@
 > the full S7/S8/S9 history or re-verify frozen facts unless a command contradicts them.
 
 ## Current position
-- **Branch:** `feature/teragon-supabase-app-auth` @ `0159e97`. **PR #3 is MERGED** (merge commit `0159e971b902e171487568c842376342449f4d6d`, source `722824c`, both gates green). The source branch `feature/teragon-supabase-domain-integration` is preserved. `main` is untouched at `4d4c9dc`.
+- **Branch:** `feature/teragon-supabase-app-auth` @ `26ec4ef`. **PR #3 and PR #5 are both MERGED** — #3 via `0159e97` (source `722824c`), #5 via `26ec4ef6253464893d4b69339356827fcf15045d` (source `1d446610b191e09157c756d70aab80bd20c0e8d0`, both gates green). Source branches `feature/teragon-supabase-domain-integration` and `feature/teragon-supabase-contacts-domain` are preserved. `main` is untouched at `4d4c9dc`.
+- **`customers` AND `contacts` are both `LIVE_VALIDATED`** (contacts: list read, customer-scoped read, create, update — **no delete, no `/contacts/:id`**). `/contacts` is RBAC-guarded by `customer.read`, matching its RLS SELECT policy. Every other domain remains `NOT_CONNECTED`; `AI_REMOTE_ENABLED` false; migrations **14**.
 - **HEAD after this session:** `65363ba` (`test(customers): validate live Supabase customer integration`). Prior: `0c9c369` (CI Node floor), `2403b2b` (preflight determinism), `e2a2201` (forensics record).
 - **Tree:** clean.
 - **customers status = `LIVE_VALIDATED`** — 12/12 live acceptance green against `teragon-staging` on the GitHub-hosted runner, cleanup verified, orphan audit 0. Contacts and every other domain remain `NOT_CONNECTED`. `AI_REMOTE_ENABLED` stays **false**. Migrations remain **14** (no 015).
