@@ -34,10 +34,11 @@ export class DomainCompositionError extends Error {
 
 /**
  * Collections the authenticated Supabase seam is IMPLEMENTATION-READY to serve.
- * S9.2-A1a: `customers` is loadable by loadSupabaseDomainRepository(), but is NOT
- * yet route-mounted / LIVE_VALIDATED — the route-aware gate + UI wiring land in
- * S9.2-A1b. Every other domain is still NOT_CONNECTED. (The DomainNotConnectedGate
- * is not route-aware yet, so in SUPABASE mode all pages still show the notice.)
+ * S9.2-A1d2a-1B2: `customers` is route-mounted (list + detail) and now
+ * **LIVE_VALIDATED** — the 12-test live customer acceptance passed 12/12 against
+ * live `teragon-staging` on the GitHub-hosted runner, with verified fixture
+ * cleanup and a zero-orphan audit. Every other domain (contacts included) is
+ * still NOT_CONNECTED and MUST stay that way until separately validated.
  */
 export const SUPABASE_CONNECTED_DOMAINS: readonly CollectionKey[] = ["customers"];
 
