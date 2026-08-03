@@ -12,18 +12,11 @@
 // LIVE_VALIDATED.
 import { useMemo } from "react";
 import type { ReactElement } from "react";
-import { DataTable, EmptyState, Panel, SectionTitle, StatusChip } from "@/design-system";
+import { DataTable, EmptyState, Panel, SectionTitle } from "@/design-system";
 import { useDomainCollection, domainReadMessage } from "@/app/data/useDomainCollection";
 import { PERSISTENCE_PROVIDER } from "@/persistence/provider";
 import type { Contact } from "@/domain/types";
-
-function primaryChip(isPrimary: boolean): ReactElement {
-  return isPrimary ? (
-    <StatusChip status="פעיל" label="ראשי" />
-  ) : (
-    <StatusChip status="מושבת" label="משני" />
-  );
-}
+import { primaryChip } from "./contactChips";
 
 export default function ContactsPage(): ReactElement {
   const isSupabase = PERSISTENCE_PROVIDER === "SUPABASE";

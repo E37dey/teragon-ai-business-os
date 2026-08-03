@@ -1,10 +1,10 @@
 // TERAGON AI BUSINESS OS — Gate S9.2-A1d1: SUPABASE customer detail (read-only
 // core + edit). A calm, presentation-ready reduction of the Customer-360 page:
-// it mounts ONLY the remotely-connected customer record and NONE of the
-// disconnected Customer-360 sections (contacts, opportunities, quotations,
-// printers, service, courses, tasks, approvals, activity…). Those are replaced
-// by ONE compact Hebrew deferred-sections notice — no wall of placeholders, no
-// IndexedDB hook mounted here.
+// it mounts ONLY remotely-connected data. S9.3-C adds the customer's CONTACTS
+// section (read-only, org-scoped, narrowed by customerId). Every still-
+// disconnected Customer-360 section (opportunities, quotations, printers,
+// service, courses, tasks, approvals, activity…) remains unmounted behind ONE
+// compact Hebrew deferred notice — no wall of placeholders, no IndexedDB hook.
 import { useState } from "react";
 import type { CSSProperties, ReactElement } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -23,6 +23,7 @@ import { useDomainRecord } from "@/app/data/useDomainRecord";
 import { domainReadMessage } from "@/app/data/useDomainCollection";
 import { useCustomerMutation } from "@/app/data/useCustomerMutation";
 import { customerInputSchema, type CustomerInput } from "@/app/quick-create/actions";
+import { CustomerContactsPanel } from "@/modules/contacts/CustomerContactsPanel";
 
 const backLink: CSSProperties = { color: "var(--os-cyan-text)", fontSize: "var(--os-text-sm)" };
 const rowLabel: CSSProperties = {
@@ -190,6 +191,10 @@ export function SupabaseCustomerDetail(): ReactElement {
         </div>
       </Panel>
 
+      {/* S9.3-C: contacts is the FIRST connected Customer-360 section. Every
+          other section stays deferred behind the notice below. */}
+      <CustomerContactsPanel customerId={id} />
+
       <p
         role="note"
         style={{
@@ -202,7 +207,7 @@ export function SupabaseCustomerDetail(): ReactElement {
           border: "1px solid var(--os-border)",
         }}
       >
-        המידע המשלים יחובר בשלבי ההטמעה הבאים
+        שאר המידע המשלים יחובר בשלבי ההטמעה הבאים
       </p>
 
       {editOpen && (
