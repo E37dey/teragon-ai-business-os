@@ -17,6 +17,12 @@ on:
         required: false
         default: false
         type: boolean
+      suite:
+        description: Which live domain suite to run
+        required: false
+        default: customers
+        type: choice
+        options: [customers, contacts]
 
 permissions:
   contents: read
@@ -99,6 +105,10 @@ jobs:
           ACCEPTANCE_BASE_URL: http://localhost:4173
           INTENDED_COMMIT: ${{ inputs.commit }}
           ACC_RUN_ID: gha${{ github.run_id }}
+          # Selects the suite AND its fixture footprint: the contacts run adds a
+          # primary-org customer + 2 contacts; the customers run is unchanged.
+          ACC_SUITE: ${{ inputs.suite }}
+          ACC_CONTACT_COUNT: ${{ inputs.suite == 'contacts' && '2' || '0' }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}

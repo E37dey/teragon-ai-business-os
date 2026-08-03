@@ -74,6 +74,16 @@ function customerIds(prefix, n) {
 }
 
 /**
+ * S9.3-E: contact fixtures live in the PRIMARY (administrator's) organization,
+ * because the browser suite signs in as the administrator and RLS correctly hides
+ * the second organization's rows. The second-org records stay exactly as they
+ * were — they are what proves isolation.
+ */
+function contactIds(prefix, n) {
+  return Array.from({ length: n }, (_, i) => `${prefix}-ct-${i + 1}`);
+}
+
+/**
  * Provision the fixtures. Returns `{ ok, handle }`; on any mid-way failure it
  * ROLLS BACK whatever it already created and returns `{ ok:false, handle:null }`.
  * The returned handle carries the fixture password IN MEMORY for the browser
@@ -92,7 +102,15 @@ export async function provisionCustomerFixtures({ adapter, config, deps = {} }) 
   const email = `${prefix}-user@${config.emailDomain ?? "fixtures.teragon.local"}`;
   const password = genPassword(); // held in memory only — NEVER logged
   const membershipId = `${prefix}-mem`;
-  const created = { userId: null, profile: false, membershipId: null, customerIds: [] };
+  // Primary-org fixtures (S9.3-E): ONE customer + N contacts the administrator's
+  // own session can legitimately read/edit. `primaryOrgId` defaults to the
+  // canonical org; when absent, no primary-org fixture is provisioned at all.
+  const primaryOrgId = config.primaryOrgId ?? "org-teragon";
+  const primaryCustomerId = `${prefix}-pcust`;
+  const created = {
+    userId: null, profile: false, membershipId: null, customerIds: [],
+    contactIds: [], primaryCustomerId: null,
+  };
 
   try {
     const existing = adapter.findUserByEmail ? await adapter.findUserByEmail(email) : null;
@@ -115,19 +133,40 @@ export async function provisionCustomerFixtures({ adapter, config, deps = {} }) 
       created.customerIds.push(id);
     }
 
+    // Primary-org customer + contacts (only when contacts are requested).
+    const contactCount = config.contactCount ?? 0;
+    if (contactCount > 0 && adapter.insertContact) {
+      await adapter.insertCustomer({ id: primaryCustomerId, orgId: primaryOrgId, name: `${prefix} לקוח ראשי`, type: "עסק", city: "תל אביב", status: "פעיל" });
+      created.primaryCustomerId = primaryCustomerId;
+      created.customerIds.push(primaryCustomerId);
+      for (const [i, id] of contactIds(prefix, contactCount).entries()) {
+        await adapter.insertContact({
+          id, orgId: primaryOrgId, customerId: primaryCustomerId,
+          name: `${prefix} איש קשר ${i + 1}`, role: i === 0 ? "רכש" : "תפעול",
+          phone: "050", email: `${id}@fixtures.teragon.local`, isPrimary: i === 0,
+        });
+        created.contactIds.push(id);
+      }
+    }
+
     return {
       ok: true,
       handle: {
         runId: config.runId, prefix, secondOrgId: config.secondOrgId, roleId: config.roleId,
         email, password, userId: user.userId, profile: true, membershipId,
         customerIds: [...created.customerIds], reusedUser: Boolean(existing),
+        primaryOrgId, primaryCustomerId: created.primaryCustomerId,
+        contactIds: [...created.contactIds],
       },
     };
   } catch (err) {
     // Roll back whatever we managed to create, then fail closed.
     const rollback = await cleanupCustomerFixtures({
       adapter,
-      handle: { userId: created.userId, profile: created.profile, membershipId: created.membershipId, customerIds: created.customerIds },
+      handle: {
+        userId: created.userId, profile: created.profile, membershipId: created.membershipId,
+        customerIds: created.customerIds, contactIds: created.contactIds,
+      },
     });
     return { ok: false, reason: `provision failed: ${classifyFixtureError(err)}`, cleanup: rollback, handle: null };
   }
@@ -159,6 +198,24 @@ export async function cleanupCustomerFixtures({ adapter, handle }) {
       errors.push(`${label}: ${classifyFixtureError(err)}`);
     }
   };
+  // Contacts FIRST — they reference customers, so deleting the parent first would
+  // violate the FK. Sweep by parent customer so browser-created contacts (whose
+  // app-generated ids the handle cannot know) are removed too, then verify the
+  // parent holds ZERO contacts before the customer itself is deleted.
+  if (handle.primaryCustomerId && typeof adapter.deleteContactsForCustomer === "function") {
+    await attempt(
+      `contacts-of:${handle.primaryCustomerId}`,
+      () => adapter.deleteContactsForCustomer(handle.primaryCustomerId),
+      async () =>
+        typeof adapter.countBy === "function"
+          ? (await adapter.countBy("contacts", "customer_id", handle.primaryCustomerId)) > 0
+          : false,
+    );
+  }
+  for (const id of handle.contactIds ?? [])
+    if (typeof adapter.deleteContact === "function")
+      await attempt(`contact:${id}`, () => adapter.deleteContact(id), () => adapter.exists("contacts", "id", id));
+
   for (const id of handle.customerIds ?? [])
     await attempt(`customer:${id}`, () => adapter.deleteCustomer(id), () => adapter.exists("customers", "id", id));
   if (handle.membershipId)

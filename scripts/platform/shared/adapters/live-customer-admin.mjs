@@ -117,6 +117,35 @@ export function createLiveCustomerAdmin({ env = process.env, clientFactory } = {
       const c = await client();
       ok(await c.from("customers").delete().eq("id", id), "deleteCustomer");
     },
+    async insertContact({ id, orgId, customerId, name, role, phone, email, isPrimary }) {
+      const c = await client();
+      ok(await c.from("contacts").upsert(
+        { id, organization_id: orgId, customer_id: customerId, name, role, phone, email, is_primary: isPrimary },
+        { onConflict: "id" },
+      ), "insertContact");
+    },
+    async deleteContact(id) {
+      const c = await client();
+      ok(await c.from("contacts").delete().eq("id", id), "deleteContact");
+    },
+    /**
+     * Delete EVERY contact under a fixture customer. The live suite creates a
+     * contact through the browser, which mints an app-generated `ct-<uuid>` id
+     * the fixture handle can never know — sweeping by parent is what guarantees
+     * zero orphans. Safe because the parent customer is itself a temporary
+     * accrun- fixture, so every row beneath it is fixture data.
+     */
+    async deleteContactsForCustomer(customerId) {
+      const c = await client();
+      ok(await c.from("contacts").delete().eq("customer_id", customerId), "deleteContactsForCustomer");
+    },
+    /** Count rows matching a column value — cleanup verification only. */
+    async countBy(table, column, value) {
+      const c = await client();
+      const { data, error } = await c.from(table).select("id").eq(column, value);
+      if (error) throw new Error(`countBy(${table}): ${safeAdminMessage(error)}`);
+      return (data ?? []).length;
+    },
     /** Existence probe for cleanup verification (returns boolean, never rows). */
     async exists(table, idColumn, idValue) {
       const c = await client();
