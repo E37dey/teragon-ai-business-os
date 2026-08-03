@@ -13,7 +13,7 @@ import type { Permission } from "./permissions";
 
 /**
  * Route path → permission required to VIEW the screen (null = open to all
- * roles). Keyed by the canonical `path` in src/app/routes.ts (all 31 routes
+ * roles). Keyed by the canonical `path` in src/app/routes.ts (all 32 routes
  * are represented — verified by a test that asserts full coverage).
  */
 export const ROUTE_PERMISSIONS: Readonly<Record<string, Permission | null>> = Object.freeze({
@@ -21,6 +21,9 @@ export const ROUTE_PERMISSIONS: Readonly<Record<string, Permission | null>> = Ob
   "/crm": "customer.read",
   "/customers": "customer.read",
   "/customers/:id": "customer.read",
+  // S9.3: contacts read is governed by the SAME capability as its RLS select
+  // policy (012_rls_policies.sql grants contacts SELECT on customer.read).
+  "/contacts": "customer.read",
   "/sales": "sales.read",
   "/courses": null,
   "/service": "service.read",

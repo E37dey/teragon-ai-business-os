@@ -26,8 +26,8 @@ function mount(path: string) {
 }
 
 describe("router smoke — all canonical paths render", () => {
-  it("has the full 31-entry route table (30 routes + customers index sample)", () => {
-    expect(APP_ROUTES.length).toBe(31);
+  it("has the full 32-entry route table (31 routes + customers index sample)", () => {
+    expect(APP_ROUTES.length).toBe(32); // +1: /contacts (S9.3-B)
   });
 
   for (const r of APP_ROUTES) {

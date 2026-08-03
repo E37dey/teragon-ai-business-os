@@ -18,6 +18,7 @@ export const APP_ROUTES: readonly AppRouteDef[] = [
   { path: "/", navPath: "/", title: "מרכז הפיקוד", wave: 3, inNav: true },
   { path: "/crm", navPath: "/crm", title: "ניהול לקוחות ולידים (CRM)", wave: 3, inNav: true },
   { path: "/customers", navPath: "/customers", title: "לקוחות", wave: 3, inNav: true },
+  { path: "/contacts", navPath: "/contacts", title: "אנשי קשר", wave: 3, inNav: true },
   {
     path: "/customers/:id",
     navPath: "/customers/cu-1",

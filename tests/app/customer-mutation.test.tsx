@@ -85,7 +85,10 @@ beforeEach(() => {
 afterEach(cleanup);
 
 function setup(provider?: PersistenceProvider) {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  // gcTime must NOT be 0: applyCacheOnSuccess writes via setQueryData, creating a
+  // query with no observer — with gcTime 0 it is garbage collected before the
+  // assertion reads it, which made "SUPABASE update…" intermittently fail.
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
   const wrapper = ({ children }: { children: ReactNode }): ReactElement => (
     <QueryClientProvider client={qc}>{children}</QueryClientProvider>
   );

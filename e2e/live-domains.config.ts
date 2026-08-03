@@ -17,9 +17,15 @@ const BASE_URL = (process.env.ACCEPTANCE_BASE_URL ?? "").replace(/\/$/, "");
 // executed=0 and reported "zero tests executed" even when the suite had run.
 const PW_JSON = resolve(process.cwd(), "e2e/live-domains/_pw.json");
 
+/** Restrict the run to ONE domain suite. Letters only — never a raw regex. */
+const SUITE = /^[a-z]+$/.test(process.env.ACC_SUITE ?? "") ? process.env.ACC_SUITE : "";
+
 export default defineConfig({
   testDir: "./live-domains",
-  testMatch: /.*\.live\.ts/,
+  // S9.3-E: ACC_SUITE selects ONE domain suite (e.g. "contacts" → contacts.live.ts)
+  // so each live run reports exactly its own inventory. Unset keeps the original
+  // behavior of matching every *.live.ts file.
+  testMatch: SUITE ? new RegExp(`${SUITE}\\.live\\.ts$`) : /.*\.live\.ts/,
   timeout: 240_000,
   fullyParallel: false,
   workers: 1,

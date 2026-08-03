@@ -45,7 +45,10 @@ const getSafe = vi.fn<(id: string) => Promise<RepoResult<Customer | undefined>>>
 const updateSafe = vi.fn<(id: string, patch: Partial<Customer>) => Promise<RepoResult<Customer>>>();
 // Mirrors loadSupabaseDomainRepository(collection, ctx) so `mock.calls` carries
 // the real tuple type and the context can be asserted without a cast.
-const loadRepo = vi.fn(async (_collection: CollectionKey, _ctx: DomainLoadContext) => ({ getSafe, updateSafe }));
+// S9.3-C: the detail page also reads the customer's contacts, so the double must
+// serve listSafe. Defaults to an empty contact list; tests that care override it.
+const listSafe = vi.fn<() => Promise<RepoResult<unknown[]>>>();
+const loadRepo = vi.fn(async (_collection: CollectionKey, _ctx: DomainLoadContext) => ({ getSafe, updateSafe, listSafe }));
 vi.mock("@/persistence/composition/loadSupabaseDomainRepository", () => ({
   loadSupabaseDomainRepository: (...a: Parameters<typeof loadRepo>) => loadRepo(...a),
 }));
@@ -71,6 +74,8 @@ beforeEach(() => {
   paramId = "cu-1";
   getSafe.mockReset();
   updateSafe.mockReset();
+  listSafe.mockReset();
+  listSafe.mockResolvedValue({ ok: true, data: [] }); // contacts: empty by default
   loadRepo.mockClear();
   (getRepository as unknown as ReturnType<typeof vi.fn>).mockClear();
 });
@@ -119,12 +124,15 @@ describe("S9.2-A1d1 · SupabaseCustomerDetail read", () => {
     expect(getRepository).not.toHaveBeenCalled(); // no IndexedDB / no fallback
   });
 
-  it("shows exactly one compact deferred-sections notice and mounts NO disconnected sections", async () => {
+  // S9.3-C: contacts is now the ONE connected Customer-360 section. Every other
+  // section must still stay unmounted behind the single deferred notice.
+  it("mounts the connected contacts section and NO other disconnected section", async () => {
     getSafe.mockResolvedValue({ ok: true, data: record() });
     renderDetail();
     await waitFor(() => expect(screen.getByTestId("customer-detail-supabase")).toBeTruthy());
-    expect(screen.getAllByText("המידע המשלים יחובר בשלבי ההטמעה הבאים")).toHaveLength(1);
-    expect(screen.queryByText("אנשי קשר")).toBeNull();
+    expect(screen.getAllByText("שאר המידע המשלים יחובר בשלבי ההטמעה הבאים")).toHaveLength(1);
+    // the contacts read resolves after the customer record — await it
+    await waitFor(() => expect(screen.getByTestId("customer-contacts")).toBeTruthy());
     expect(screen.queryByText("מדפסות הלקוח")).toBeNull();
     expect(screen.queryByText("הצעות מחיר פתוחות")).toBeNull();
   });

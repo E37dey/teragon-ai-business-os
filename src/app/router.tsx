@@ -23,6 +23,7 @@ const MODULE_PAGES: Record<string, LazyExoticComponent<ComponentType>> = {
   "/crm": lazy(() => import("@/modules/crm/CrmPage")),
   "/customers": lazy(() => import("@/modules/customers/CustomersPage")),
   "/customers/:id": lazy(() => import("@/modules/customers/CustomerDetailPage")),
+  "/contacts": lazy(() => import("@/modules/contacts/ContactsPage")),
   "/sales": lazy(() => import("@/modules/sales/SalesPage")),
   "/documents": lazy(() => import("@/modules/documents/DocumentsPage")),
   "/agents": lazy(() => import("@/modules/agents-ui/AgentsPage")),

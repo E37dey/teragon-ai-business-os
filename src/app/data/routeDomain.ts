@@ -17,5 +17,8 @@ const CUSTOMER_DETAIL = /^\/customers\/[^/]+$/;
 export function routeDomain(pathname: string): CollectionKey | null {
   if (pathname === "/customers") return "customers";
   if (CUSTOMER_DETAIL.test(pathname)) return "customers";
+  // S9.3-B: contacts LIST only. There is deliberately no /contacts/:id mapping —
+  // a contact detail route stays not-connected until its own checkpoint.
+  if (pathname === "/contacts") return "contacts";
   return null;
 }

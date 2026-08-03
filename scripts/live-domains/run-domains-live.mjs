@@ -442,9 +442,30 @@ async function main() {
   const runId = env.ACC_RUN_ID ?? "";
   let pwStatus = 1;
   const outcome = await withCustomerFixtures(
-    { adapter, config: { runId, secondOrgId: env.ACC_SECOND_ORG ?? "org-staging-beta", roleId: env.ACC_FIXTURE_ROLE ?? "crole-sales", customerCount: Number(env.ACC_CUSTOMER_COUNT ?? 3) } },
+    {
+      adapter,
+      config: {
+        runId,
+        secondOrgId: env.ACC_SECOND_ORG ?? "org-staging-beta",
+        roleId: env.ACC_FIXTURE_ROLE ?? "crole-sales",
+        customerCount: Number(env.ACC_CUSTOMER_COUNT ?? 3),
+        // S9.3-E: primary-org customer + contacts, provisioned only for the
+        // contacts suite so the customers run's footprint is unchanged.
+        primaryOrgId: env.ACC_PRIMARY_ORG ?? "org-teragon",
+        contactCount: Number(env.ACC_CONTACT_COUNT ?? 0),
+      },
+    },
     async (handle) => {
-      const childEnv = { ...process.env, ACC_FIXTURE_EMAIL: handle.email, ACC_FIXTURE_PASSWORD: handle.password };
+      const childEnv = {
+        ...process.env,
+        ACC_FIXTURE_EMAIL: handle.email,
+        ACC_FIXTURE_PASSWORD: handle.password,
+        ACC_FIXTURE_CUSTOMER_ID: handle.primaryCustomerId ?? "",
+        ACC_FIXTURE_SECOND_CUSTOMER_ID: (handle.customerIds ?? [])[0] ?? "",
+        ACC_FIXTURE_CONTACT_ID: (handle.contactIds ?? [])[0] ?? "",
+        ACC_FIXTURE_CONTACT_ID_2: (handle.contactIds ?? [])[1] ?? "",
+        ACC_FIXTURE_PREFIX: handle.prefix,
+      };
       // No `--reporter=` here on purpose: a CLI reporter list REPLACES the
       // config's, which silently discarded the json reporter and left the
       // authoritative totals at executed=0. The config owns list+json.
