@@ -127,11 +127,10 @@ test("quick-create dialog fits inside the viewport", async ({ page }, testInfo) 
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(page.locator("header.os-header").first()).toBeVisible({ timeout: 30_000 });
 
+  // The quick-add trigger is always present in the header — assert it strictly
+  // rather than skipping (the dialog-fit check must never be silently bypassed).
   const trigger = page.getByRole("button", { name: /הוספה מהירה|יצירה|חדש/i }).first();
-  if ((await trigger.count()) === 0) {
-    test.skip(true, "no quick-create trigger on this build");
-    return;
-  }
+  await expect(trigger).toBeVisible();
   await trigger.click();
 
   const dialog = page.getByRole("dialog").first();
