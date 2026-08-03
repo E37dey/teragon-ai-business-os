@@ -47,6 +47,12 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     # No powerful features are used by the app — deny camera/mic/geolocation.
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    # HTTPS enforcement (Phase 10.3-B). One year. Netlify serves the site over
+    # HTTPS only. Deliberately CONSERVATIVE: no `includeSubDomains` (no subdomain
+    # topology is proven HTTPS-only — the deploy is teragon-os-demo.netlify.app),
+    # and no `preload` (permanent browser-preload-list registration requires
+    # every-subdomain HTTPS + explicit operator approval, neither established).
+    Strict-Transport-Security = "max-age=31536000"
     # Content Security Policy — restrictive, audited against the actual build:
     #   default-src 'self'          — everything falls back to same-origin.
     #   script-src 'self'           — NO 'unsafe-inline'/'unsafe-eval'. Verified:
