@@ -158,7 +158,10 @@ privileged `postgres` role):
 
 - **schema-verify** (`schema-verify.mjs`) — one read-only introspection query
   compared to the CI baseline: 47 public tables, 14 migrations, 3 namespaces,
-  RLS enabled on every protected table, 9 functions incl. `bootstrap_admin`,
+  RLS enabled on every protected table, 9 functions incl. `bootstrap_admin`
+  (this baseline counts the 7 RLS helpers from `011` + the 2 domain functions
+  from `013`; it EXCLUDES the `set_updated_at` trigger helper from `001`, so a
+  full `public` inventory is **10** — see the 2026-08-03 drill evidence),
   FK/CHECK/index/policy presence, 0 nullable tenant `organization_id`
   (`organizations`/`roles` exempt), 2 storage buckets. Fails closed on drift;
   never auto-repairs; records safe totals only.
