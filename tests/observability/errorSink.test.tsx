@@ -25,7 +25,7 @@ function Boom(): ReactElement {
 describe("S10.0-B · sink whitelist", () => {
   it("keeps ONLY the six allowed fields", () => {
     const out = sanitizeErrorEvent({
-      kind: "domain_read_error", code: "unauthorized", domain: "contacts",
+      kind: "domain_read_denied", code: "unauthorized", domain: "contacts",
       route: "/contacts", correlationId: "abc-1", timestamp: "2026-01-01T00:00:00.000Z",
     });
     expect(Object.keys(out).sort()).toEqual(
@@ -67,9 +67,9 @@ describe("S10.0-B · sink robustness", () => {
   it("delivers the sanitized event to an injected provider", () => {
     const seen: unknown[] = [];
     setErrorReportProvider((e) => seen.push(e));
-    reportError({ kind: "authorization_denied", code: "unauthorized", domain: "contacts" });
+    reportError({ kind: "domain_write_denied", code: "unauthorized", domain: "contacts" });
     expect(seen).toHaveLength(1);
-    expect(seen[0]).toMatchObject({ kind: "authorization_denied", code: "unauthorized", domain: "contacts" });
+    expect(seen[0]).toMatchObject({ kind: "domain_write_denied", code: "unauthorized", domain: "contacts" });
   });
 
   it("a THROWING provider never propagates to the caller", () => {

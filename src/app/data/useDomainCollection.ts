@@ -25,6 +25,7 @@ import { useAuth } from "@/auth/useAuth";
 import { loadSupabaseDomainRepository } from "@/persistence/composition/loadSupabaseDomainRepository";
 import type { SafeError } from "@/persistence/result";
 import { collectionQueryKey } from "./hooks";
+import { newCorrelationId, reportDomainFailure } from "@/observability/domainEvents";
 
 /** Root prefix for every SUPABASE domain-collection query (used for bulk purge). */
 const SUPABASE_DOMAIN_KEY_ROOT = ["domain-collection", "SUPABASE"] as const;
@@ -90,14 +91,25 @@ export function useDomainCollection<T extends BaseEntity>(
           enabled: authed, // wait for Auth init; run only with a canonical identity
           retry: false, // no retry-through-fallback; a failure stays a typed error
           queryFn: async (): Promise<T[]> => {
-            const repo = await loadSupabaseDomainRepository<T>(collection, {
-              provider: "SUPABASE",
-              sessionActive: status === "AUTHENTICATED",
-              identity,
-            });
-            const res = await repo.listSafe();
-            if (!res.ok) throw new DomainReadError(res.error);
-            return res.data;
+            // S10.0-C: ONE correlation id per ACTUAL read. queryFn runs per
+            // operation, not per render, so a rerender cannot duplicate an
+            // event and retry:false keeps it to a single execution.
+            const correlationId = newCorrelationId();
+            try {
+              const repo = await loadSupabaseDomainRepository<T>(collection, {
+                provider: "SUPABASE",
+                sessionActive: status === "AUTHENTICATED",
+                identity,
+              });
+              const res = await repo.listSafe();
+              if (!res.ok) throw new DomainReadError(res.error);
+              return res.data;
+            } catch (e) {
+              // Observe, then rethrow UNCHANGED — retries, caching, typed errors
+              // and UI messages must behave exactly as before.
+              reportDomainFailure("read", collection, e, correlationId);
+              throw e;
+            }
           },
         }
       : {

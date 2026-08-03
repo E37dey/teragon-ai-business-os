@@ -35,6 +35,7 @@ import { useAuth } from "@/auth/useAuth";
 import { loadSupabaseDomainRepository } from "@/persistence/composition/loadSupabaseDomainRepository";
 import { DomainCompositionError } from "@/persistence/composition/domainComposition";
 import type { SafeError } from "@/persistence/result";
+import { newCorrelationId, reportDomainFailure, reportSafeCodeFailure } from "@/observability/domainEvents";
 
 export type CustomerMutationErrorCode =
   | "AUTH_REQUIRED"
@@ -156,11 +157,17 @@ export function useCustomerMutation(
   const supabaseWrite = useCallback(
     async (
       key: string,
-      run: (repo: Awaited<ReturnType<typeof loadSupabaseDomainRepository<Customer>>>) => Promise<CustomerMutationResult>,
+      run: (
+        repo: Awaited<ReturnType<typeof loadSupabaseDomainRepository<Customer>>>,
+        correlationId: string,
+      ) => Promise<CustomerMutationResult>,
     ): Promise<CustomerMutationResult> => {
       const existing = inFlight.get(key);
       if (existing) return existing; // collapse concurrent identical submits → one write
       const issued = { userId: identity?.userId ?? null, orgId: identity?.organizationId ?? null };
+      // S10.0-C: ONE correlation id per ACTUAL write. A collapsed duplicate
+      // submit returns the in-flight promise above, so it cannot double-report.
+      const correlationId = newCorrelationId();
       const promise = (async (): Promise<CustomerMutationResult> => {
         try {
           const repo = await loadSupabaseDomainRepository<Customer>("customers", {
@@ -168,8 +175,9 @@ export function useCustomerMutation(
             sessionActive: status === "AUTHENTICATED",
             identity,
           });
-          return await run(repo);
+          return await run(repo, correlationId);
         } catch (e) {
+          reportDomainFailure("write", "customers", e, correlationId);
           return fromThrown(e);
         }
       })().finally(() => inFlight.delete(key));
@@ -203,8 +211,11 @@ export function useCustomerMutation(
       }
 
       const entity = buildCustomerEntity(parsed.data, submissionId);
-      return supabaseWrite(`create:${submissionId}`, async (repo) => {
+      return supabaseWrite(`create:${submissionId}`, async (repo, correlationId) => {
         const res = await repo.upsertSafe(entity); // idempotent by deterministic id
+        // Report from the RAW SafeError code: fromSafe collapses "unauthorized"
+        // into REMOTE_WRITE_FAILED, which would lose the denial signal.
+        if (!res.ok) reportSafeCodeFailure("write", "customers", res.error.code, correlationId);
         return res.ok ? { ok: true, data: res.data } : fromSafe(res.error);
       });
     },
@@ -227,8 +238,9 @@ export function useCustomerMutation(
         }
       }
 
-      return supabaseWrite(`update:${id}`, async (repo) => {
+      return supabaseWrite(`update:${id}`, async (repo, correlationId) => {
         const res = await repo.updateSafe(id, patch); // idempotent; RLS rejects cross-org
+        if (!res.ok) reportSafeCodeFailure("write", "customers", res.error.code, correlationId);
         return res.ok ? { ok: true, data: res.data } : fromSafe(res.error);
       });
     },

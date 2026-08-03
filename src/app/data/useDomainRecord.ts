@@ -22,6 +22,7 @@ import { PERSISTENCE_PROVIDER, type PersistenceProvider } from "@/persistence/pr
 import { useAuth } from "@/auth/useAuth";
 import { loadSupabaseDomainRepository } from "@/persistence/composition/loadSupabaseDomainRepository";
 import { DomainReadError } from "./useDomainCollection";
+import { newCorrelationId, reportDomainFailure } from "@/observability/domainEvents";
 
 const SUPABASE_RECORD_KEY_ROOT = ["domain-record", "SUPABASE"] as const;
 
@@ -63,14 +64,23 @@ export function useDomainRecord<T extends BaseEntity>(
           enabled: authed && hasId,
           retry: false,
           queryFn: async (): Promise<T | null> => {
-            const repo = await loadSupabaseDomainRepository<T>(collection, {
-              provider: "SUPABASE",
-              sessionActive: status === "AUTHENTICATED",
-              identity,
-            });
-            const res = await repo.getSafe(id as string);
-            if (!res.ok) throw new DomainReadError(res.error);
-            return res.data ?? null; // null ⇒ not found
+            // S10.0-C: ONE correlation id per ACTUAL read (queryFn runs per
+            // operation, not per render).
+            const correlationId = newCorrelationId();
+            try {
+              const repo = await loadSupabaseDomainRepository<T>(collection, {
+                provider: "SUPABASE",
+                sessionActive: status === "AUTHENTICATED",
+                identity,
+              });
+              const res = await repo.getSafe(id as string);
+              if (!res.ok) throw new DomainReadError(res.error);
+              return res.data ?? null; // null ⇒ not found
+            } catch (e) {
+              // Observe, then rethrow UNCHANGED.
+              reportDomainFailure("read", collection, e, correlationId);
+              throw e;
+            }
           },
         }
       : {

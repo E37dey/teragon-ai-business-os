@@ -21,9 +21,13 @@ import { REDACTED } from "@/lib/redact";
 /** What kind of operational event this is. Extend deliberately, never freely. */
 export type ErrorEventKind =
   | "render_error" // an unexpected React render/lifecycle failure
-  | "domain_read_error"
-  | "domain_write_error"
-  | "authorization_denied";
+  // S10.0-C: domain read/write outcomes. FAILURES ONLY — success is never
+  // reported. `_denied` means an access refusal (RLS / auth), `_failed` any
+  // other typed safe failure.
+  | "domain_read_failed"
+  | "domain_read_denied"
+  | "domain_write_failed"
+  | "domain_write_denied";
 
 /** The ONLY fields allowed to leave the app. */
 export interface SafeErrorEvent {
