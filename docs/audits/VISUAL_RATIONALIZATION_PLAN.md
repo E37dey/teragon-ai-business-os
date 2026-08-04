@@ -4,56 +4,70 @@
 Findings are grounded in the 128-screenshot sweep + `_metrics-<w>.json` (overflow,
 console, nav mode) and targeted handler reads. Severity: BLOCKER / HIGH / MEDIUM / LOW.
 
-## Findings by severity
+> **Revised in S11.1-A2** after replacing the flawed 200ms settle with deterministic
+> route readiness and independently re-verifying in a live browser. The corrected
+> evidence **broadened H1** (overflow is systemic, not presentation-only) and **withdrew
+> H2** (the sidebar breakpoint is an intentional, correct responsive decision).
+
+## Findings by severity (corrected)
 
 ### BLOCKER — 0
-No crash, no dead route, no console error at any viewport; every route renders its shell.
+No crash, no dead route, no console error at any viewport; all shell routes render
+(`mainRendered` 31/31 at every viewport).
 
-### HIGH — 2
-- **H1 · `/submission/presentation` horizontal overflow.** Fixed-width slides clip:
-  **238px @ 768**, **616px @ 390** (screenshot-confirmed; content cut off, tab row
-  overflowing). This page is the **academic deliverable**, so overflow on a projector
-  or tablet is high-impact. Fix: make slide layout fluid (`max-width:100%`, wrap the
-  deck in `overflow-x:auto`, responsive slide width).
-- **H2 · Persistent sidebar only at 1440.** `nav.os-nav` is inline at 1440 (31/32) but
-  **collapses to the hamburger at 1024/768/390** (0 inline). A 1024–1439 "desktop" user
-  loses the primary navigation affordance. Fix: show the inline sidebar from ~1024 (or a
-  slim rail), keep the hamburger for < 768.
+### HIGH — 1
+- **H1 · Systemic narrow-viewport overflow (≤ ~883px).** Root-caused and independently
+  verified: `main.os-workspace__canvas` has an **~883px intrinsic minimum width** because
+  its KPI / metrics grids are fixed **4-column** layouts (`~238px × 4 ≈ 952px`,
+  `os-more-metrics__grid ~223px × 4`) that do **not** collapse to fewer columns on narrow
+  screens. Overflow ≈ `883 − viewport`: **0 @ 1024/1440**, **up to 238px across 12 routes
+  @ 768**, **up to 616px across 26 routes @ 390**. `/submission/presentation` is worst
+  (238/616) — it adds fixed-width slides on top of the canvas floor.
+  **Fix (Phase 2):** make the KPI/metrics grids responsive
+  (`grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr))` or explicit
+  column-count media queries collapsing 4→2→1), and make the presentation deck fluid
+  (`max-width:100%`, responsive slide width, `overflow-x:auto` wrapper). Assert
+  `documentElement.scrollWidth − clientWidth ≤ 2` at 1440/1024/768/390 on every route.
 
-### MEDIUM — 5
-- **M1 · Navigation grouping.** Flatten-and-regroup to **6 primary areas + AI Lab + a
-  "more/admin" area** per `PAGE_KEEP_HIDE_REMOVE_MATRIX.md` (reduces cognitive load;
-  local, low-risk).
-- **M2 · Header density at ≤1024.** Search + two theme toggles + mail + notifications +
-  quick-add + account compete for space. Condense (single theme control; group
-  secondary icons) to prevent overload at 1024.
-- **M3 · Contextual panel ("לוח הקשר").** On ≤1024 captures it lands at the bottom;
-  ensure it is **collapsible** and never precedes main content on mobile, and never
-  reduces the workspace excessively at 1024.
+### MEDIUM — 3
+- **M1 · Navigation grouping.** Regroup to **6 primary areas + AI Lab + "more/admin"**
+  per `PAGE_KEEP_HIDE_REMOVE_MATRIX.md` (reduces cognitive load; local, low-risk).
+- **M2 · Header density at ≤1024.** 8 header controls (search + two theme toggles + mail
+  + notifications + quick-add + account) compete for space. Condense (single theme
+  control; group secondary icons) to prevent overload at 1024.
 - **M4 · Inconsistent selects/controls.** Standardize native/dark selects, buttons,
-  filters, chips, badges and empty states into the shared component set (preserve
-  visible focus + accessible names).
-- **M5 · `/automations` overflow (transient).** The authoritative full-reload sweep
-  showed **0px** at 1024; the earlier 12px was a soft-navigation artifact. Verify it
-  stays 0 after the nav/header changes; no dedicated fix needed unless it reappears.
+  filters, chips, badges and empty states into the shared component set (preserve visible
+  focus + accessible names).
 
-### LOW — 4 (document, do not expand scope)
-- **L1 · ≤1024 cold-load paint.** `<main>` content paints > 200ms on hard reload at
-  ≤1024 (blank middle in sweep frames; content proven present by passing gates). Add
-  loading skeletons for perceived performance.
+### LOW — 3 (document, do not expand scope)
 - **L2 · Mixed Hebrew/English.** Intentional product/agent names (TERAGON, AI Copilot,
-  Hunter, Stage Gates, Microlearning) are acceptable; sweep the UI for *unintended*
-  English strings only.
+  Hunter, Stage Gates, Microlearning) are acceptable; sweep only for *unintended* English.
 - **L3 · Card/badge density.** Some dashboard sections repeat status text/badges; a
-  density pass (≤4 KPI cards is already met) improves calm.
+  density pass improves calm (≤4 KPI cards is already met).
 - **L4 · Long content pages.** UI_ONLY pages are scroll-heavy by design; acceptable.
+- Note: `/automations` shows a negligible **6px @ 1024** (within the same grid-floor
+  family); it disappears once H1 is fixed. Not a separate finding.
+
+## Reassessed & withdrawn
+
+- **~~H2 · "sidebar only at 1440"~~ → INTENTIONAL RESPONSIVE DECISION (withdrawn).**
+  Evidence: at 1024 the hamburger frees the workspace to ~1014px so the 977px canvas fits
+  (**0 overflow**); forcing an inline sidebar there would steal ~250px and push the 883px
+  content floor into overflow **at 1024 too**. The drawer toggle is labelled
+  (`פתיחת תפריט הניווט`) so navigation stays discoverable. This maximizes workspace and
+  avoids overflow — a correct decision, not a defect. (Once H1 makes content fluid, an
+  inline rail at 1024 becomes a *design option*, still not a bug.)
+- **~~M3 contextual panel~~** — with `mainRendered` now true everywhere, the earlier
+  "empty main / panel at bottom" observation was a capture artifact; no action.
 
 ## Fix policy (for the Phase-2 implementation PR)
 
-- **Fix all BLOCKER + HIGH** → H1 (presentation overflow), H2 (sidebar breakpoint).
-- **Fix MEDIUM when local + low-risk** → M1 nav grouping, M2 header condense, M3 panel
-  collapsible, M4 control standardization.
-- **Document LOW** (L1–L4) rather than widen scope.
+- **Fix all BLOCKER + HIGH** → **H1 only**: responsive KPI/metrics grids + fluid
+  presentation deck, with a per-route overflow assertion at 1440/1024/768/390.
+- **Fix MEDIUM when local + low-risk** → M1 nav grouping, M2 header condense, M4 control
+  standardization.
+- **Document LOW** (L2–L4) rather than widen scope.
+- **Do NOT "fix" the sidebar breakpoint** — it is intentional (see withdrawn H2).
 
 ## What is already good (do not "fix")
 
@@ -66,7 +80,9 @@ No crash, no dead route, no console error at any viewport; every route renders i
 ## Exact first implementation PR (Phase 2)
 
 **Branch `feature/teragon-visual-rationalization` → Draft PR to
-`feature/teragon-supabase-app-auth`.** First coherent commit batch: **H1 presentation
-responsiveness + H2 sidebar breakpoint** (the two HIGH findings), each with a
-cross-browser/overflow assertion at 1440/1024/768/390, then M1–M4 in follow-up batches.
-No Supabase/flags/migrations; Customers & Contacts untouched.
+`feature/teragon-supabase-app-auth`.** First coherent commit batch: **H1 — responsive
+KPI/metrics grids (collapse 4→2→1) + fluid presentation deck**, adding a per-route
+overflow-≤2px assertion at 1440/1024/768/390 (extend `e2e/cross-browser.config.ts` or a
+dedicated overflow gate). Follow-up batches: M1 nav grouping, M2 header condense, M4
+control standardization. **No sidebar-breakpoint change** (intentional). No
+Supabase/flags/migrations; Customers & Contacts untouched; `AI_REMOTE_ENABLED` stays false.

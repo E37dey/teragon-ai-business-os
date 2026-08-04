@@ -4,6 +4,13 @@
 Guiding rule: **hiding a screen from nav never deletes its schema, domain data, or
 tested repository code.** Base @ `eade083`.
 
+> **S11.1-A2 note:** the corrected responsive evidence (deterministic readiness;
+> systemic ≤883px overflow; sidebar reclassified as intentional) changed **visual/finding
+> totals only** — it did **not** change any page's product decision. **Route total stays
+> 32**; the decision totals below (7 / 13 / 5 / 7 / 0 / 0) are unchanged. The overflow fix
+> is a Phase-2 styling task, not a keep/hide/remove change. `/submission/presentation`
+> stays **KEEP_PRIMARY** (fix its overflow; do not hide the deliverable).
+
 ## Decision per route
 
 | Route | Decision | Rationale (evidence) |
