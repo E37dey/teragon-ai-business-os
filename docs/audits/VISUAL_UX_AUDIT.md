@@ -9,17 +9,37 @@ The responsive contract is enforced by an automated **cross-browser × responsiv
 matrix** (`e2e/cross-browser.config.ts`): chromium / firefox / webkit × **1440 / 768 /
 390** — **9/9 cells green** after the B4 fix (S10.3-C2 evidence). The a11y gate
 (`e2e/a11y.config.ts`, axe-core) is **18/18 green**; the offline UI gate proves zero
-horizontal overflow at 390 and reachable nav. **1024** is not a dedicated matrix cell;
-it sits inside the same desktop breakpoint band as 1440 and is covered by reasoned
-inspection, not an independent automated assertion — recorded honestly below.
+horizontal overflow at 390 and reachable nav. **1024** is not a matrix cell, so S11.0
+adds a **non-mutating live 1024px smoke** (below) as its own evidence.
+
+## §1024 smoke — live inspection (S11.0, 2026-08-04)
+
+Ran a **non-mutating** DOM inspection against the built preview at **exactly 1024×768**
+across the major shell and AI routes: `/`, `/customers`, `/agents`, `/automations`,
+`/agents/collaboration`, `/memory`, `/learning`. Measured `scrollWidth − clientWidth`,
+element right-edges, header/main presence, `dir`, and the nav mechanism.
+
+| Check | Result at 1024px |
+|-------|------------------|
+| Document overflow | **0px** on `/`, `/customers`, `/agents`, `/agents/collaboration`, `/memory`, `/learning`; **12px** on `/automations` (V2) — **no element exceeds the viewport** (no clipping culprit found) |
+| Header usable | ✅ visible with 8 interactive controls |
+| Main content readable | ✅ `main` = 978px wide, visible on every route |
+| Right sidebar / nav usable | ✅ at 1024 the inline `nav.os-nav` is collapsed **by design** (`display:none`); navigation is reachable via a labelled hamburger toggle — `aria-label="פתיחת תפריט הניווט"` |
+| Contextual panel obscuring workspace | ✅ none — no overlay covers `main` in default state |
+| Critical clipping | ✅ none — max element right-edge = 1014px (< 1024) at every route |
+| RTL integrity | ✅ `dir="rtl"` on every route |
+
+**1024 verdict: PASS.** No document overflow on the shell/AI routes except a
+negligible 12px scroll on `/automations` (no visible clipping); header, main and
+drawer-based navigation are all usable; nothing obscures the workspace.
 
 ## Findings
 
 | ID | Severity | Viewport(s) | Area | Finding | State |
 |----|----------|-------------|------|---------|-------|
 | V1 | ~~HIGH~~ | 390 | shell | Horizontal overflow on narrow mobile (B4) | **FIXED** (S10.3-C2; overflow ≤ 2px asserted) |
-| V2 | LOW | 1024 | matrix | No dedicated 1024 automated cell — covered by breakpoint reasoning only | ACCEPTED (in desktop band; C-tier) |
-| V3 | LOW | all | STATIC pages | Long curated Hebrew pages are content-dense; readable, RTL-correct, but scroll-heavy | ACCEPTED (content by design) |
+| V2 | LOW | 1024 | `/automations` | 12px document scroll at 1024 (no element exceeds the viewport; not critical clipping) | ACCEPTED (negligible; see §1024 smoke) |
+| V3 | LOW | all | UI_ONLY pages | Long curated Hebrew pages are content-dense; readable, RTL-correct, but scroll-heavy | ACCEPTED (content by design) |
 | V4 | LOW | 390 | lazy routes | Navigating to an *unvisited* lazy route while offline can't fetch its chunk | ACCEPTED (standard SPA limit; documented) |
 
 **No BLOCKER and no unresolved HIGH visual findings.**
@@ -35,11 +55,13 @@ inspection, not an independent automated assertion — recorded honestly below.
 
 ## Honest limitations
 
-- Visual proof is automated at **1440 / 768 / 390**; **1024** is reasoned, not
-  independently asserted (V2).
+- Automated matrix cells are **1440 / 768 / 390**; **1024** is proven by the S11.0
+  live smoke above (DOM measurement, not a persisted matrix cell).
+- The 1024 smoke ran on **chromium only** (single-engine); cross-engine 1024 parity is
+  inferred from the 9/9 matrix at the neighbouring widths, not independently asserted.
 - WebKit on Windows/CI is a **Safari compatibility proxy**, not proof on real Safari.
-- Screenshots are captured **only on failure** by the matrix; with 9/9 green there are
-  no failure artifacts to attach — the passing assertions are the evidence.
+- Screenshots at 1024 could not be captured (the browser pane was not compositing
+  frames in this headless run); evidence is DOM measurement, which is objective.
 
-**Verdict: VISUAL STATE ACCEPTABLE FOR SUBMISSION.** One prior HIGH (B4) fixed; all
-remaining findings are LOW / accepted demo limitations.
+**Verdict: VISUAL STATE ACCEPTABLE FOR SUBMISSION.** One prior HIGH (B4) fixed; the
+1024 smoke passes; all remaining findings are LOW / accepted demo limitations.

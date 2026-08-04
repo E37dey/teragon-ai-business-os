@@ -2,11 +2,14 @@
 
 **Documentation-only.** No flags, providers, or prompts changed. Date 2026-08-04.
 
-## Classification legend
+## Classification legend (approved taxonomy only)
 
-`REAL_OPERATIONAL` (calls a live model, real effect) · `DETERMINISTIC_DEMO` (deterministic
-local-rules output, honest) · `PARTIALLY_CONNECTED` (real seam, gated capability) ·
-`UI_ONLY` (renders, no logic) · `PLACEHOLDER` · `INACTIVE_BY_FLAG` (built, off by flag).
+`DETERMINISTIC_DEMO` (deterministic local-rules output, honest, no model spend) ·
+`CONNECTED_LOCAL_TESTED` (backed by the local persistence seam with domain tests) ·
+`LOCAL_ONLY` (backed locally, no dedicated domain test file) · `DEFERRED` (capability
+built but intentionally off by flag). `LIVE_VALIDATED` applies to no AI surface (no AI
+surface calls a live model in this build). `MOCK`/`STUB`/`UI_ONLY`/`NOT_CONNECTED`/
+`DEAD_OR_UNREACHABLE` apply to zero AI surfaces.
 
 ## The governing truth
 
@@ -26,10 +29,10 @@ about that, not disguised as a model.
 | Agent coordination room | `/agents/collaboration` | deterministic orchestrator | **DETERMINISTIC_DEMO** |
 | Automations | `/automations` | deterministic rules engine | **DETERMINISTIC_DEMO** |
 | Learning / improvement signals | `/learning` | local-rules over seed | **DETERMINISTIC_DEMO** |
-| Organizational memory (Obsidian-style) | `/memory` | IndexedDB records + local links | **DETERMINISTIC_DEMO** (data), no model |
-| Knowledge base | `/knowledge` | IndexedDB notes/articles | **DETERMINISTIC_DEMO** (data), no model |
-| Remote model provider | registry | `RemoteAIProvider` | **INACTIVE_BY_FLAG** (`AI_REMOTE_ENABLED=false`) |
-| AI governance / controls | `/governance` | governance records (IDB) | **DETERMINISTIC_DEMO** |
+| Organizational memory (Obsidian-style) | `/memory` | IndexedDB records + local links (tested) | **CONNECTED_LOCAL_TESTED** (data layer; no model) |
+| Knowledge base | `/knowledge` | IndexedDB notes/articles (no dedicated test) | **LOCAL_ONLY** (data layer; no model) |
+| Remote model provider | registry | `RemoteAIProvider` | **DEFERRED** (`AI_REMOTE_ENABLED=false`) |
+| AI governance / controls | `/governance` | governance records (IDB, no dedicated test) | **LOCAL_ONLY** (data layer; no model) |
 
 ## Honesty flags (the things this audit was asked to catch)
 
@@ -50,7 +53,7 @@ These surfaces are **deterministic demos, not live intelligence**. That is
 appropriate and sufficient for the academic scope (synthetic data, no paid services,
 `AI_REMOTE` may stay false). Turning on real intelligence is a **flag + key** change
 (`AI_REMOTE_ENABLED=true` + provider credentials) — the seam is already built and
-type-safe (`PARTIALLY_CONNECTED` at the architecture level), deliberately left OFF.
+type-safe, deliberately left OFF and therefore classified **DEFERRED**, not removed.
 
 **Verdict: AI CAPABILITY HONESTLY REPRESENTED.** No fake-AI, no misleading counters,
 no simulated-as-real approvals. All AI is deterministic-by-design and clearly labelled.

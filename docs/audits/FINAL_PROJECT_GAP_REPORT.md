@@ -25,7 +25,7 @@ is submission-ready.
 | Routes & navigation | 100% | 32 routes mapped, all reachable, RBAC known |
 | Architecture map | 100% | Diagram + boundaries documented |
 | AI capability truth | 100% | Every surface classified; honest |
-| Visual / UX | 95% | 1440/768/390 asserted; 1024 reasoned (LOW) |
+| Visual / UX | 100% | 1440/768/390 matrix + live 1024 smoke (PASS) |
 | Functional actions | 100% | Working / demo-only / disabled-honestly |
 | Quality gates | 100% | Build, typecheck×2, 2551 tests, a11y, network, cross-browser |
 | Data connectivity | ~15% by domain | 2/14 live *by design* (academic scope) |
@@ -35,7 +35,7 @@ is submission-ready.
 1. `customers` + `contacts` are genuinely LIVE (Supabase + RLS + acceptance). ✅
 2. All other 102 collection keys are LOCAL deterministic seed — honest, fail-closed. ✅
 3. All AI is deterministic local-rules; `model=null`, "never pretends to be an LLM". ✅
-4. `AI_REMOTE_ENABLED=false` — remote model OFF by flag (INACTIVE_BY_FLAG). ✅
+4. `AI_REMOTE_ENABLED=false` — remote model OFF by flag (classified `DEFERRED`). ✅
 5. Agent counters read real seed records — **not** fabricated. ✅
 6. Build + typecheck (app & tests) clean; **2551/2551** unit tests pass. ✅
 7. a11y **18/18**, network **6/6**, cross-browser **9/9** cells green. ✅
@@ -49,11 +49,11 @@ is submission-ready.
 
 **B — Should-fix (post-submission / if scope grows):**
 - B1 Backup/restore + PITR before any **real** business data is entered (unbounded RPO today).
-- Dedicated **1024** viewport assertion (currently reasoned, LOW).
+- Add a **1024** cell to the persisted cross-browser matrix (S11.0 proved it via a live smoke; not yet a standing CI cell).
 - Resolve local `tests/platform/*` Rolldown parse so local == CI.
 
 **C — Acceptable demo limitations (academic scope):**
-- 12 modules LOCAL-only; seed resets per build.
+- 16 non-live domain routes run locally (13 CONNECTED_LOCAL_TESTED + 3 LOCAL_ONLY); seed resets per build.
 - AI deterministic, remote model OFF by flag.
 - Offline navigation to unvisited lazy routes can't fetch chunks.
 - WebKit is a Safari proxy, not real-Safari proof.

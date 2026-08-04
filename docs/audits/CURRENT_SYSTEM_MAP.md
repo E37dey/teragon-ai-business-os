@@ -25,48 +25,56 @@ only** — the map below is honest about what is real, what is demo, and what is
 32 canonical routes (`src/app/routes.ts`) — 31 in-nav + 1 hidden detail route.
 RBAC capability from `src/authorization/routeGuard.ts` (`null` = open, no gate).
 
-**Status legend:** `LIVE_VALIDATED` (Supabase + RLS + acceptance) · `LOCAL_DEMO`
-(IndexedDB seed, real CRUD, deterministic) · `DETERMINISTIC_DEMO` (local-rules AI, no
-model spend) · `STATIC_CONTENT` (curated Hebrew content / evidence, no data layer).
+**Status legend (approved taxonomy only):** `LIVE_VALIDATED` (Supabase + RLS +
+acceptance) · `CONNECTED_LOCAL_TESTED` (wired to the local IndexedDB persistence seam
+**and** covered by domain tests) · `LOCAL_ONLY` (wired locally, no dedicated domain
+test file found) · `DETERMINISTIC_DEMO` (local-rules AI, no model spend) · `UI_ONLY`
+(renders curated Hebrew content, no data layer). Classification is evidence-driven:
+`CONNECTED_LOCAL_TESTED` vs `LOCAL_ONLY` is decided by presence of a matching
+`*.test.ts` under `tests/`/`src/`.
 
 | # | URL | Hebrew label | Wave | Capability | Data source | Status |
 |--:|-----|--------------|:----:|-----------|-------------|--------|
-| 1 | `/` | מרכז הפיקוד | 3 | `null` | aggregates local collections | LOCAL_DEMO |
-| 2 | `/crm` | ניהול לקוחות ולידים (CRM) | 3 | `customer.read` | leads/opportunities (IDB) | LOCAL_DEMO |
+| 1 | `/` | מרכז הפיקוד | 3 | `null` | aggregates local collections | CONNECTED_LOCAL_TESTED |
+| 2 | `/crm` | ניהול לקוחות ולידים (CRM) | 3 | `customer.read` | leads/opportunities (IDB) | CONNECTED_LOCAL_TESTED |
 | 3 | `/customers` | לקוחות | 3 | `customer.read` | **Supabase** | **LIVE_VALIDATED** |
 | 4 | `/contacts` | אנשי קשר | 3 | `customer.read` | **Supabase** | **LIVE_VALIDATED** |
 | 5 | `/customers/:id` | כרטיס לקוח (hidden) | 3 | `customer.read` | **Supabase** | **LIVE_VALIDATED** |
-| 6 | `/sales` | מכירות והצעות מחיר | 3 | `sales.read` | quotations (IDB) | LOCAL_DEMO |
-| 7 | `/courses` | קורסים ולמידה | 4 | `null` | courses (IDB) | LOCAL_DEMO |
-| 8 | `/service` | שירות ותיקונים | 4 | `service.read` | serviceTickets (IDB) | LOCAL_DEMO |
-| 9 | `/printers` | מדפסות ודגמים | 4 | `service.read` | printerModels (IDB) | LOCAL_DEMO |
-| 10 | `/organizations` | ארגונים | 4 | `customer.read` | organizations (IDB) | LOCAL_DEMO |
-| 11 | `/tasks` | משימות ופגישות | 4 | `null` | tasks/meetings (IDB) | LOCAL_DEMO |
-| 12 | `/documents` | מסמכים והצעות מחיר | 3 | `sales.read` | documents (IDB) | LOCAL_DEMO |
+| 6 | `/sales` | מכירות והצעות מחיר | 3 | `sales.read` | quotations (IDB) | CONNECTED_LOCAL_TESTED |
+| 7 | `/courses` | קורסים ולמידה | 4 | `null` | courses (IDB) | CONNECTED_LOCAL_TESTED |
+| 8 | `/service` | שירות ותיקונים | 4 | `service.read` | serviceTickets (IDB) | CONNECTED_LOCAL_TESTED |
+| 9 | `/printers` | מדפסות ודגמים | 4 | `service.read` | printerModels (IDB) | CONNECTED_LOCAL_TESTED |
+| 10 | `/organizations` | ארגונים | 4 | `customer.read` | organizations (IDB) | CONNECTED_LOCAL_TESTED |
+| 11 | `/tasks` | משימות ופגישות | 4 | `null` | tasks/meetings (IDB) | CONNECTED_LOCAL_TESTED |
+| 12 | `/documents` | מסמכים והצעות מחיר | 3 | `sales.read` | documents (IDB) | LOCAL_ONLY |
 | 13 | `/automations` | אוטומציות | 5 | `null` | rules engine (local) | DETERMINISTIC_DEMO |
 | 14 | `/agents` | סוכני AI | 5 | `null` | 7 agents · local-rules | DETERMINISTIC_DEMO |
 | 15 | `/agents/collaboration` | חדר התיאום של הסוכנים | 5 | `null` | orchestrator (local) | DETERMINISTIC_DEMO |
-| 16 | `/memory` | זיכרון ארגוני · Obsidian | 6 | `null` | memoryRecords (IDB) | LOCAL_DEMO |
-| 17 | `/knowledge` | מאגר ידע | 6 | `null` | knowledgeNotes (IDB) | LOCAL_DEMO |
+| 16 | `/memory` | זיכרון ארגוני · Obsidian | 6 | `null` | memoryRecords (IDB) | CONNECTED_LOCAL_TESTED |
+| 17 | `/knowledge` | מאגר ידע | 6 | `null` | knowledgeNotes (IDB) | LOCAL_ONLY |
 | 18 | `/learning` | מרכז למידה ושיפור | 6 | `null` | local-rules signals | DETERMINISTIC_DEMO |
-| 19 | `/analytics` | דוחות וניתוחים | 4 | `null` | computed from seed | LOCAL_DEMO |
-| 20 | `/governance` | ממשל ובקרת AI | 4 | `governance.review` | governance records (IDB) | LOCAL_DEMO |
-| 21 | `/implementation` | תכנית ההטמעה | 7 | `null` | curated content | STATIC_CONTENT |
-| 22 | `/personas` | פרסונות ומסלולי הדרכה | 7 | `null` | curated content | STATIC_CONTENT |
-| 23 | `/stage-gates` | Stage Gates · שערי מעבר וראיות | 7 | `null` | evidence index | STATIC_CONTENT |
-| 24 | `/training-materials` | מרכז חומרי ההדרכה | 7 | `null` | curated content | STATIC_CONTENT |
-| 25 | `/quick-start` | התחלה מהירה ושימוש נכון | 7 | `null` | curated content | STATIC_CONTENT |
-| 26 | `/faq` | FAQ והתנגדויות | 7 | `null` | curated content | STATIC_CONTENT |
-| 27 | `/support` | תמיכה לאחר ההשקה | 7 | `null` | curated content | STATIC_CONTENT |
-| 28 | `/administration` | ניהול המערכת | 4 | `user.manage` | users/roles (IDB) | LOCAL_DEMO |
-| 29 | `/system-health` | בריאות המערכת | 9 | `health.diagnostics` | local diagnostics | LOCAL_DEMO |
-| 30 | `/settings` | הגדרות | 9 | `settings.update` | settings (IDB) | LOCAL_DEMO |
-| 31 | `/submission` | מרכז ההגשה והראיות | 7 | `null` | evidence index | STATIC_CONTENT |
-| 32 | `/submission/presentation` | מצגת ההגשה | 7 | `null` | curated content | STATIC_CONTENT |
+| 19 | `/analytics` | דוחות וניתוחים | 4 | `null` | computed from seed | CONNECTED_LOCAL_TESTED |
+| 20 | `/governance` | ממשל ובקרת AI | 4 | `governance.review` | governance records (IDB) | LOCAL_ONLY |
+| 21 | `/implementation` | תכנית ההטמעה | 7 | `null` | curated content | UI_ONLY |
+| 22 | `/personas` | פרסונות ומסלולי הדרכה | 7 | `null` | curated content | UI_ONLY |
+| 23 | `/stage-gates` | Stage Gates · שערי מעבר וראיות | 7 | `null` | evidence index | UI_ONLY |
+| 24 | `/training-materials` | מרכז חומרי ההדרכה | 7 | `null` | curated content | UI_ONLY |
+| 25 | `/quick-start` | התחלה מהירה ושימוש נכון | 7 | `null` | curated content | UI_ONLY |
+| 26 | `/faq` | FAQ והתנגדויות | 7 | `null` | curated content | UI_ONLY |
+| 27 | `/support` | תמיכה לאחר ההשקה | 7 | `null` | curated content | UI_ONLY |
+| 28 | `/administration` | ניהול המערכת | 4 | `user.manage` | users/roles (IDB) | CONNECTED_LOCAL_TESTED |
+| 29 | `/system-health` | בריאות המערכת | 9 | `health.diagnostics` | local diagnostics | CONNECTED_LOCAL_TESTED |
+| 30 | `/settings` | הגדרות | 9 | `settings.update` | settings (IDB) | CONNECTED_LOCAL_TESTED |
+| 31 | `/submission` | מרכז ההגשה והראיות | 7 | `null` | evidence index | UI_ONLY |
+| 32 | `/submission/presentation` | מצגת ההגשה | 7 | `null` | curated content | UI_ONLY |
 
-**Totals:** 32 routes · **3 LIVE_VALIDATED** · 12 LOCAL_DEMO · 5 DETERMINISTIC_DEMO ·
-12 STATIC_CONTENT. **Domains/modules:** ~14 business modules over **104 collection
-keys**; **2** are Supabase-connected.
+**Totals (32 routes):** **3 LIVE_VALIDATED** · **13 CONNECTED_LOCAL_TESTED** · **3
+LOCAL_ONLY** · **4 DETERMINISTIC_DEMO** · **9 UI_ONLY**. (3+13+3+4+9 = 32.)
+**Domains/modules:** ~14 business modules over **104 collection keys**; **2** are
+Supabase-connected. Unused approved statuses (`MOCK`, `STUB`, `NOT_CONNECTED`,
+`DEFERRED`, `DEAD_OR_UNREACHABLE`) applied to zero routes — no route is a mock, stub,
+disconnected shell, or dead link; the flagged-off remote AI provider is classified
+`DEFERRED` in the AI audit.
 
 **Loading / empty / error:** every domain route uses the shared TanStack Query seam
 (`useDomainCollection`) → deterministic loading state, honest empty states, and a
@@ -107,11 +115,11 @@ demo mode gates every external side-effect.
 |--------|----------|---------|
 | Create/edit customer, contact | `/customers`, `/contacts` | **WORKING** (Supabase, RLS, 12/12 acceptance each) |
 | Quick-add dialog + validation | shell header | **WORKING** (Hebrew validation, focus-safe) |
-| CRUD on leads/tasks/tickets/etc. | 12 LOCAL_DEMO routes | **WORKING_DEMO_ONLY** (IndexedDB seed, resets per build) |
+| CRUD on leads/tasks/tickets/etc. | CONNECTED_LOCAL_TESTED + LOCAL_ONLY routes | **WORKING_DEMO_ONLY** (IndexedDB seed, resets per build) |
 | Run agent / automation | `/agents`, `/automations` | **WORKING_DEMO_ONLY** (deterministic local-rules output) |
-| Remote-model AI call | provider registry | **DISABLED_HONESTLY** (`AI_REMOTE_ENABLED=false`) |
+| Remote-model AI call | provider registry | **DISABLED_HONESTLY** (`AI_REMOTE_ENABLED=false`; classified `DEFERRED`) |
 | Backup / restore real data | ops | **NOT AVAILABLE** (staging free plan, no PITR — synthetic-only, §gap B1) |
-| Static content pages | 12 STATIC_CONTENT routes | **WORKING** (render curated Hebrew content) |
+| Curated content pages | 9 UI_ONLY routes | **WORKING** (render curated Hebrew content) |
 
 **No NO_OP / BROKEN / MISLEADING actions found** in the audited surfaces. Demo-only
 actions are labelled by the persistent Demo-Mode banner (not disguised as production).
