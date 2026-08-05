@@ -434,7 +434,7 @@ function CommandCenterInner(): ReactElement {
           Passive analytics (revenue, pipeline value, course %) moved to
           "מדדים נוספים" — quieter, but never deleted. */}
       <div
-        style={gridStyle("repeat(auto-fit, minmax(180px, 1fr))", "var(--os-space-4)")}
+        style={gridStyle("repeat(auto-fit, minmax(min(100%, 180px), 1fr))", "var(--os-space-4)")}
         data-testid="command-kpis"
       >
         <KpiCard
