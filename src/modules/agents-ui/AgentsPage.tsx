@@ -32,6 +32,7 @@ import type { AIProviderHealth } from "@/ai/contracts/AIProvider";
 import { ProviderStateBadge, getAgentEngine, AGENT_DISABLED_STATUS } from "@/components/ai";
 import { dateTimeHe } from "@/modules/quotations/fmt";
 import { fleetRows, fleetSummary, type AgentFleetRow } from "./lib";
+import { AgentActionsPanel } from "./AgentActionsPanel";
 
 const stack = (gap = "var(--os-space-4)"): CSSProperties => ({ display: "grid", gap });
 
@@ -90,7 +91,7 @@ function AgentDetailDrawer({
   health,
   onClose,
 }: DetailDrawerProps): ReactElement {
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState("actions");
   const def = row.definition;
   const myTasks = tasks.filter((t) => t.agentId === row.agent.id);
   const myRuns = runs.filter(
@@ -163,6 +164,7 @@ function AgentDetailDrawer({
       <div style={stack("var(--os-space-3)")} data-testid="agent-detail-drawer">
         <Tabs
           items={[
+            { id: "actions", label: "פעולות" },
             { id: "overview", label: "סקירה" },
             { id: "tasks", label: "משימות", badge: myTasks.length },
             { id: "permissions", label: "הרשאות" },
@@ -174,6 +176,7 @@ function AgentDetailDrawer({
           activeId={tab}
           onChange={setTab}
         />
+        {tab === "actions" && <AgentActionsPanel agentId={row.agent.id} />}
         {tab === "overview" && (
           <div style={stack("var(--os-space-3)")}>
             <Field label="ייעוד">{def?.purposeHe ?? row.agent.purpose}</Field>
