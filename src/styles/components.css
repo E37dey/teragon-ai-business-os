@@ -2542,7 +2542,9 @@
 }
 
 .os-qc-input {
-  background: var(--os-raised);
+  /* background-color (not the `background` shorthand) so the standardized <select>
+     caret background-image below is not reset on select.os-qc-input (S11.2-B). */
+  background-color: var(--os-raised);
   border: var(--os-border-thin);
   border-radius: var(--os-radius-md);
   color: var(--os-text);
@@ -2567,6 +2569,37 @@
 
 .os-qc-input[aria-invalid="true"] {
   border-color: var(--os-danger-border);
+}
+
+/* Standardize EVERY native <select> into one consistent, theme-aware control
+   (S11.2-B). Some pages used unstyled selects (native OS arrow + a light option list
+   that clashes in dark mode). This gives them the same raised surface, border, and a
+   single themed caret on the inline-end (left in RTL) — matching `.os-qc-input`. The
+   mid-grey caret reads on both light and dark surfaces. Accessible name and keyboard
+   behaviour are unchanged; focus shows the standard ring. */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--os-raised);
+  color: var(--os-text);
+  border: var(--os-border-thin);
+  border-radius: var(--os-radius-md);
+  font-family: var(--os-font);
+  font-size: var(--os-text-sm);
+  padding: var(--os-space-4) var(--os-space-5);
+  padding-inline-end: calc(var(--os-space-5) + 18px);
+  /* !important: some pages still set an inline `background` shorthand on the select,
+     which would reset the caret and leave appearance:none with NO affordance. The
+     caret must always win so every select keeps a visible, consistent dropdown cue. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%238a94a6' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: left var(--os-space-4) center !important;
+  background-size: 12px !important;
+}
+select:focus-visible {
+  border-color: var(--os-cyan-border);
+  box-shadow: var(--os-focus-ring);
+  outline: none;
 }
 
 .os-qc-error {

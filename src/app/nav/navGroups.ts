@@ -43,8 +43,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     ],
   },
   {
+    // AI Lab — all deterministic AI surfaces grouped under one honest "local demo"
+    // area (S11.2-B). id kept as "knowledge" for stable persisted state + tests.
     id: "knowledge",
-    label: "ידע ואוטומציה",
+    label: "מעבדת AI · דמו מקומי",
     items: [
       { path: "/agents", label: "סוכני AI", icon: "bot" },
       { path: "/agents/collaboration", label: "חדר התיאום", icon: "network" },
@@ -52,6 +54,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { path: "/memory", label: "זיכרון Obsidian", icon: "memory" },
       { path: "/knowledge", label: "מאגר ידע", icon: "book" },
       { path: "/learning", label: "מרכז למידה ושיפור", icon: "sparkle" },
+      { path: "/governance", label: "ממשל ובקרת AI", icon: "shield" },
     ],
   },
   {
@@ -69,10 +72,11 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     ],
   },
   {
+    // Secondary / reference area — renamed "עוד" (S11.2-B). Governance moved to the
+    // AI Lab group above; the remaining system pages stay reachable here.
     id: "system",
-    label: "ניהול המערכת",
+    label: "עוד",
     items: [
-      { path: "/governance", label: "ממשל ובקרת AI", icon: "shield" },
       { path: "/administration", label: "משתמשים והרשאות", icon: "users" },
       { path: "/system-health", label: "בריאות המערכת", icon: "gauge" },
       { path: "/settings", label: "הגדרות", icon: "gear" },
