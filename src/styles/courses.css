@@ -57,6 +57,14 @@
   min-inline-size: 0;
   grid-template-columns: repeat(2, minmax(190px, 1fr));
 }
+/* Two 190px columns (~380px) exceed the ~366px canvas on a 390px phone (14px
+   overflow — S11.2-A). Stack to one column on narrow phones; 2→3 columns return with
+   width. */
+@media (max-width: 430px) {
+  .courses-kpi {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .courses-kpi > * {
   min-inline-size: 0;
   max-inline-size: 100%;
