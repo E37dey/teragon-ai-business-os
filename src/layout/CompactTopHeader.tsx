@@ -134,19 +134,22 @@ export function CompactTopHeader({
             <span className="os-header__count">{notificationsCount}</span>
           )}
         </button>
-        <button
-          type="button"
-          className="os-header__iconbtn"
-          onClick={onMail}
-          disabled={!onMail}
-          aria-label={typeof mailCount === "number" ? `הודעות (${mailCount})` : "הודעות"}
-          title={onMail ? "הודעות" : "הודעות — יחובר בהמשך"}
-        >
-          <OsIcon name="mail" size={15} />
-          {typeof mailCount === "number" && mailCount > 0 && (
-            <span className="os-header__count">{mailCount}</span>
-          )}
-        </button>
+        {/* Mail is shown ONLY when actually wired — a perpetually-disabled control is
+            clutter and notifications already covers inbound messages (S11.2-B). */}
+        {onMail && (
+          <button
+            type="button"
+            className="os-header__iconbtn"
+            onClick={onMail}
+            aria-label={typeof mailCount === "number" ? `הודעות (${mailCount})` : "הודעות"}
+            title="הודעות"
+          >
+            <OsIcon name="mail" size={15} />
+            {typeof mailCount === "number" && mailCount > 0 && (
+              <span className="os-header__count">{mailCount}</span>
+            )}
+          </button>
+        )}
         {actions}
       </div>
 

@@ -7,14 +7,18 @@ import { APP_ROUTES } from "@/app/routes";
 const ROUTE_PATHS = new Set(APP_ROUTES.map((r) => r.path));
 
 describe("NAV_GROUPS integrity", () => {
-  it("has the 5 canonical groups", () => {
+  it("has the 5 canonical groups (S11.2-B: AI Lab + עוד)", () => {
     expect(NAV_GROUPS.map((g) => g.label)).toEqual([
       "ניהול העסק",
       "שירות והדרכה",
-      "ידע ואוטומציה",
+      "מעבדת AI · דמו מקומי",
       "הטמעה והגשה",
-      "ניהול המערכת",
+      "עוד",
     ]);
+  });
+
+  it("governance is grouped under the AI Lab (deterministic AI area)", () => {
+    expect(groupOfPath("/governance")?.id).toBe("knowledge");
   });
 
   it("every nav item path exists in the canonical route table", () => {
