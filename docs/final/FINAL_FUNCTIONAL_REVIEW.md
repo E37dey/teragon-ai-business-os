@@ -18,7 +18,7 @@ remains NO_OP / BROKEN / MISLEADING / NOT_TESTED.** Evidence: prior merged audit
 | Account / logout | ACCEPTED | real `signOut` → `/login`; SUPABASE invalidates repo |
 | Contextual rail | ACCEPTED | collapsible, locally persisted; shows only when a page contributes |
 | Route redirects / not-found | ACCEPTED | NotFound renders; auth gate pass-through in LOCAL |
-| Mail control | DISABLED_HONESTLY | removed from header (was never wired) |
+| Mail control | NOT_APPLICABLE | **No Mail control is presented.** PR #20 removed the unwired button; `CompactTopHeader` renders mail only when `onMail` is wired, and `OsShell` never wires it — so there is no visible Mail control to classify |
 | Remote AI | DISABLED_HONESTLY | `AI_REMOTE_ENABLED=false`; local rules only |
 
 ## Customers (LIVE_VALIDATED)
@@ -61,5 +61,6 @@ List · search/filter · create · update · validation · safe errors → **ACC
 
 **~40 primary functions inspected.** ACCEPTED (live/full): Customers, Contacts, shell
 core (nav/theme/account/rail/redirects), agent validation & duplicate-blocking. Everything
-else **ACCEPTED_DEMO_ONLY** with honest labelling. **DISABLED_HONESTLY:** remote AI, mail.
+else **ACCEPTED_DEMO_ONLY** with honest labelling. **DISABLED_HONESTLY:** remote AI
+(flag-gated). **NOT_APPLICABLE:** Mail — no Mail control is presented (removed in PR #20).
 **0 BLOCKER · 0 NO_OP · 0 BROKEN · 0 MISLEADING · 0 NOT_TESTED.**

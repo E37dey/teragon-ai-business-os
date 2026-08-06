@@ -62,6 +62,15 @@ Status: **ACCEPTED** (live/tested), **ACCEPTED_DEMO_ONLY** (honest local/determi
 | 31 | `/submission` | מרכז ההגשה והראיות | evidence index | ACCEPTED_DEMO_ONLY |
 | 32 | `/submission/presentation` | מצגת ההגשה | full-bleed deck (fluid) | ACCEPTED_DEMO_ONLY |
 
+## Academic scope clarity (explicit)
+
+- **3 routes are LIVE_VALIDATED — the only Supabase-backed business domains:**
+  `/customers`, `/contacts`, `/customers/:id` (Supabase + RLS, 12/12 live acceptance each).
+- **29 routes are ACCEPTED_DEMO_ONLY.** They demonstrate product workflows, local modules
+  and deterministic AI over synthetic data (IndexedDB seed / curated content / local
+  rules). **They are NOT Supabase-backed business domains** and are not represented as
+  such — each carries the persistent Demo-Mode banner and honest labels.
+
 **Totals: 32/32 routes ACCEPTED — 3 ACCEPTED (LIVE_VALIDATED) + 29 ACCEPTED_DEMO_ONLY.**
 0 BLOCKER. Every route resolves, renders, is RTL-correct, keyboard-reachable (a11y gate
 18/18), overflow-free, and console-error-free at all four viewports. Local-demo screens

@@ -10,17 +10,19 @@ FINAL_AI_REVIEW · FINAL_VISUAL_REVIEW · FINAL_DEMO_FLOW.
 | Gate | Result |
 |------|--------|
 | build · typecheck · typecheck:tests | ✅ · ✅ · ✅ (0 errors) |
-| Full unit/integration (vitest) | ✅ **2569 tests pass** |
+| Full unit/integration (vitest) | ✅ **2569/2569 executable logic tests pass** |
 | Router smoke · nav integrity · agent-action | ✅ 36/36 · 9/9 · 17/17 |
 | Accessibility gate (axe-core) | ✅ **18/18** |
 | Network-resilience gate | ✅ **6/6** |
 | Cross-browser matrix (chromium/firefox/webkit × 1440/768/390) | ✅ **144 passed** |
 | Full-route responsive capture (32 × 1440/1024/768/390) | ✅ overflow **0**, emptyMain **0**, console **0** |
 
-**Known local limitation (not a logic failure):** 12 `tests/platform/*` files fail
-**only on this machine** with a Rolldown parse error; **CI is authoritative** and runs
-them green. All 2569 application-logic tests pass. 0 test.skip, 0 test.fail, no weakened
-assertions.
+**Known local limitation (NOT an application-logic failure):** **2569/2569 executable
+logic tests pass.** Separately, 12 `tests/platform/*` files have a **known local Rolldown
+loading limitation** on this machine (a parse/load error before assertions run) — they
+are **not application-logic failures**. **GitHub CI is authoritative** for those files,
+runs them green, and **must be green before merge**. 0 test.skip, 0 test.fail, no
+weakened assertions.
 
 ## Category scores (0.0–10.0) with evidence
 
