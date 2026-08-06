@@ -16,7 +16,7 @@ Pre-submission checklist for TERAGON AI BUSINESS OS. Branch
 - [x] **No real data** — synthetic demo data only; real business data prohibited.
 - [x] **No Production dependency** — local demo needs no Supabase/secrets/Production.
 - [x] **Final SHA recorded** — distinguished, not conflated: the **package source SHA** is the head of `feature/teragon-academic-submission-package` (the S12.1 docs commit); the **resulting merged base SHA** of `feature/teragon-supabase-app-auth` is a *different, later* commit recorded **after** merge in the S12.1 return summary. The pre-merge PR SHA is **not** the final repository HEAD.
-- [ ] **Evaluator demo rehearsed** — **NOT yet done.** The 5-minute path is *scripted* in [PRESENTATION_SCRIPT_HE.md](PRESENTATION_SCRIPT_HE.md) and the Fixer approval flow was *functionally* verified in-browser (propose → awaiting → approve → applied → duplicate-blocked), but **no actual timed dry-run has been performed** — the presenter must run one before the session. Left unchecked on purpose (honesty).
+- [ ] **Evaluator demo rehearsed** — **remains UNCHECKED (honesty).** A real timed run WAS performed (S12.2 · base `b405c651` · evidence: [TIMED_DEMO_REHEARSAL.md](TIMED_DEMO_REHEARSAL.md)) — the **functional flow PASSED** (all screens + Hunter/Fixer/Orchestrator actions worked, 0 console errors, no blocker, no misleading statement). **But the timed result did not meet ≤ 5:00** (raw automated total **08:18**, inflated by automation round-trip latency + 2 diagnostic detours). Per the rule, only a clean ≤ 5:00 PASS may check this box; a human **spoken** ≤ 5:00 dry-run is still required. Recommended script reductions are documented in the evidence file.
 
 ## Course-aligned QA (From Working MVP → Trusted AI)
 
