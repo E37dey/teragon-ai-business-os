@@ -15,8 +15,8 @@ Pre-submission checklist for TERAGON AI BUSINESS OS. Branch
 - [x] **Presentation route works** — `/submission/presentation` renders, fluid, 0 overflow at all viewports.
 - [x] **No real data** — synthetic demo data only; real business data prohibited.
 - [x] **No Production dependency** — local demo needs no Supabase/secrets/Production.
-- [x] **Final SHA recorded** — the head of `feature/teragon-academic-submission-package` (the S12.1 docs commit); recorded in the S12.1 return summary and the Draft PR.
-- [x] **Evaluator demo rehearsed** — the 5-minute path (Command Center → Customers → Contacts → Agents → Fixer approval → Orchestrator plan) is scripted in [PRESENTATION_SCRIPT_HE.md](PRESENTATION_SCRIPT_HE.md) and the Fixer approval flow was live-verified (propose → awaiting → approve → applied → duplicate-blocked).
+- [x] **Final SHA recorded** — distinguished, not conflated: the **package source SHA** is the head of `feature/teragon-academic-submission-package` (the S12.1 docs commit); the **resulting merged base SHA** of `feature/teragon-supabase-app-auth` is a *different, later* commit recorded **after** merge in the S12.1 return summary. The pre-merge PR SHA is **not** the final repository HEAD.
+- [ ] **Evaluator demo rehearsed** — **NOT yet done.** The 5-minute path is *scripted* in [PRESENTATION_SCRIPT_HE.md](PRESENTATION_SCRIPT_HE.md) and the Fixer approval flow was *functionally* verified in-browser (propose → awaiting → approve → applied → duplicate-blocked), but **no actual timed dry-run has been performed** — the presenter must run one before the session. Left unchecked on purpose (honesty).
 
 ## Course-aligned QA (From Working MVP → Trusted AI)
 
