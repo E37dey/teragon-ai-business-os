@@ -8,6 +8,9 @@ evaluator should read it. Start here, then the [root README](../../README.md).
 - **[README.md](../../README.md)** — the one-page product, scope, run and quality summary.
 - **[RUN_AND_DEMO_GUIDE.md](RUN_AND_DEMO_GUIDE.md)** — exactly how to install, run and test locally (no secrets).
 - **[PRESENTATION_SCRIPT_HE.md](PRESENTATION_SCRIPT_HE.md)** — the 60-second / 5-min / 10-min demo scripts with fallback.
+- **[PRESENTATION_SCRIPT_4_30_HE.md](PRESENTATION_SCRIPT_4_30_HE.md)** — the tightened 04:30 human script (per-section route, action, sentences, timestamp, emergency-skip line).
+- **[HUMAN_REHEARSAL_SCORECARD_HE.md](HUMAN_REHEARSAL_SCORECARD_HE.md)** — the blank scorecard the presenter fills after a real timed run (not yet done).
+- **[TIMED_DEMO_REHEARSAL.md](TIMED_DEMO_REHEARSAL.md)** — the functional timed-run evidence (raw 08:18; automation-dominated; ≤5:00 human timing not yet validated).
 - **[EVALUATOR_FAQ_HE.md](EVALUATOR_FAQ_HE.md)** — grounded answers to the questions an evaluator is most likely to ask.
 - **[ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md)** — three Mermaid diagrams distinguishing the current build from future production.
 - **[TRUSTED_AI_TEST_PACK_HE.md](TRUSTED_AI_TEST_PACK_HE.md)** — the course-aligned QA pack: success criteria, 15 test cards, rubric, risk register, HITL map, three real failures, and Go/No-Go.
