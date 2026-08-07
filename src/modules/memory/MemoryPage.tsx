@@ -396,9 +396,12 @@ export default function MemoryPage(): ReactElement {
       </PageRail>
 
       <div>
-        <h1 style={{ margin: 0, fontSize: "var(--os-text-xl, 20px)" }}>זיכרון ארגוני</h1>
+        <h1 style={{ margin: 0, fontSize: "var(--os-text-xl, 20px)" }}>זיכרון מקומי</h1>
         <div style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-sm, 13px)" }}>
           ארבע שכבות זיכרון · הצעות באישור אנושי · גרסאות בלתי-ניתנות-לשינוי · מצב הדגמה מקומי
+        </div>
+        <div style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-sm, 13px)", marginTop: "0.25rem" }}>
+          נשמר מקומית במצב הדמו — אינו מחובר כעת לכספת Obsidian.
         </div>
       </div>
 
