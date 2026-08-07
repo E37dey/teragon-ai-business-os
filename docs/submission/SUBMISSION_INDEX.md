@@ -12,6 +12,7 @@ evaluator should read it. Start here, then the [root README](../../README.md).
 - **[FINAL_HUMAN_DEMO_SCRIPT_4_30_HE.md](FINAL_HUMAN_DEMO_SCRIPT_4_30_HE.md)** — the final spoken Hebrew script to read while presenting (389 words ≈ 3:00 speech; est. ~04:00–04:15 total; ≤05:00).
 - **[HUMAN_DEMO_CHEAT_SHEET_HE.md](HUMAN_DEMO_CHEAT_SHEET_HE.md)** — the one-page TIME·SCREEN·CLICK·KEY-SENTENCE reference with three timing checkpoints.
 - **[HUMAN_REHEARSAL_RESULT_TEMPLATE.md](HUMAN_REHEARSAL_RESULT_TEMPLATE.md)** — the blank template the presenter fills after a real timed run (not yet done).
+- **[HUMAN_REHEARSAL_RESULT.md](HUMAN_REHEARSAL_RESULT.md)** — honest status record: the human timed rehearsal is **not yet performed** (no PASS; checkbox unchecked; submission not marked READY).
 - **[HUMAN_REHEARSAL_SCORECARD_HE.md](HUMAN_REHEARSAL_SCORECARD_HE.md)** — the blank scorecard the presenter fills after a real timed run (not yet done).
 - **[TIMED_DEMO_REHEARSAL.md](TIMED_DEMO_REHEARSAL.md)** — the functional timed-run evidence (raw 08:18; automation-dominated; ≤5:00 human timing not yet validated).
 - **[EVALUATOR_FAQ_HE.md](EVALUATOR_FAQ_HE.md)** — grounded answers to the questions an evaluator is most likely to ask.
