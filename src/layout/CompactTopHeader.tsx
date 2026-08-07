@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { OsIcon, SearchInput } from "../design-system";
 import "../styles/components.css";
@@ -32,10 +32,6 @@ export interface CompactTopHeaderProps {
   className?: string;
 }
 
-function formatClock(d: Date): string {
-  return d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
-}
-
 function formatGregorian(d: Date): string {
   return d.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
@@ -56,8 +52,8 @@ function formatHebrewDate(d: Date): string {
 
 /**
  * CompactTopHeader — avatar + name/role, quick actions (+, bell w/ badge,
- * mail), global smart search with ⌘K hint, Hebrew + Gregorian date, live clock.
- * The clock and dates are REAL (Intl over Date.now) — never mocked.
+ * mail), global smart search with ⌘K hint, and a single Hebrew + Gregorian date.
+ * S13.1: the decorative live clock was removed to calm the header. Dates are REAL.
  */
 export function CompactTopHeader({
   user,
@@ -72,13 +68,8 @@ export function CompactTopHeader({
   actions,
   className = "",
 }: CompactTopHeaderProps): ReactElement {
-  const [now, setNow] = useState<Date>(() => new Date());
+  const [now] = useState<Date>(() => new Date());
   const [query, setQuery] = useState("");
-
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(new Date()), 30_000);
-    return () => window.clearInterval(id);
-  }, []);
 
   const hebrewDate = formatHebrewDate(now);
   const initial = user.name.trim().charAt(0) || "?";
@@ -172,8 +163,6 @@ export function CompactTopHeader({
           </>
         )}
         <span className="os-num">{formatGregorian(now)}</span>
-        <span className="os-header__sep" aria-hidden="true" />
-        <span className="os-header__clock">{formatClock(now)}</span>
       </div>
     </header>
   );
