@@ -563,7 +563,7 @@ export default function CrmPage(): ReactElement {
           gap: "var(--os-space-3)",
         }}
       >
-        <h1 style={{ margin: 0, fontSize: "var(--os-text-xl, 20px)" }}>ניהול לקוחות ולידים</h1>
+        <h1 style={{ margin: 0, fontSize: "var(--os-text-xl, 20px)" }}>ניהול לקוחות ולידים (CRM)</h1>
         <div style={{ display: "flex", gap: "var(--os-space-2)" }}>
           <OsButton icon="plus" onClick={() => setCreateKind("lead")}>
             ליד חדש
