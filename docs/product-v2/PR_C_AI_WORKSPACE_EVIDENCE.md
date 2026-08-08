@@ -19,13 +19,15 @@ LLM, no MCP, no vector DB, no real memory, no Agent Loop, no new agents, no new 
   recommended action · canonical target).
 - **C. Agent quick actions** — a **compact 7-agent selector** (not seven big cards); selecting an agent
   renders the existing `AgentActionsPanel` (≤2 actions/agent) which reuses the engine.
-- **D. Approval queue** — real approval-gated Fixer proposals (before/after, why, evidence collapsed);
-  Approve reuses the gate (applies once, blocks duplicates); Reject removes without any engine call.
+- **D. Approval queue — APPROVAL TRUTH** — contains **only real `awaiting_approval` instances** produced
+  when a user runs an approval-gated action WITHOUT approval; it is **empty on load** (verified: 0 items),
+  never derived from findings/candidates. Approve reuses the gate (applies once, blocks duplicates);
+  Reject removes without any engine call.
 - **E. Recent activity** — **≤5** deterministic results (agent · action · status · time · shortened
   correlationId); detail lives in the action/approval cards (progressive disclosure).
 
-One honest engine line at the top (not repeated per card): `מנוע חוקים מקומי — ללא מודל מרוחק · נתוני דמו
-סינתטיים · ההמלצות ניתנות להסבר · כתיבה מחייבת אישור.`
+One honest engine line at the top (not repeated per card): `מנוע AI מקומי ודטרמיניסטי · נתוני דמו
+סינתטיים · ללא מודל מרוחק · ההמלצות ניתנות להסבר · כתיבה מחייבת אישור.`
 
 ## Seven-agent representation & handoffs
 
@@ -39,18 +41,21 @@ code name. The workflow is understandable and **user-triggered only**: a Hunter 
 `workspaceActionCount() === AGENT_ACTIONS.length === 14` (exactly 2 per agent × 7). The Workspace defines
 **zero** new actions — it imports the single registry and calls `runAgentAction`.
 
-## Approvals result
+## Approvals result (truthful)
 
-Approve → `runAgentAction("fixer.apply-correction", {recordId}, {approved:true})` → `applied`;
-`appliedCorrectionCount()` increments exactly once; the item leaves the queue (no re-approval from UI);
-duplicate application is blocked by the engine. Reject → **no engine call** → `appliedCorrectionCount()`
-stays 0. Rendering the page applies nothing (approvals require explicit user action).
+The queue is **empty on load** (no fabricated pending). A pending item appears **only** after a user
+runs an approval-gated action without approval and the engine returns `awaiting_approval` (a real
+instance, no mutation). Approve → `runAgentAction("fixer.apply-correction", {recordId}, {approved:true})`
+→ `applied`; `appliedCorrectionCount()` increments exactly once; the item leaves the queue; duplicate
+application is blocked by the engine. Reject → **no engine call** → `appliedCorrectionCount()` stays 0.
+Rendering the page applies nothing. "דורש טיפול" (attention/findings) and "ממתין לאישורך" (real
+awaiting-approval) are two distinct concepts.
 
 ## Page-density metrics (live)
 
 | Viewport | Doc height | Overflow | Notes |
 |---------|---:|:---:|------|
-| 1440 | 1,617px | 0 | 4 KPIs · 5 attention · 7-agent selector · 3 approvals · recent empty |
+| 1440 | 1,617px | 0 | 4 KPIs · 5 attention · 7-agent selector · 0 approvals (empty on load) · recent empty |
 | 1024 | 1,649px | 0 | |
 | 768 | 1,738px | 0 | |
 | 390 | 2,420px | 0 | one column · 0 unfocusable scrollable regions |
@@ -69,12 +74,12 @@ a11y / network-resilience / cross-browser gates are authoritative and run on thi
 
 ## Tests
 
-- **AI Workspace suite: 7/7** — single 14-action registry reused (no duplicate); 7 agents; counters
+- **AI Workspace suite: 9/9** — single 14-action registry reused (no duplicate); 7 agents; counters
   derive from real state; title + 4 KPIs + 7 agents render; ≤5 attention / ≤5 recent; approval requires
   explicit action, applies once, blocks duplicates; reject never mutates; handoff pre-fills Fixer without
   auto-executing.
 - typecheck ✅ · typecheck:tests ✅ · agents + agents-ui + ai-workspace + router/nav **137/137** ✅ ·
-  full `vitest` executable **2579/2579** (7 workspace + 1 extra route-smoke) — only the 12 known `tests/platform/*` Rolldown
+  full `vitest` executable **2581/2581** (9 workspace + 1 extra route-smoke) — only the 12 known `tests/platform/*` Rolldown
   file-load failures remain (pre-existing, CI-authoritative). oxlint ✅. No `test.skip`/`test.fail`/
   weakened assertions.
 
@@ -83,7 +88,7 @@ a11y / network-resilience / cross-browser gates are authoritative and run on thi
 - New: `src/modules/ai-workspace/AiWorkspacePage.tsx`, `src/modules/ai-workspace/workspaceModel.ts`,
   `tests/ai-workspace/workspace.test.tsx`, `docs/product-v2/AI_WORKSPACE_CONSOLIDATION_MAP.md`, this file.
 - Edited: `src/app/routes.ts`, `src/app/router.tsx`, `src/app/nav/navGroups.ts`, `tests/router.test.tsx`,
-  `src/modules/agents-ui/AgentActionsPanel.tsx` (optional `initialInputs` + `onResult`, backward compatible).
+  `src/modules/agents-ui/AgentActionsPanel.tsx` (optional `initialActionId` + `initialInputs`, `onResult` passes inputs — backward compatible).
 
 ## Consolidation recommendations (see AI_WORKSPACE_CONSOLIDATION_MAP.md)
 
