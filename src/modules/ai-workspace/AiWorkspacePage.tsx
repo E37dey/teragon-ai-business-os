@@ -21,6 +21,7 @@ import {
 } from "@/design-system";
 import { HideShellRail } from "@/app/rail";
 import { AgentActionsPanel } from "@/modules/agents-ui/AgentActionsPanel";
+import { AgentLoopPanel } from "./AgentLoopPanel";
 import { AGENT_IDS, getAgentDefinition } from "@/agents/definitions";
 import {
   runAgentAction,
@@ -214,7 +215,7 @@ export default function AiWorkspacePage(): ReactElement {
                       {item.recommendedActionHe}
                     </OsButton>
                   ) : (
-                    <Link to={item.navigationTarget} style={{ color: "var(--os-cyan-text)", fontSize: "var(--os-text-2xs)" }}>
+                    <Link to={item.navigationTarget} style={{ color: "var(--os-cyan-text)", fontSize: "var(--os-text-2xs)", textDecoration: "underline" }}>
                       {item.recommendedActionHe} ←
                     </Link>
                   )}
@@ -225,10 +226,13 @@ export default function AiWorkspacePage(): ReactElement {
         </div>
       </Panel>
 
+      {/* B2. GUIDED, HUMAN-CONTROLLED bounded loop — secondary to the attention area. */}
+      <AgentLoopPanel />
+
       {/* C. AGENT QUICK ACTIONS — 7 agents compact; selecting reuses the engine */}
       <Panel variant="panel" style={{ padding: "var(--os-space-5)" }} data-testid="workspace-agents">
         <SectionTitle icon="bot" title="איזה סוכן יכול לעזור?" subtitle="שבעה סוכנים דטרמיניסטיים · עד שתי פעולות לכל אחד" />
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBlock: "var(--os-space-3)" }} role="tablist" aria-label="בחירת סוכן">
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBlock: "var(--os-space-3)" }} role="group" aria-label="בחירת סוכן">
           {AGENT_IDS.map((id) => {
             const def = getAgentDefinition(id);
             const activeSel = id === selectedAgentId;
@@ -241,7 +245,7 @@ export default function AiWorkspacePage(): ReactElement {
                 aria-pressed={activeSel}
                 title={def?.purposeHe}
               >
-                {def?.nameHe ?? id} <span className="os-ltr" style={{ color: "var(--os-text-2)" }}>· {def?.codeName}</span>
+                {def?.nameHe ?? id} <span className="os-ltr">· {def?.codeName}</span>
               </OsButton>
             );
           })}
@@ -328,7 +332,8 @@ export default function AiWorkspacePage(): ReactElement {
       </Panel>
 
       <div style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-muted)" }}>
-        לניהול סוכנים מפורט ותצוגת התזמור: <Link to="/agents">מסך הסוכנים ←</Link>
+        לניהול סוכנים מפורט ותצוגת התזמור:{" "}
+        <Link to="/agents" style={{ color: "var(--os-cyan-text)", textDecoration: "underline" }}>מסך הסוכנים ←</Link>
       </div>
     </div>
   );
