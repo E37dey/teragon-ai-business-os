@@ -93,6 +93,18 @@ No `test.skip` / `test.fail` / weakened assertions.
   could convert some info-badges to plain text.
 - Chart redesign (Gantt, KpiCard delta/sparkline) remains **PR B-charts / future** — not attempted here.
 
+## Required a11y fix (shared table scroll region)
+
+The CI Accessibility gate caught a **pre-existing** critical/serious axe violation
+(`scrollable-region-focusable`) on **contacts-list @ mobile 390px** — a page PR B did not touch. Root
+cause: the shared `DataTable` wrapper `.os-table-scroll` was made keyboard-focusable **only** when a
+vertical `maxHeight` was set, but it also scrolls **horizontally** (`overflow-x:auto`) at narrow widths,
+so at 390px it became an unfocusable scrollable region. Since a green a11y gate is a hard merge
+precondition, the fix is included here: `src/design-system/DataTable.tsx` now makes `.os-table-scroll`
+**unconditionally** `tabIndex={0}` + `role="region"` + labeled. Verified locally: unfocusable-scrollable
+count on contacts@390 went 1 → **0**; overflow still 0; contacts/customers table tests 29/29. This is an
+additive keyboard-a11y fix benefiting every table page (no data/behaviour change).
+
 ## Scope note
 
 **No AI Workspace (PR C) work is included.** No agent-action, memory, Supabase, migration, Production, or
