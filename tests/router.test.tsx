@@ -33,13 +33,13 @@ describe("router smoke — all canonical paths render", () => {
   for (const r of APP_ROUTES) {
     it(`${r.navPath} renders "${r.title}"`, async () => {
       mount(r.navPath);
-      // title appears in the page heading (and possibly the nav) — at least once.
-      // /submission/presentation is a top-level lazy route outside OsShell (W7-F),
-      // so its content (which contains the title) must be awaited.
-      const matches =
-        r.path === "/submission/presentation"
-          ? await screen.findAllByText((text) => text.includes(r.title))
-          : screen.getAllByText((text) => text.includes(r.title));
+      // Product V2 (S13.1): the shell no longer renders a placeholder rail that
+      // echoed the route title synchronously — each page now OWNS its heading. Pages
+      // are lazy-loaded, so the title must be awaited (assertion unchanged: the page
+      // itself must render its own title at least once).
+      const matches = await screen.findAllByText((text) => text.includes(r.title), undefined, {
+        timeout: 10_000,
+      });
       expect(matches.length).toBeGreaterThanOrEqual(1);
     });
   }

@@ -602,9 +602,15 @@ function CommandCenterInner(): ReactElement {
         ownerName={userName(CEO_USER_ID)}
       />
 
-      {/* ONE operational summary — the follow-up queue (actionable). Kept
-          permanently visible, but styled subordinate to the focal panel. */}
-      <Panel variant="panel" style={{ padding: "var(--os-space-5)" }} data-testid="ops-summary">
+      {/* S13.1 declutter: the follow-up queue is secondary to the AI decision
+          center and the agent summary, so it opens on demand instead of always
+          competing on the first viewport. Still in the DOM (searchable). */}
+      <details className="os-more-metrics" data-testid="ops-summary">
+        <summary>תור פולואו-אפ · לידים שמועד המעקב שלהם הגיע</summary>
+        <Panel
+          variant="panel"
+          style={{ padding: "var(--os-space-5)", marginBlockStart: "var(--os-space-3)" }}
+        >
         <SectionTitle
           title="תור פולואו-אפ"
           subtitle="לידים פתוחים שמועד המעקב שלהם הגיע"
@@ -647,7 +653,8 @@ function CommandCenterInner(): ReactElement {
             ))
           )}
         </div>
-      </Panel>
+        </Panel>
+      </details>
 
       {/* SECONDARY — moved out of the initial focal view into ONE disclosure:
           sales funnel, course/service/revenue trends, today's timeline and the

@@ -294,6 +294,9 @@ function LocalCustomerDetailPage(): ReactElement {
           }}
         >
           <div style={{ display: "grid", gap: 4 }}>
+            <div style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-sm, 13px)" }}>
+              כרטיס לקוח
+            </div>
             <div style={{ display: "flex", gap: "var(--os-space-3)", alignItems: "center" }}>
               <h1 style={{ margin: 0, fontSize: "var(--os-text-xl, 20px)" }}>{customer.name}</h1>
               {entityChip(customer.status)}
