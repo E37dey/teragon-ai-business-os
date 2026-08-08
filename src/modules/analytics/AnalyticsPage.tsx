@@ -765,7 +765,7 @@ function FilterBar({
   onSave: () => void;
 }): ReactElement {
   return (
-    <Panel style={{ padding: "var(--os-space-4)", display: "flex", flexWrap: "wrap", gap: "var(--os-space-4)", alignItems: "center" }}>
+    <Panel style={{ padding: "var(--os-space-3)", display: "flex", flexWrap: "wrap", gap: "var(--os-space-2)", alignItems: "center" }}>
       <select
         style={selectStyle}
         value={filter.rangePreset}
