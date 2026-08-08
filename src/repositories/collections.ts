@@ -44,6 +44,8 @@ export const COLLECTIONS = [
   "memoryConflicts",
   "memoryImportJobs",
   "memoryExportJobs",
+  // S13.4 (PR D) — real ungoverned local-memory CRUD (separate from memoryRecords)
+  "memoryEntries",
   "automations",
   "automationRuns",
   "agents",
