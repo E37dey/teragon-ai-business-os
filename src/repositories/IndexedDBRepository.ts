@@ -7,7 +7,7 @@ import { COLLECTIONS } from "./collections";
 
 export const IDB_NAME = "teragon-os";
 // v2: + "notifications" object store (Wave 2 notification center)
-export const IDB_VERSION = 6; // v6: + analytics/governance/administration/health collections (Wave 8)
+export const IDB_VERSION = 7; // v7: + "memoryEntries" real local-memory CRUD (S13.4 / PR D)
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
