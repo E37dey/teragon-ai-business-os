@@ -45,6 +45,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     id: "ai",
     label: "AI וסוכנים",
     items: [
+      { path: "/ai-workspace", label: "מרחב AI", icon: "sparkle" },
       { path: "/agents", label: "סוכני AI", icon: "bot" },
       { path: "/agents/collaboration", label: "חדר התיאום", icon: "network" },
     ],

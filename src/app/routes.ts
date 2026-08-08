@@ -34,6 +34,7 @@ export const APP_ROUTES: readonly AppRouteDef[] = [
   { path: "/tasks", navPath: "/tasks", title: "משימות ופגישות", wave: 4, inNav: true },
   { path: "/documents", navPath: "/documents", title: "מסמכים והצעות מחיר", wave: 3, inNav: true },
   { path: "/automations", navPath: "/automations", title: "אוטומציות", wave: 5, inNav: true },
+  { path: "/ai-workspace", navPath: "/ai-workspace", title: "מרחב AI", wave: 5, inNav: true },
   { path: "/agents", navPath: "/agents", title: "סוכני AI", wave: 5, inNav: true },
   {
     path: "/agents/collaboration",
