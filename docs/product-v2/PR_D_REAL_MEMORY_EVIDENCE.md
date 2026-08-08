@@ -78,6 +78,23 @@ materially expand this PR and touch the frozen agent engine.
 Search/category/archived/new/save/edit/archive/restore are real buttons/inputs with accessible names;
 keyboard-operable; honest loading/empty/error states; 0 NO_OP controls.
 
+## Accessibility gate (`/memory` added to the REQUIRED CI a11y Pilot)
+
+`/memory` is now in `e2e/pilot/a11y.pilot.ts` (the CI Accessibility job), scanned by Axe at **1440 + 390**
+with **zero critical/serious** violations, **no exclusions, no disabled rules**. A dedicated memory test
+verifies keyboard access + accessible names for search / category filter / archived toggle / "זיכרון חדש" /
+title / content / tags / category / save / edit / archive / restore; visible focus; an **announced**
+(`role="alert"`) error state; a labelled empty state; and **archived status conveyed by text** ("בארכיון"
++ a "שחזור" action) — never colour alone. Verified locally: **4/4** memory a11y tests pass (both viewports).
+
+## IndexedDB v6 → v7 upgrade safety (real client-side migration)
+
+Adding the store bumps `IDB_VERSION` 6→7 — a real client migration. Regression tests prove the upgrade
+**preserves every existing store and its data** (e.g. `memoryRecords`, `customers` survive intact),
+**adds only `memoryEntries`**, never wipes/clears existing IndexedDB data, and `seedIfEmpty` **never
+overwrites user-created `memoryEntries`** (seeds only when the store is empty). The store-creation logic is
+additive (`if (!contains) createObjectStore`), so existing users upgrade non-destructively.
+
 ## Tests
 
 - **Repository (9, fake-indexeddb):** create/edit/archive/restore persist across a simulated reload;
@@ -85,8 +102,12 @@ keyboard-operable; honest loading/empty/error states; 0 NO_OP controls.
   missing-org fail-closed; invalid input writes nothing; agent read-only adapter.
 - **UI (4):** honest notice + accessible controls; create persists & appears with **no network/Obsidian
   call**; archive hides + search filters; invalid input errors with no record.
+- **IDB upgrade (3):** v6→v7 preserves stores + data / adds only memoryEntries; seed never overwrites user
+  entries; seed populates only when empty.
+- **/memory a11y Pilot (4, Chromium × 1440/390):** axe zero critical/serious + labelled/keyboard/archived-
+  text/announced-error.
 - build ✅ · typecheck ✅ · typecheck:tests ✅ · memory + repository + router/nav + rbac suites 307/307 ✅ ·
-  full `vitest` **2594/2594** (13 new) — only the 12 known `tests/platform/*` Rolldown file-load failures
+  full `vitest` **2597/2597** (16 new) — only the 12 known `tests/platform/*` Rolldown file-load failures
   remain (pre-existing, CI-authoritative). oxlint ✅. No `test.skip`/`test.fail`/weakened assertions.
 
 ## Limitations
