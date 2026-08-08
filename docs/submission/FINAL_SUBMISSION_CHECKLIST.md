@@ -34,3 +34,17 @@ Pre-submission checklist for TERAGON AI BUSINESS OS. Branch
 
 Academic submission: **GO — TESTED MVP**, consistent with the merged
 **FINAL PROJECT PRODUCT READY**. Not claimed production-ready.
+
+## Product V2 — Final Freeze (S13.6)
+
+- [x] **Frozen base SHA recorded** — `a0d7abec18374624bbfa243d9e7f76dc559691d5` (`feature/teragon-supabase-app-auth`).
+- [x] **Product V2 freeze recorded** — PR A–E merged (Visual Declutter · Analytics/Governance · AI Workspace · Real Local Memory · Bounded Agent Loop); feature development frozen. See [../product-v2/PRODUCT_V2_FINAL_FREEZE.md](../product-v2/PRODUCT_V2_FINAL_FREEZE.md).
+- [x] **Prime Agent intentionally deferred** — NO-GO / DEFERRED post-academic (architecture-only rationale; no external-runtime/paid/platform/sandbox claims).
+- [x] **Final route taxonomy correct** — 33 canonical routes; 3 LIVE_VALIDATED (`/customers`, `/contacts`, `/customers/:id`, Supabase+RLS); 30 non-LIVE_VALIDATED retain their individual local/demo/supporting/UI classifications (not collapsed, not shown as backend-connected).
+- [x] **CI status documented** — Static ✅ · Accessibility ✅ (incl. `/memory` + `/ai-workspace` loop states @1440/390) · Network-resilience ✅ · Detect-persistence ✅ · Live-DB skipping · cross-browser ✅.
+- [x] **Final test total documented** — `vitest` **2,613/2,613** executable; only the 12 known `tests/platform/*` Rolldown file-load failures remain (local limitation; CI-authoritative). 0 serious/critical Axe · 0 overflow · 0 console errors.
+- [x] **No unsupported claims** — no remote AI, no autonomous agents, no Prime Agent, no Obsidian sync, no production pilot represented as implemented.
+- [x] **Synthetic/demo disclaimer clear** — all data synthetic; only the 3 LIVE_VALIDATED domains are Supabase-backed; demo-mode banner present.
+- [ ] **Evaluator demo rehearsed** — **remains UNCHECKED (honesty).** No actual human timed rehearsal of the final Product V2 flow has been recorded. Only a real ≤ 5:00 human run against [PRODUCT_V2_DEMO_SCRIPT_HE.md](PRODUCT_V2_DEMO_SCRIPT_HE.md) may check this.
+
+**Final evaluator-facing status:** Academic **GO — Tested MVP** · Real-company **INTERNAL — not yet pilot-ready**.
