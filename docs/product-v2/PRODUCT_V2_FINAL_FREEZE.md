@@ -32,16 +32,24 @@ persistence bypass (agents read memory only via the bounded adapter; never write
 
 ## Final product inventory
 
-**Routes:** 33 canonical, all with explicit fail-closed `ROUTE_PERMISSIONS` guards.
-- **LIVE_VALIDATED (Supabase + RLS):** `/customers`, `/contacts`, `/customers/:id`.
-- **Deterministic/local + supporting:** the remaining 30 (demo/local; academic/reference demoted under "מערכת ומתקדם").
+**Routes:** **33 canonical routes total**, all with explicit fail-closed `ROUTE_PERMISSIONS` guards.
+- **3 LIVE_VALIDATED** (actual Supabase-backed, RLS-validated domains): `/customers`, `/contacts`, `/customers/:id`.
+- **30 non-LIVE_VALIDATED routes** — local/demo/supporting product surfaces, each retaining its **existing
+  individual classification** (per the merged S12.0 acceptance matrix and per-route audits). These are a mix
+  of local-persistent, deterministic-demo, and supporting/UI surfaces; they are **not** collapsed into one
+  technical class here and are **not** represented as backend-connected.
 
 **AI:** 7 governed agents · **exactly 14** business actions (2 per agent) · **2** approval-gated
 (`fixer.apply-correction`, `flow.automation-proposal`) · 1 bounded 4-step loop · 1 central Workspace ·
 read-only local-memory adapter for agents.
 
-**Data:** Supabase-backed domains = Customers/Contacts (LIVE) · IndexedDB local memory = `memoryEntries`
-(v7) + governed `memoryRecords` · everything else synthetic demo-only (105 collections total).
+**Data taxonomy (distinct categories — not conflated):**
+- **LIVE_VALIDATED** = actual Supabase-backed, RLS-validated domains: Customers / Contacts / Customer-Detail.
+- **Local persistent** = IndexedDB (`memoryEntries` v7 real local-memory CRUD; governed `memoryRecords`).
+- **Deterministic demo** = local synthetic agent/action behaviour (the 14 actions run on frozen demo data).
+- **Supporting / UI surfaces** = presentation/reference screens; **not** represented as backend-connected.
+
+(105 registered collections total; only the LIVE_VALIDATED domains are Supabase-backed.)
 
 **Trust boundaries:** no remote AI (`AI_REMOTE_ENABLED=false`) · no real customer data (synthetic only) ·
 no autonomous execution (human click between every step) · human approval before every mutation ·
@@ -74,24 +82,36 @@ failures remain (pre-existing local limitation; CI-authoritative). **No BLOCKER/
 
 **Decision: NO-GO / DEFERRED (post-academic).**
 
-> Prime Agent POC was intentionally not implemented because the existing Orchestrator + AI Workspace +
-> bounded Agent Loop already provide the required planning, routing and controlled multi-agent
-> coordination. Adding another agent layer would increase complexity without sufficient incremental value.
+**Rationale (based only on the demonstrated Product V2 architecture):**
 
-**Reason (evidence-based):** Per `PRIME_AGENT_FEASIBILITY.md`, Prime Agent is an external RLM **runtime**
-(feasibility ~4.5/10 for this project): **no native Windows** (needs WSL2/Docker), **requires a paid
-provider** (breaks `AI_REMOTE_ENABLED=false`), and is **explicitly not a sandbox** (executes model-
-generated code with host permissions). Against the acceptance test — "adds a clearly distinct capability
-not already covered by Orchestrator / Workspace / agent selector / handoff / bounded loop" — it would
-mainly **duplicate the Orchestrator**, add a **second execution layer**, imply **autonomy**, and add
-**cost + complexity** with no measurable demo value. It fails the bar; NO-GO is the correct default.
+> Prime Agent POC was intentionally deferred because the existing Orchestrator, AI Workspace,
+> user-triggered handoffs, and bounded Agent Loop already provide the required planning, routing, and
+> controlled multi-agent coordination.
+>
+> A Prime Agent at this stage would largely introduce another orchestration layer over capabilities
+> already present, increasing architectural complexity and demo surface without sufficient incremental
+> academic or product value.
+
+Measured against the acceptance test — "adds a clearly distinct capability not already covered by
+Orchestrator / AI Workspace / agent selector / user-triggered handoff / bounded Agent Loop" — it does not
+clear the bar, so NO-GO is the correct default. (No external-runtime, licensing, platform, or sandbox
+claims are relied upon for this decision.)
 
 ## Roadmap
 
-Prime Agent → **DEFERRED / POST-ACADEMIC** (not failed, not missing). If ever implemented, it must start
-as **planner/router only**: `user request → proposed plan → recommended agent/action → human confirmation
-→ existing engine`. It must **never** bypass the existing approval gate or action engine.
+Future Prime Agent remains a **valid post-academic concept** — **DEFERRED / POST-ACADEMIC**, not failed and
+not missing. If ever implemented, it should initially be **planner/router only**:
+
+```
+user request → proposed plan → recommended existing agent/action → explicit human confirmation → existing action engine
+```
+
+It must **not** bypass any of:
+- `AGENT_ACTIONS` (the single action registry)
+- `runAgentAction` (the single deterministic engine)
+- the approval gates (human approval before mutation)
+- the organization / security boundaries (org isolation + fail-closed route/repository behaviour)
 
 ## Verdict
 
-**PRIME AGENT — NO-GO / DEFERRED. PRODUCT V2 — FEATURE FREEZE READY.**
+**PRIME AGENT — NO-GO / DEFERRED POST-ACADEMIC. PRODUCT V2 — FEATURE FROZEN.**
