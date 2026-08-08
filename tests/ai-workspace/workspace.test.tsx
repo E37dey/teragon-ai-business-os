@@ -7,6 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { AuthProvider } from "@/auth/AuthProvider";
 import { RailProvider } from "@/app/rail";
 import AiWorkspacePage from "@/modules/ai-workspace/AiWorkspacePage";
 import {
@@ -27,11 +28,13 @@ afterEach(cleanup);
 
 function mount() {
   return render(
-    <MemoryRouter initialEntries={["/ai-workspace"]}>
-      <RailProvider>
-        <AiWorkspacePage />
-      </RailProvider>
-    </MemoryRouter>,
+    <AuthProvider>
+      <MemoryRouter initialEntries={["/ai-workspace"]}>
+        <RailProvider>
+          <AiWorkspacePage />
+        </RailProvider>
+      </MemoryRouter>
+    </AuthProvider>,
   );
 }
 

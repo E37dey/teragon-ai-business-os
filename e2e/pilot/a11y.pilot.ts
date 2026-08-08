@@ -19,6 +19,7 @@ const ROUTES: ReadonlyArray<{ id: string; path: string; shell: boolean }> = [
   { id: "contacts-list", path: "/contacts", shell: true },
   { id: "system-health", path: "/system-health", shell: true },
   { id: "memory", path: "/memory", shell: true }, // S13.4 (PR D): real local-memory CRUD
+  { id: "ai-workspace", path: "/ai-workspace", shell: true }, // S13.5 (PR E): guided agent loop
 ];
 
 async function ready(page: Page): Promise<void> {
@@ -126,6 +127,37 @@ test("memory CRUD — labelled controls, keyboard reachable, accessible archived
   // Visible focus: a toolbar control can be focused (real interactive element).
   await page.getByTestId("memory-new").focus();
   await expect(page.getByTestId("memory-new")).toBeFocused();
+});
+
+test("guided agent loop — accessible states, keyboard, distinct controls, axe-clean at awaiting + completed", async ({ page }) => {
+  // S13.5 (PR E): the bounded loop is substantial new interactive UI; exercise its states.
+  await page.goto("/ai-workspace", { waitUntil: "domcontentloaded" });
+  await ready(page);
+  await page.getByTestId("agent-loop").waitFor({ state: "visible", timeout: 30_000 });
+
+  // idle → four explicit clicks → AWAITING_APPROVAL
+  await expect(page.getByRole("button", { name: "התחל תהליך" })).toBeVisible();
+  for (let i = 0; i < 4; i++) await page.getByTestId("loop-next").click();
+
+  // three distinct, accessibly-named controls at the approval gate
+  await expect(page.getByRole("button", { name: /אשר והחל/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "דחה" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "עצור תהליך" })).toBeVisible();
+  expect(await criticalSerious(page)).toEqual([]); // AWAITING state axe-clean
+
+  // approve → summarize → COMPLETED; timeline readable
+  await page.getByTestId("loop-approve").click();
+  await page.getByTestId("loop-next").click();
+  await expect(page.getByTestId("loop-timeline")).toContainText("4.");
+  expect(await criticalSerious(page)).toEqual([]); // COMPLETED state axe-clean
+
+  // keyboard: the reset control is focusable (real interactive element)
+  await page.getByTestId("loop-reset").focus();
+  await expect(page.getByTestId("loop-reset")).toBeFocused();
+
+  // no horizontal document overflow (timeline stays readable, incl. 390)
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
 });
 
 test("quick-create form has labelled inputs and an assertive validation message", async ({ page }) => {
