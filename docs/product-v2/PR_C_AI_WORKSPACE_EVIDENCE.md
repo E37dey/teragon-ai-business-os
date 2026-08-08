@@ -74,7 +74,7 @@ a11y / network-resilience / cross-browser gates are authoritative and run on thi
   explicit action, applies once, blocks duplicates; reject never mutates; handoff pre-fills Fixer without
   auto-executing.
 - typecheck ✅ · typecheck:tests ✅ · agents + agents-ui + ai-workspace + router/nav **137/137** ✅ ·
-  full `vitest` executable **2578/2578** (7 new) — only the 12 known `tests/platform/*` Rolldown
+  full `vitest` executable **2579/2579** (7 workspace + 1 extra route-smoke) — only the 12 known `tests/platform/*` Rolldown
   file-load failures remain (pre-existing, CI-authoritative). oxlint ✅. No `test.skip`/`test.fail`/
   weakened assertions.
 
