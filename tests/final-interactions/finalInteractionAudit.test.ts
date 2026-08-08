@@ -34,8 +34,8 @@ function runAuditor(args: string[]): { code: number; out: string } {
 }
 
 describe("canonical route table", () => {
-  it("has 32 real routes with unique paths and Hebrew titles", () => {
-    expect(APP_ROUTES.length).toBe(32); // +1: /contacts (S9.3)
+  it("has 33 real routes with unique paths and Hebrew titles", () => {
+    expect(APP_ROUTES.length).toBe(33); // +1: /ai-workspace (S13.3)
     const paths = APP_ROUTES.map((r) => r.path);
     expect(new Set(paths).size).toBe(paths.length);
     for (const r of APP_ROUTES) {

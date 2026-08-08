@@ -57,10 +57,27 @@ function InputField({
   );
 }
 
-export function AgentActionsPanel({ agentId }: { agentId: string }): ReactElement {
+export function AgentActionsPanel({
+  agentId,
+  initialActionId,
+  initialInputs,
+  onResult,
+}: {
+  agentId: string;
+  /** S13.3: optional action to pre-select (used by AI Workspace user-triggered handoff). */
+  initialActionId?: string;
+  /** S13.3: optional pre-filled inputs (used by AI Workspace user-triggered handoff). */
+  initialInputs?: Readonly<Record<string, string>>;
+  /** S13.3: optional callback invoked with each engine result (recent-activity feed). */
+  onResult?: (result: AgentActionResult, actionId: string, inputs: Readonly<Record<string, string>>) => void;
+}): ReactElement {
   const actions = useMemo(() => getActionsForAgent(agentId), [agentId]);
-  const [activeId, setActiveId] = useState<string>(actions[0]?.id ?? "");
-  const [inputs, setInputs] = useState<Record<string, string>>({});
+  const [activeId, setActiveId] = useState<string>(
+    initialActionId && actions.some((a) => a.id === initialActionId)
+      ? initialActionId
+      : (actions[0]?.id ?? ""),
+  );
+  const [inputs, setInputs] = useState<Record<string, string>>(initialInputs ? { ...initialInputs } : {});
   const [result, setResult] = useState<AgentActionResult | null>(null);
   const [running, setRunning] = useState(false);
   const [showEvidence, setShowEvidence] = useState(false);
@@ -81,8 +98,10 @@ export function AgentActionsPanel({ agentId }: { agentId: string }): ReactElemen
     setRunning(true);
     // deterministic + synchronous; defer once so the loading state paints + is testable
     queueMicrotask(() => {
-      setResult(runAgentAction(active.id, inputs, approved ? { approved: true } : {}));
+      const r = runAgentAction(active.id, inputs, approved ? { approved: true } : {});
+      setResult(r);
       setRunning(false);
+      onResult?.(r, active.id, inputs);
     });
   }
 

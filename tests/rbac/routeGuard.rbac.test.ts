@@ -12,12 +12,12 @@ import { APP_ROUTES } from "@/app/routes";
 import { CANONICAL_ROLE_IDS } from "@/domain/administration";
 
 describe("W9-B — route coverage", () => {
-  it("every one of the 32 canonical routes has an explicit guard entry", () => {
-    expect(APP_ROUTES.length).toBe(32); // +1: /contacts (S9.3)
+  it("every one of the 33 canonical routes has an explicit guard entry", () => {
+    expect(APP_ROUTES.length).toBe(33); // +1: /ai-workspace (S13.3)
     for (const r of APP_ROUTES) {
       expect(Object.prototype.hasOwnProperty.call(ROUTE_PERMISSIONS, r.path)).toBe(true);
     }
-    expect(GUARDED_ROUTE_PATHS.length).toBe(32);
+    expect(GUARDED_ROUTE_PATHS.length).toBe(33);
   });
 
   // A connected domain route must be gated by the SAME capability as its RLS
