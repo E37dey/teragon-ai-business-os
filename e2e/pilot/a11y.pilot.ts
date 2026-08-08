@@ -18,6 +18,7 @@ const ROUTES: ReadonlyArray<{ id: string; path: string; shell: boolean }> = [
   { id: "customer-detail", path: "/customers/cu-1", shell: true },
   { id: "contacts-list", path: "/contacts", shell: true },
   { id: "system-health", path: "/system-health", shell: true },
+  { id: "memory", path: "/memory", shell: true }, // S13.4 (PR D): real local-memory CRUD
 ];
 
 async function ready(page: Page): Promise<void> {
@@ -83,6 +84,48 @@ test("primary header actions have accessible names and are keyboard reachable", 
     });
   }
   expect(landed, "Tab reaches a focusable interactive control").toBe(true);
+});
+
+test("memory CRUD — labelled controls, keyboard reachable, accessible archived + error state", async ({ page }) => {
+  // S13.4 (PR D): the real local-memory CRUD is substantial new interactive UI.
+  await page.goto("/memory", { waitUntil: "domcontentloaded" });
+  await ready(page);
+  await page.getByTestId("memory-entries-workspace").waitFor({ state: "visible", timeout: 30_000 });
+
+  // Toolbar controls have accessible names (labels/aria-label), not icon-only.
+  await expect(page.getByLabel("חיפוש בזיכרון המקומי").first()).toBeVisible();
+  await expect(page.getByLabel("סינון לפי קטגוריה")).toBeVisible();
+  await expect(page.getByLabel("הצגת פריטים בארכיון")).toBeVisible();
+  await expect(page.getByTestId("memory-new")).toBeVisible();
+
+  // Keyboard: opening the editor exposes labelled fields + a save control.
+  await page.getByTestId("memory-new").click();
+  await expect(page.getByTestId("memory-editor")).toBeVisible();
+  for (const label of ["כותרת הזיכרון", "תוכן הזיכרון", "קטגוריית הזיכרון", "תגיות הזיכרון"]) {
+    await expect(page.getByLabel(label)).toBeVisible();
+  }
+  await expect(page.getByTestId("memory-save")).toBeVisible();
+
+  // Error state is announced (role="alert") — no silent failure on invalid input.
+  await page.getByLabel("תוכן הזיכרון").fill("תוכן בלי כותרת");
+  await page.getByTestId("memory-save").click();
+  await expect(page.getByRole("alert").first()).toBeVisible();
+
+  // Create a valid entry, then archive it and reveal the archive: archived status
+  // is conveyed by TEXT ("בארכיון" + a "שחזור" action), never by colour alone.
+  await page.getByLabel("כותרת הזיכרון").fill("בדיקת נגישות");
+  await page.getByTestId("memory-save").click();
+  const row = page.getByTestId("memory-entry-row").filter({ hasText: "בדיקת נגישות" }).first();
+  await expect(row).toBeVisible();
+  await row.getByTestId("memory-archive").click();
+  await page.getByLabel("הצגת פריטים בארכיון").check();
+  const archived = page.getByTestId("memory-entry-row").filter({ hasText: "בדיקת נגישות" }).first();
+  await expect(archived).toContainText("בארכיון");
+  await expect(archived.getByTestId("memory-restore")).toBeVisible();
+
+  // Visible focus: a toolbar control can be focused (real interactive element).
+  await page.getByTestId("memory-new").focus();
+  await expect(page.getByTestId("memory-new")).toBeFocused();
 });
 
 test("quick-create form has labelled inputs and an assertive validation message", async ({ page }) => {

@@ -10,6 +10,7 @@ import { useAuth } from "@/auth/useAuth";
 import {
   MEMORY_CATEGORIES,
   MEMORY_CATEGORY_LABELS_HE,
+  MEMORY_STATUS_LABELS_HE,
   type MemoryCategory,
   type MemoryEntry,
 } from "@/domain/memory/entry";
@@ -162,20 +163,18 @@ export function MemoryEntriesWorkspace(): ReactElement {
           aria-label="חיפוש בזיכרון המקומי"
           style={{ flex: "1 1 12rem", minWidth: "10rem" }}
         />
-        <label style={{ display: "flex", gap: 4, alignItems: "center", fontSize: "var(--os-text-sm)" }}>
-          <span className="os-visually-hidden">סינון לפי קטגוריה</span>
-          <select
-            className="os-qc-input"
-            value={category}
-            onChange={(e) => setCategory(e.target.value as MemoryCategory | "ALL")}
-            aria-label="סינון לפי קטגוריה"
-          >
-            <option value="ALL">כל הקטגוריות</option>
-            {MEMORY_CATEGORIES.map((c) => (
-              <option key={c} value={c}>{MEMORY_CATEGORY_LABELS_HE[c]}</option>
-            ))}
-          </select>
-        </label>
+        <select
+          className="os-qc-input"
+          value={category}
+          onChange={(e) => setCategory(e.target.value as MemoryCategory | "ALL")}
+          aria-label="סינון לפי קטגוריה"
+          style={{ minWidth: "9rem" }}
+        >
+          <option value="ALL">כל הקטגוריות</option>
+          {MEMORY_CATEGORIES.map((c) => (
+            <option key={c} value={c}>{MEMORY_CATEGORY_LABELS_HE[c]}</option>
+          ))}
+        </select>
         <label style={{ display: "flex", gap: 4, alignItems: "center", fontSize: "var(--os-text-sm)" }}>
           <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} aria-label="הצגת פריטים בארכיון" />
           כולל ארכיון
@@ -241,6 +240,11 @@ export function MemoryEntriesWorkspace(): ReactElement {
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <StatusChip status={e.status === "ACTIVE" ? "פעיל" : "מושבת"} label={MEMORY_CATEGORY_LABELS_HE[e.category]} />
                     <span style={{ fontWeight: "var(--os-weight-semibold)", fontSize: "var(--os-text-sm)" }}>{e.title}</span>
+                    {e.status === "ARCHIVED" && (
+                      <span style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-2xs, 11px)" }}>
+                        · {MEMORY_STATUS_LABELS_HE.ARCHIVED}
+                      </span>
+                    )}
                   </div>
                   <span style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-text-2)" }}>
                     {e.content.length > 90 ? `${e.content.slice(0, 90)}…` : e.content}
