@@ -3,6 +3,11 @@
 // the SAME registry, runAgentAction, result schema and approval gate as /agents.
 // It answers four questions: what needs attention · which agent helps · what did
 // agents find · what needs approval. No remote model; synthetic demo data only.
+//
+// APPROVAL TRUTH: the approval queue ("ממתין לאישורך") contains ONLY real
+// AgentActionResult instances whose status is truly `awaiting_approval` — produced
+// when a user runs an approval-gated action WITHOUT approval. It is NEVER derived
+// from findings/candidates/recommendations. An empty queue is the honest default.
 import { useMemo, useState } from "react";
 import type { ReactElement } from "react";
 import { Link } from "react-router-dom";
@@ -19,13 +24,11 @@ import { AgentActionsPanel } from "@/modules/agents-ui/AgentActionsPanel";
 import { AGENT_IDS, getAgentDefinition } from "@/agents/definitions";
 import {
   runAgentAction,
-  LOCAL_ENGINE_LABEL,
   type AgentActionResult,
   type FindingSeverity,
 } from "@/agents/actions";
 import {
   availableAgentCount,
-  buildApprovalCandidates,
   buildAttention,
   type AttentionItem,
 } from "./workspaceModel";
@@ -46,6 +49,15 @@ interface RecentItem {
   readonly correlationId: string;
 }
 
+/** A REAL awaiting_approval instance (not a candidate) queued for the user. */
+interface PendingApproval {
+  readonly key: string; // actionId + inputs — dedups repeat stagings
+  readonly actionId: string;
+  readonly agentId: string;
+  readonly inputs: Readonly<Record<string, string>>;
+  readonly result: AgentActionResult; // status === "awaiting_approval"
+}
+
 const STATUS_LABEL: Record<AgentActionResult["status"], string> = {
   ok: "הושלם",
   applied: "הוחל",
@@ -55,6 +67,9 @@ const STATUS_LABEL: Record<AgentActionResult["status"], string> = {
   execution_error: "תקלה",
 };
 
+function pendingKey(actionId: string, inputs: Readonly<Record<string, string>>): string {
+  return `${actionId}:${JSON.stringify(inputs)}`;
+}
 function shortId(id: string): string {
   return id.length > 8 ? `${id.slice(0, 8)}…` : id;
 }
@@ -67,20 +82,18 @@ function timeHe(iso: string): string {
 }
 
 export default function AiWorkspacePage(): ReactElement {
-  // Composed once from real deterministic read-only scans (no remote model).
+  // Attention (A) = findings/candidates from real deterministic read-only scans.
   const attention = useMemo(() => buildAttention(), []);
-  const candidates = useMemo(() => buildApprovalCandidates(), []);
 
-  const [resolved, setResolved] = useState<Set<string>>(new Set()); // approved OR rejected recordIds
-  const [applied, setApplied] = useState<Set<string>>(new Set()); // approved recordIds
+  // Approvals (B) = ONLY real awaiting_approval instances, produced at runtime.
+  const [pending, setPending] = useState<readonly PendingApproval[]>([]);
   const [recent, setRecent] = useState<readonly RecentItem[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>("ag-orchestrator");
-  const [prefill, setPrefill] = useState<{ inputs: Record<string, string>; nonce: number }>({
+  const [prefill, setPrefill] = useState<{ actionId?: string; inputs: Record<string, string>; nonce: number }>({
     inputs: {},
     nonce: 0,
   });
 
-  const pending = candidates.filter((c) => !resolved.has(c.recordId));
   const topAttention = attention.slice(0, 5);
   const recentTop = recent.slice(0, 5);
 
@@ -100,23 +113,36 @@ export default function AiWorkspacePage(): ReactElement {
     );
   }
 
-  // User-triggered handoff — pre-fills the agent panel; NEVER auto-runs.
+  // Every engine result flows through here. A genuine awaiting_approval result
+  // (and only that) enters the approval queue; an applied result clears it.
+  function handleResult(agentId: string, r: AgentActionResult, actionId: string, inputs: Readonly<Record<string, string>>): void {
+    pushRecent(agentId, r, actionId);
+    const key = pendingKey(actionId, inputs);
+    if (r.status === "awaiting_approval") {
+      setPending((prev) => (prev.some((p) => p.key === key) ? prev : [{ key, actionId, agentId, inputs, result: r }, ...prev]));
+    } else if (r.status === "applied") {
+      setPending((prev) => prev.filter((p) => p.key !== key));
+    }
+  }
+
+  // User-triggered handoff — pre-selects Fixer's apply-correction and pre-fills the
+  // recordId. It NEVER auto-runs: the user must click "הרצה" in the panel, which
+  // returns awaiting_approval (no mutation) and surfaces here for explicit approval.
   function handoff(item: AttentionItem): void {
     if (!item.handoffAgentId) return;
     setSelectedAgentId(item.handoffAgentId);
-    setPrefill((p) => ({ inputs: { ...(item.handoffInputs ?? {}) }, nonce: p.nonce + 1 }));
+    setPrefill((p) => ({ actionId: "fixer.apply-correction", inputs: { ...(item.handoffInputs ?? {}) }, nonce: p.nonce + 1 }));
   }
 
-  // Approve reuses the SAME approval gate; applies once, blocks duplicates.
-  function approve(recordId: string): void {
-    const r = runAgentAction("fixer.apply-correction", { recordId }, { approved: true });
-    setResolved((s) => new Set(s).add(recordId));
-    setApplied((s) => new Set(s).add(recordId));
-    pushRecent("ag-fixer", r, "fixer.apply-correction");
+  // Approve reuses the SAME gate with explicit approval → applies once, blocks dupes.
+  function approve(p: PendingApproval): void {
+    const r = runAgentAction(p.actionId, p.inputs, { approved: true });
+    setPending((prev) => prev.filter((x) => x.key !== p.key));
+    pushRecent(p.agentId, r, p.actionId);
   }
-  // Reject NEVER calls the engine → no mutation.
-  function reject(recordId: string): void {
-    setResolved((s) => new Set(s).add(recordId));
+  // Reject NEVER calls the engine → no mutation; the pending instance is dropped.
+  function reject(p: PendingApproval): void {
+    setPending((prev) => prev.filter((x) => x.key !== p.key));
   }
 
   return (
@@ -127,7 +153,7 @@ export default function AiWorkspacePage(): ReactElement {
       <div>
         <h1 style={{ margin: 0, fontSize: "var(--os-text-xl, 20px)" }}>מרחב AI</h1>
         <div style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-sm, 13px)" }}>
-          {LOCAL_ENGINE_LABEL} · נתוני דמו סינתטיים · ההמלצות ניתנות להסבר · כתיבה מחייבת אישור.
+          מנוע AI מקומי ודטרמיניסטי · נתוני דמו סינתטיים · ללא מודל מרוחק · ההמלצות ניתנות להסבר · כתיבה מחייבת אישור.
         </div>
       </div>
 
@@ -151,7 +177,7 @@ export default function AiWorkspacePage(): ReactElement {
         <SectionTitle
           icon="alert"
           title="מה דורש טיפול עכשיו?"
-          subtitle="רשימה מדורגת שנגזרה מסריקות Hunter ו-Orchestrator על נתוני הדמו"
+          subtitle="רשימה מדורגת שנגזרה מסריקות Hunter ו-Orchestrator על נתוני הדמו — ממצאים, לא אישורים"
         />
         <div style={{ display: "grid", gap: "var(--os-space-2)", marginBlockStart: "var(--os-space-3)" }}>
           {topAttention.length === 0 ? (
@@ -223,51 +249,52 @@ export default function AiWorkspacePage(): ReactElement {
         <p style={{ margin: "0 0 var(--os-space-3)", fontSize: "var(--os-text-sm)", color: "var(--os-text-2)" }}>
           {getAgentDefinition(selectedAgentId)?.purposeHe}
         </p>
-        {/* remount per (agent, handoff) so pre-filled inputs apply; never auto-runs */}
+        {/* remount per (agent, handoff) so pre-filled inputs/action apply; never auto-runs */}
         <AgentActionsPanel
           key={`${selectedAgentId}:${prefill.nonce}`}
           agentId={selectedAgentId}
+          initialActionId={prefill.nonce > 0 ? prefill.actionId : undefined}
           initialInputs={prefill.nonce > 0 ? prefill.inputs : undefined}
-          onResult={(r, actionId) => pushRecent(selectedAgentId, r, actionId)}
+          onResult={(r, actionId, inputs) => handleResult(selectedAgentId, r, actionId, inputs)}
         />
       </Panel>
 
-      {/* D. APPROVAL QUEUE — real approval-gated proposals; reuse the gate */}
+      {/* D. APPROVAL QUEUE — ONLY real awaiting_approval instances; reuse the gate */}
       <Panel variant="panel" style={{ padding: "var(--os-space-5)" }} data-testid="workspace-approvals">
-        <SectionTitle icon="shield" title="מה דורש את אישורך?" subtitle="תיקוני דמו מוצעים — נכתבים רק לאחר אישור אנושי מפורש" />
+        <SectionTitle icon="shield" title="מה דורש את אישורך?" subtitle="רק פעולות שהורצו והוחזרו כ״ממתין לאישור״ — נכתבות רק לאחר אישור אנושי מפורש" />
         <div style={{ display: "grid", gap: "var(--os-space-3)", marginBlockStart: "var(--os-space-3)" }}>
           {pending.length === 0 ? (
-            <EmptyState icon="check" title="אין פריטים שממתינים לאישורך" reason={applied.size > 0 ? "כל התיקונים שהוצעו טופלו." : "לא הוצעו תיקונים הדורשים אישור בנתוני הדמו."} />
+            <EmptyState icon="check" title="אין פריטים שממתינים לאישורך" reason="פריט יופיע כאן רק לאחר הרצת פעולה המחייבת אישור (למשל החלת תיקון) שהוחזרה כ״ממתין לאישור״." />
           ) : (
-            pending.map((c) => (
-              <div key={c.recordId} data-testid="approval-item" style={{ display: "grid", gap: 6, border: "1px solid var(--os-border)", borderRadius: "var(--os-radius-sm, 6px)", padding: "var(--os-space-3)" }}>
+            pending.map((p) => (
+              <div key={p.key} data-testid="approval-item" style={{ display: "grid", gap: 6, border: "1px solid var(--os-border)", borderRadius: "var(--os-radius-sm, 6px)", padding: "var(--os-space-3)" }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   <StatusChip status="ממתין" label="ממתין לאישור" />
-                  <span style={{ fontWeight: "var(--os-weight-semibold)", fontSize: "var(--os-text-sm)" }}>{c.proposal.summary}</span>
+                  <span style={{ fontWeight: "var(--os-weight-semibold)", fontSize: "var(--os-text-sm)" }}>{p.result.summary}</span>
                 </div>
-                {c.proposal.findings.length > 0 && (
+                {p.result.findings.length > 0 && (
                   <ul style={{ margin: 0, paddingInlineStart: "1.1rem", display: "grid", gap: 2 }}>
-                    {c.proposal.findings.map((f) => (
+                    {p.result.findings.map((f) => (
                       <li key={f.id} style={{ fontSize: "var(--os-text-sm)" }}>{f.textHe}</li>
                     ))}
                   </ul>
                 )}
                 <details>
-                  <summary style={{ cursor: "pointer", fontSize: "var(--os-text-sm)" }}>למה זה מוצע? · ראיות ({c.proposal.evidence.length})</summary>
+                  <summary style={{ cursor: "pointer", fontSize: "var(--os-text-sm)" }}>למה זה מוצע? · ראיות ({p.result.evidence.length})</summary>
                   <div style={{ marginBlockStart: 6, fontSize: "var(--os-text-sm)", color: "var(--os-text-2)", display: "grid", gap: 2 }}>
-                    <span>{c.proposal.why.foundHe}</span>
-                    <span>{c.proposal.why.importanceHe}</span>
-                    <span>על סמך: {c.proposal.why.basedOnHe}</span>
-                    {c.proposal.evidence.map((e) => (
+                    <span>{p.result.why.foundHe}</span>
+                    <span>{p.result.why.importanceHe}</span>
+                    <span>על סמך: {p.result.why.basedOnHe}</span>
+                    {p.result.evidence.map((e) => (
                       <span key={`${e.kind}-${e.refId}`} className="os-ltr" style={{ color: "var(--os-muted)" }}>{e.labelHe} ({e.kind})</span>
                     ))}
                   </div>
                 </details>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <OsButton size="sm" variant="approve" icon="check" onClick={() => approve(c.recordId)}>
+                  <OsButton size="sm" variant="approve" icon="check" onClick={() => approve(p)}>
                     אישור והחלה (דמו מקומי)
                   </OsButton>
-                  <OsButton size="sm" variant="ghost" onClick={() => reject(c.recordId)}>
+                  <OsButton size="sm" variant="ghost" onClick={() => reject(p)}>
                     דחייה
                   </OsButton>
                 </div>

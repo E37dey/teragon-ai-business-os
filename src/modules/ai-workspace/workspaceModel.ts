@@ -29,14 +29,6 @@ export interface AttentionItem {
   readonly handoffInputs?: Readonly<Record<string, string>>;
 }
 
-/** One approval-gated proposal derived from a real incomplete demo record. */
-export interface ApprovalCandidate {
-  readonly recordId: string;
-  readonly customerNameHe: string;
-  /** the fixer.propose-correction result (before/after, why, evidence) */
-  readonly proposal: AgentActionResult;
-}
-
 const SEV_ORDER: Record<FindingSeverity, number> = { high: 0, medium: 1, low: 2, info: 3 };
 
 function agentNameHe(agentId: string): string {
@@ -82,22 +74,14 @@ export function buildAttention(now?: string): AttentionItem[] {
 }
 
 /**
- * Approval-gated proposals derived from the REAL incomplete demo customers.
- * Each is a fixer.propose-correction result (proposal only, no mutation). The
- * Workspace approves by calling fixer.apply-correction with explicit approval —
- * the same gate as /agents; approval applies once and blocks duplicates.
+ * Approval TRUTH (S13.3 fix): the Workspace does NOT pre-derive "pending approvals"
+ * from findings/candidates. A pending approval exists ONLY after a user runs an
+ * approval-gated action (e.g. fixer.apply-correction) WITHOUT approval and the
+ * engine returns status "awaiting_approval". Those real instances populate the
+ * approval queue at runtime (see AiWorkspacePage). An empty queue is the honest
+ * default. This module therefore exposes attention (A) only — never a fabricated
+ * pending-approval list (B).
  */
-export function buildApprovalCandidates(now?: string): ApprovalCandidate[] {
-  const ctx = now ? { now } : {};
-  const scan = runAgentAction("hunter.incomplete-customers", {}, ctx);
-  const recordIds = [...new Set(scan.findings.map((f) => f.recordId).filter((v): v is string => v != null))];
-  return recordIds
-    .map((recordId) => {
-      const proposal = runAgentAction("fixer.propose-correction", { recordId }, ctx);
-      return { recordId, customerNameHe: proposal.evidence[0]?.labelHe ?? recordId, proposal };
-    })
-    .filter((c) => c.proposal.status === "ok");
-}
 
 /** Enabled/available agents in the local demo — the 7 frozen definitions. */
 export function availableAgentCount(): number {
