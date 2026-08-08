@@ -32,6 +32,7 @@ export const ROUTE_PERMISSIONS: Readonly<Record<string, Permission | null>> = Ob
   "/tasks": null,
   "/documents": "sales.read",
   "/automations": null,
+  "/ai-workspace": null,
   "/agents": null,
   "/agents/collaboration": null,
   "/memory": null,
