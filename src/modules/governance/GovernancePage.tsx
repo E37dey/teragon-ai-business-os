@@ -636,6 +636,15 @@ export default function GovernancePage(): ReactElement {
       </details>
 
       {/* zone 1 — active policies */}
+      {/* S13.2 declutter: supporting governance reference (policies, boundaries,
+          permissions, protected prompts, audit) opens on demand. The 4 status KPIs
+          and the attention area (risk register) stay visible. Nothing removed;
+          every zone testid is preserved for the tests and search. */}
+      <details className="os-more-metrics" data-testid="governance-reference">
+        <summary>מדיניות, גבולות, הרשאות, פרומפטים מוגנים ויומן ביקורת</summary>
+        <div
+          style={{ display: "grid", gap: "var(--os-space-4)", marginBlockStart: "var(--os-space-3)" }}
+        >
       <Panel variant="panel" style={{ padding: "var(--os-space-5)" }} data-testid="zone-policies">
         <SectionTitle
           title="מדיניות פעילה"
@@ -1057,6 +1066,9 @@ export default function GovernancePage(): ReactElement {
       </Panel>
 
       {/* zone 6 — risk register */}
+        </div>
+      </details>
+
       <Panel variant="panel" style={{ padding: "var(--os-space-5)" }} data-testid="zone-risks">
         <SectionTitle
           title="Risk Register"
@@ -1161,8 +1173,15 @@ export default function GovernancePage(): ReactElement {
         )}
       </Panel>
 
-      {/* zone 7 — incident management */}
-      <Panel variant="panel" style={{ padding: "var(--os-space-5)" }} data-testid="zone-incidents">
+      {/* zone 7 — incident management. S13.2: the incident log opens on demand;
+          the risk register above remains the visible attention area. */}
+      <details className="os-more-metrics" data-testid="governance-incidents-d">
+        <summary>ניהול תקריות ואירועי בריאות המערכת</summary>
+      <Panel
+        variant="panel"
+        style={{ padding: "var(--os-space-5)", marginBlockStart: "var(--os-space-3)" }}
+        data-testid="zone-incidents"
+      >
         <SectionTitle
           title="ניהול תקריות"
           subtitle="פתיחה → הקצאה → הכלה → פתרון → תחקיר → סגירה. סגירה מחייבת תחקיר — אין סגירה ללא הפקת לקחים"
@@ -1495,6 +1514,8 @@ export default function GovernancePage(): ReactElement {
           )}
         </div>
       </Panel>
+
+      </details>
 
       <Panel variant="raised" style={{ padding: "var(--os-space-4)" }}>
         <div style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-muted)" }}>

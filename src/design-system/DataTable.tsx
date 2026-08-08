@@ -77,15 +77,16 @@ export function DataTable<T>({
 
   return (
     <div className={`os-table-wrap ${className}`.trim()}>
-      {/* W7-G trivial a11y fix: a max-height table is a scrollable region and
-          must be keyboard-reachable (axe scrollable-region-focusable, serious)
-          — focusable + labeled only when it actually scrolls */}
+      {/* a11y: os-table-scroll is a scrollable region — vertically when maxHeight is
+          set, and horizontally (overflow-x:auto) at narrow widths regardless. Either
+          way it must be keyboard-reachable (axe scrollable-region-focusable, serious),
+          so it is unconditionally focusable + labeled (S13.2: horizontal case fix). */}
       <div
         className="os-table-scroll"
         style={scrollStyle}
-        tabIndex={maxHeight ? 0 : undefined}
-        role={maxHeight ? "region" : undefined}
-        aria-label={maxHeight ? "אזור טבלה נגלל" : undefined}
+        tabIndex={0}
+        role="region"
+        aria-label="אזור טבלה נגלל"
       >
         <table className="os-table">
           <thead>
