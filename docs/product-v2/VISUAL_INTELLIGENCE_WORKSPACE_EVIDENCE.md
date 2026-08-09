@@ -95,19 +95,38 @@ graph **auto-fits** to the canvas (fills the space — no "tiny graph in empty s
 communities detected, spatially separated, two distinct cluster fills + hub glow, `autoFit` produced
 `scale 0.64` centered.
 
-## Agent Network (exactly the 7 canonical agents) — redesigned entities
+## Agent Network → Agent Intelligence Graph (exactly the 7 canonical agents, real force engine)
 
-Reads the real `AGENT_DEFINITIONS` (no invented agents, no duplicate registry): `ag-orchestrator` (מנהל התזמור),
-`ag-hunter` (סוכן מכירות), `ag-fixer` (סוכן שירות), `ag-mentor` (סוכן הדרכה), `ag-nexa` (סוכן שיווק וצמיחה),
-`ag-wiki` (סוכן ידע), `ag-flow` (סוכן אוטומציות). A curated orbital layout (orchestrator **coordination core**
-centred, the six business agents around it) — legible + appropriate for a fixed 7-entity system, redesigned as
-large rich entities (identity glyph + name + role + live status ring + status dot). Selecting an agent opens the
-**contextual inspector** with its real `purposeHe`, `allowedOperations` + `allowedDomains`, `prohibitedDomains`,
-the cross-view note-usage line, and the **existing `AgentActionsPanel`** (the real `runAgentAction` engine +
-approval gate; no second engine). Per-agent **status is real** — derived from actual action results
-(`ok/applied → SUCCESS`, `awaiting_approval → WAITING`, `execution_error → ERROR`); default **IDLE**, never
-animated as working. **Runtime (browser):** exactly 7 entities, the orchestrator core with glow + double ring, the
-floating inspector with real capabilities + reused action panel, and the bounded-loop visual flow.
+The Agent Network is no longer a curated radial star — it runs on the **same real d3 `ForceGraph` engine** as the
+Knowledge Graph. Reads the real `AGENT_DEFINITIONS` (no invented agents, no duplicate registry): `ag-orchestrator`
+(מנהל התזמור), `ag-hunter` (סוכן מכירות), `ag-fixer` (סוכן שירות), `ag-mentor` (סוכן הדרכה), `ag-nexa`
+(סוכן שיווק וצמיחה), `ag-wiki` (סוכן ידע), `ag-flow` (סוכן אוטומציות).
+
+- **Organic functional regions (not equal-radius spokes):** agents settle into real role-based regions via cluster
+  forces — **coordination** (orchestrator, centre), **growth** (Hunter + Nexa), **service** (Fixer + Flow),
+  **knowledge** (Wiki + Mentor). Edges still come ONLY from real supported/active relationships; functional
+  grouping influences layout, never fabricates links.
+- **Large entities:** each agent renders as an intelligent entity (identity glyph + name + role + live status ring
+  + status dot), names readable without zoom. Measured on-screen footprint — orchestrator **127px @375 / ~180px
+  desktop** (dominant coordination core with layered nucleus + energy ring + real-state pulse), agents **68px @375
+  / 99–105px desktop** — within the requested targets.
+- **Fills the canvas:** the engine's viewBox tracks the container's pixel size + `autoFit`, so node footprint is
+  **84–90%** of canvas width at 375 / 768 / 1024 / 1366 (no "tiny graph in empty space").
+- **Full graph interaction:** drag (mouse + touch, `touch-action:none`), pan, zoom, fit, reset, programmatic focus
+  on select — same quality as the Knowledge Graph.
+- **Edges:** supported handoffs are subtle dashed `<line>` (brighten on select/hover); real **active** traces are
+  solid accent with an animated directional signal (`.tvg-signal`) + `data-testid="agent-handoff-active"`.
+- Selecting an agent triggers a **camera focus** and opens the **contextual inspector** (right on desktop, bottom
+  sheet under 768px) with real `purposeHe`, `allowedOperations` + `allowedDomains`, `prohibitedDomains`, real
+  active handoffs involving the agent, the cross-view note-usage line, and the **existing `AgentActionsPanel`**
+  (real `runAgentAction` engine + approval gate; no second engine). Unrelated agents dim; related stay visible.
+- Per-agent **status is real** (from action results: `ok/applied → SUCCESS`, `awaiting_approval → WAITING`,
+  `execution_error → ERROR`; default **IDLE**, never animated as working). The bounded-loop strip tints its
+  Hunter/Fixer steps by those **real** statuses.
+- **Runtime (browser, seeded local data):** exactly 7 entities; **6** dashed supported edges + **2 real** active
+  handoff traces rendered as animated signals (e.g. `סוכן שירות → סוכן ידע`), surfaced honestly in the inspector;
+  no fabricated nodes/edges. Validated at **375 / 768 / 1024 / 1366** (0 horizontal overflow at every size),
+  selection→focus→inspector, and immersive **fullscreen** (canvas fills the viewport, dashboard framing removed).
 
 ## Handoff visualization (real only) — unchanged semantics
 

@@ -1,9 +1,10 @@
-// TERAGON Agent Network — a premium spatial view of the EXACTLY 7 canonical agents as
-// recognizable AI entities (identity icon, name, role, live status) orbiting the
-// orchestrator coordination core. Real registry, real capabilities, real supported
-// handoffs (orchestrator dispatch) + real active handoff traces, and per-agent status
-// driven by REAL action results. Reuses the existing action engine. No fake activity.
-import { useCallback, useEffect, useMemo, useState } from "react";
+// TERAGON Agent Intelligence Graph — the EXACTLY 7 canonical agents as a living force
+// network (real d3 engine): the orchestrator coordination core with the six business
+// agents settling organically into functional regions (coordination / growth / service /
+// knowledge). Real registry, real capabilities, real supported handoffs (orchestrator
+// dispatch) + real active handoff traces (animated signal), and per-agent status driven
+// by REAL action results. Reuses the existing action engine. No fake activity, no fake nodes.
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactElement } from "react";
 import { OsButton, StatusChip } from "@/design-system";
 import { AGENT_IDS, getAgentDefinition } from "@/agents/definitions";
@@ -11,6 +12,7 @@ import { AgentActionsPanel } from "@/modules/agents-ui/AgentActionsPanel";
 import { getActionDefinition, type AgentActionResult } from "@/agents/actions";
 import { getRepository } from "@/repositories";
 import { LOOP_OBJECTIVE_HE } from "@/modules/ai-workspace/agentLoop";
+import { ForceGraph, type FGEdge, type ForceGraphApi } from "./ForceGraph";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 import type { AgentNoteUsage } from "./crossView";
 import "./visual.css";
@@ -19,10 +21,8 @@ const stack = (gap = "var(--os-space-3)"): CSSProperties => ({ display: "grid", 
 const row: CSSProperties = { display: "flex", flexWrap: "wrap", gap: "var(--os-space-2)", alignItems: "center" };
 const muted: CSSProperties = { color: "var(--os-text-2)" };
 
-const VIEW_W = 1000;
-const VIEW_H = 640;
-
-// Distinctive identity glyph per agent (function-evocative, not decorative).
+// Distinctive identity glyph per agent (function-evocative, consistent across graph +
+// inspector + list + traces).
 const AGENT_ICON: Record<string, string> = {
   "ag-orchestrator": "🧭",
   "ag-hunter": "🎯",
@@ -32,7 +32,6 @@ const AGENT_ICON: Record<string, string> = {
   "ag-wiki": "📚",
   "ag-flow": "⚙️",
 };
-// One-word role, distinct from the longer purposeHe sentence.
 const AGENT_ROLE: Record<string, string> = {
   "ag-orchestrator": "תזמור",
   "ag-hunter": "מכירות",
@@ -42,12 +41,29 @@ const AGENT_ROLE: Record<string, string> = {
   "ag-wiki": "ידע",
   "ag-flow": "אוטומציה",
 };
+// Real functional regions (derived from the agents' actual roles) → organic spatial layout
+// (NOT equal-radius spokes). Edges still come only from real supported/active relationships.
+const AGENT_REGION: Record<string, string> = {
+  "ag-orchestrator": "coordination",
+  "ag-hunter": "growth",
+  "ag-nexa": "growth",
+  "ag-fixer": "service",
+  "ag-flow": "service",
+  "ag-wiki": "knowledge",
+  "ag-mentor": "knowledge",
+};
+const REGION_ANCHOR: Record<string, { x: number; y: number }> = {
+  coordination: { x: 0.5, y: 0.5 },
+  growth: { x: 0.16, y: 0.26 },
+  service: { x: 0.84, y: 0.28 },
+  knowledge: { x: 0.5, y: 0.85 },
+};
 
 type AgentStatus = "IDLE" | "RUNNING" | "SUCCESS" | "WAITING" | "ERROR";
 const STATUS_META: Record<AgentStatus, { label: string; color: string }> = {
   IDLE: { label: "רגוע", color: "var(--os-muted, #8a94a6)" },
   RUNNING: { label: "פעיל", color: "var(--os-accent-blue, #4a86e8)" },
-  SUCCESS: { label: "הצליח", color: "var(--os-accent-green, #2a9d5a)" },
+  SUCCESS: { label: "הצליח", color: "var(--os-accent-green, #37b06a)" },
   WAITING: { label: "ממתין לאישור", color: "var(--os-accent-violet, #8b7bff)" },
   ERROR: { label: "שגיאה", color: "var(--os-danger, #c0392b)" },
 };
@@ -56,19 +72,6 @@ function statusFromResult(r: AgentActionResult): AgentStatus {
   if (r.status === "awaiting_approval") return "WAITING";
   if (r.status === "execution_error") return "ERROR";
   return "IDLE";
-}
-
-// Curated orbital layout: orchestrator core centred, the six business agents evenly
-// distributed around it (appropriate + legible for a fixed 7-entity system).
-function agentPositions(): Map<string, { x: number; y: number }> {
-  const pos = new Map<string, { x: number; y: number }>();
-  const others = AGENT_IDS.filter((id) => id !== "ag-orchestrator");
-  pos.set("ag-orchestrator", { x: VIEW_W / 2, y: VIEW_H / 2 });
-  others.forEach((id, i) => {
-    const a = (i / others.length) * Math.PI * 2 - Math.PI / 2;
-    pos.set(id, { x: VIEW_W / 2 + Math.cos(a) * 300, y: VIEW_H / 2 + Math.sin(a) * 210 });
-  });
-  return pos;
 }
 
 interface HandoffRecord {
@@ -80,14 +83,18 @@ interface HandoffRecord {
   sourceAgentId?: string;
   targetAgentId?: string;
 }
+interface AgentNode {
+  id: string;
+}
 
 export function AgentNetworkPanel({ usages = [] }: { usages?: AgentNoteUsage[] }): ReactElement {
   const reduced = usePrefersReducedMotion();
   const [selected, setSelected] = useState<string | null>(null);
-  const [hovered, setHovered] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, AgentStatus>>({});
   const [fullscreen, setFullscreen] = useState(false);
-  const pos = useMemo(agentPositions, []);
+  const apiRef = useRef<ForceGraphApi | null>(null);
+
+  const nodes = useMemo<AgentNode[]>(() => AGENT_IDS.map((id) => ({ id })), []);
   const [handoffRows, setHandoffRows] = useState<HandoffRecord[]>([]);
   useEffect(() => {
     let alive = true;
@@ -108,21 +115,9 @@ export function AgentNetworkPanel({ usages = [] }: { usages?: AgentNoteUsage[] }
     () =>
       handoffRows
         .map((h) => ({ from: h.fromAgentId ?? h.sourceAgentId, to: h.toAgentId ?? h.targetAgentId }))
-        .filter((h): h is { from: string; to: string } => !!h.from && !!h.to && pos.has(h.from) && pos.has(h.to)),
-    [handoffRows, pos],
+        .filter((h): h is { from: string; to: string } => !!h.from && !!h.to && AGENT_REGION[h.from] != null && AGENT_REGION[h.to] != null),
+    [handoffRows],
   );
-
-  // Supported handoffs = the orchestrator may dispatch to each business agent (real: it
-  // holds the "dispatch" operation + agentHandoffs domain). Shown distinctly from traces.
-  const supportedHandoffs = useMemo(() => AGENT_IDS.filter((id) => id !== "ag-orchestrator").map((to) => ({ from: "ag-orchestrator", to })), []);
-
-  const onResult = useCallback((r: AgentActionResult, actionId: string) => {
-    const agentId = getActionDefinition(actionId)?.agentId ?? null;
-    if (agentId) setStatuses((s) => ({ ...s, [agentId]: statusFromResult(r) }));
-  }, []);
-
-  const selectedDef = selected ? getAgentDefinition(selected) : null;
-  const selectedUsages = selected ? usages.filter((u) => u.agentId === selected) : [];
   const activeSet = useMemo(() => {
     const s = new Set<string>();
     activeHandoffs.forEach((h) => {
@@ -131,6 +126,36 @@ export function AgentNetworkPanel({ usages = [] }: { usages?: AgentNoteUsage[] }
     });
     return s;
   }, [activeHandoffs]);
+
+  // Edges = real supported handoffs (orchestrator → each business agent) + real active traces.
+  const edges = useMemo<FGEdge[]>(() => {
+    const supported: FGEdge[] = AGENT_IDS.filter((id) => id !== "ag-orchestrator").map((to) => ({ source: "ag-orchestrator", target: to, kind: "supported" }));
+    const active: FGEdge[] = activeHandoffs.map((h) => ({ source: h.from, target: h.to, kind: "active" }));
+    return [...supported, ...active];
+  }, [activeHandoffs]);
+  const degreeMap = useMemo(() => {
+    const m = new Map<string, number>();
+    edges.forEach((e) => {
+      m.set(e.source, (m.get(e.source) ?? 0) + 1);
+      m.set(e.target, (m.get(e.target) ?? 0) + 1);
+    });
+    return m;
+  }, [edges]);
+
+  const onResult = useCallback((r: AgentActionResult, actionId: string) => {
+    const agentId = getActionDefinition(actionId)?.agentId ?? null;
+    if (agentId) setStatuses((s) => ({ ...s, [agentId]: statusFromResult(r) }));
+  }, []);
+
+  const selectAndFocus = useCallback((id: string | null) => {
+    setSelected(id);
+    if (id) apiRef.current?.focus(id);
+  }, []);
+
+  const selectedDef = selected ? getAgentDefinition(selected) : null;
+  const selectedUsages = selected ? usages.filter((u) => u.agentId === selected) : [];
+
+  const agentRadius = useCallback((id: string) => (id === "ag-orchestrator" ? 60 : 42), []);
 
   return (
     <div data-testid="agent-network-panel" style={stack()}>
@@ -142,84 +167,92 @@ export function AgentNetworkPanel({ usages = [] }: { usages?: AgentNoteUsage[] }
         <StatusChip status="פעיל" label={`${AGENT_IDS.length} סוכנים`} />
       </div>
 
-      <div className={`tvg-canvas${fullscreen ? " tvg-fullscreen" : ""}`} style={{ height: fullscreen ? "100vh" : "min(60vh, 540px)" }}>
+      <div className={`tvg-canvas${fullscreen ? " tvg-fullscreen" : ""}`} style={{ height: fullscreen ? "100vh" : "min(70vh, 620px)" }}>
         <div className="tvg-toolbar" role="toolbar" aria-label="בקרת רשת סוכנים">
-          <span style={{ fontSize: "var(--os-text-2xs, 11px)", ...muted, padding: "0 6px" }}>ליבת תזמור + 6 סוכנים</span>
+          <OsButton variant="ghost" size="sm" onClick={() => apiRef.current?.fit()} aria-label="התאם לתצוגה">
+            התאמה
+          </OsButton>
+          <OsButton variant="ghost" size="sm" onClick={() => apiRef.current?.zoomBy(1.3)} aria-label="הגדל">
+            +
+          </OsButton>
+          <OsButton variant="ghost" size="sm" onClick={() => apiRef.current?.zoomBy(1 / 1.3)} aria-label="הקטן">
+            −
+          </OsButton>
+          <OsButton variant="ghost" size="sm" onClick={() => apiRef.current?.reset()} aria-label="איפוס תצוגה">
+            איפוס
+          </OsButton>
           <OsButton variant={fullscreen ? "primary" : "ghost"} size="sm" onClick={() => setFullscreen((v) => !v)} aria-label="מסך מלא" aria-pressed={fullscreen}>
             מסך מלא
           </OsButton>
         </div>
 
-        <svg data-testid="agent-network-svg" role="img" aria-label="רשת הסוכנים של TERAGON" viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} style={{ width: "100%", height: "100%", display: "block" }} onClick={() => setSelected(null)}>
-          <defs>
-            <radialGradient id="tvg-core" cx="50%" cy="42%" r="65%">
-              <stop offset="0%" stopColor="var(--os-accent-cyan)" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="var(--os-accent-cyan)" stopOpacity="0" />
-            </radialGradient>
-          </defs>
-
-          {/* supported handoff edges (dashed, subtle) — MUST stay <line> for the contract */}
-          {supportedHandoffs.map((e, i) => {
-            const a = pos.get(e.from)!;
-            const b = pos.get(e.to)!;
-            const emphasised = selected === e.from || selected === e.to || hovered === e.to;
-            return <line key={`s${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={emphasised ? "var(--os-accent-cyan)" : "var(--os-border)"} strokeOpacity={emphasised ? 0.7 : selected ? 0.12 : 0.4} strokeDasharray="4 4" strokeWidth={emphasised ? 2 : 1} />;
-          })}
-          {/* active handoff traces (solid, accent, animated signal on REAL trace only) */}
-          {activeHandoffs.map((e, i) => {
-            const a = pos.get(e.from)!;
-            const b = pos.get(e.to)!;
-            return <line key={`a${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="var(--os-accent-cyan)" strokeOpacity={0.95} strokeWidth={3} className={reduced ? undefined : "tvg-signal"} data-testid="agent-handoff-active" />;
-          })}
-
-          {AGENT_IDS.map((id) => {
-            const def = getAgentDefinition(id)!;
-            const p = pos.get(id)!;
-            const st = statuses[id] ?? "IDLE";
-            const isSel = id === selected;
-            const isHover = id === hovered;
-            const isOrch = id === "ag-orchestrator";
-            const dim = selected != null && !isSel && !(isOrch || selected === "ag-orchestrator");
-            const r = isOrch ? 56 : 42;
-            const ringColor = STATUS_META[st].color;
+        <ForceGraph<AgentNode>
+          testId="agent-network-svg"
+          ariaLabel="רשת הסוכנים של TERAGON — ליבת תזמור ו-6 סוכנים"
+          nodes={nodes}
+          edges={edges}
+          selectedId={selected}
+          onSelect={selectAndFocus}
+          degreeOf={(id) => degreeMap.get(id) ?? 0}
+          nodeRadius={(n) => agentRadius(n.id)}
+          labelFor={(n) => getAgentDefinition(n.id)?.nameHe ?? n.id}
+          clusterOf={(id) => AGENT_REGION[id] ?? "coordination"}
+          clusterAnchor={(key) => REGION_ANCHOR[key]}
+          clusterStrength={0.32}
+          linkDistance={90}
+          linkStrength={0.04}
+          chargeStrength={-140}
+          autoFit
+          hideEngineLabels
+          reducedMotion={reduced}
+          onReady={(api) => {
+            apiRef.current = api;
+          }}
+          edgeAppearance={(e, ctx) => {
+            if (e.kind === "active") {
+              return { stroke: "var(--os-accent-cyan, #35c0c9)", opacity: 0.95, width: 3, signal: true, testId: "agent-handoff-active" };
+            }
+            const emphasised = ctx.active || ctx.hovered;
+            return { dashed: true, stroke: emphasised ? "var(--os-accent-cyan, #35c0c9)" : "var(--os-border)", opacity: ctx.dim ? 0.1 : emphasised ? 0.75 : 0.4, width: emphasised ? 2 : 1 };
+          }}
+          renderNode={(n, ctx) => {
+            const def = getAgentDefinition(n.id)!;
+            const isOrch = n.id === "ag-orchestrator";
+            const r = agentRadius(n.id);
+            const st = statuses[n.id] ?? "IDLE";
+            const ring = STATUS_META[st].color;
             const pulsing = st === "RUNNING" || st === "WAITING";
-            const coordinating = isOrch && activeSet.has(id);
+            const coordinating = isOrch && activeSet.has(n.id);
             return (
-              <g
-                key={id}
-                transform={`translate(${p.x} ${p.y})`}
-                style={{ cursor: "pointer", opacity: dim ? 0.32 : 1, transition: reduced ? undefined : "opacity 180ms ease" }}
-                onClick={(ev) => {
-                  ev.stopPropagation();
-                  setSelected(id);
-                }}
-                onMouseEnter={() => setHovered(id)}
-                onMouseLeave={() => setHovered(null)}
-              >
-                <title>{`${def.nameHe} (${def.codeName})\n${def.purposeHe}`}</title>
-                {isOrch && <circle r={r + 40} fill="url(#tvg-core)" style={{ pointerEvents: "none" }} />}
-                {/* orchestrator coordination core: double ring */}
-                {isOrch && <circle r={r + 16} fill="none" stroke="var(--os-accent-cyan)" strokeOpacity={0.25} strokeWidth={1.5} />}
-                {/* live status ring (pulse only on REAL running/waiting, or orchestrator coordinating a real trace) */}
-                <circle r={r + 7} fill="none" stroke={ringColor} strokeWidth={st === "IDLE" ? 1.5 : 3} strokeOpacity={st === "IDLE" ? 0.5 : 0.95} className={pulsing || coordinating ? "agent-status-pulse" : undefined} />
+              <>
+                <title>{`${def.nameHe} (${def.codeName})\n${AGENT_ROLE[n.id] ?? ""} · ${STATUS_META[st].label}\n${def.purposeHe}`}</title>
+                {/* orchestrator coordination core — layered nucleus + energy ring */}
+                {isOrch && <circle r={r + 22} fill="var(--os-accent-cyan, #35c0c9)" opacity={0.06} />}
+                {isOrch && <circle r={r + 14} fill="var(--os-accent-cyan, #35c0c9)" opacity={0.09} />}
+                {isOrch && <circle r={r + 11} fill="none" stroke="var(--os-accent-cyan, #35c0c9)" strokeOpacity={0.22} strokeWidth={1.2} />}
+                {(ctx.selected || ctx.hovered) && <circle r={r + 10} fill={ring} opacity={0.16} />}
+                {/* live status ring — pulses ONLY on real running/waiting/coordinating */}
+                <circle r={r + 6} fill="none" stroke={ring} strokeWidth={st === "IDLE" ? 1.5 : 3} strokeOpacity={st === "IDLE" ? 0.5 : 0.95} className={pulsing || coordinating ? "agent-status-pulse" : undefined} />
                 {/* body */}
-                <circle r={r} fill={isSel ? "color-mix(in srgb, var(--os-accent-cyan) 30%, var(--os-surface-2))" : "var(--os-surface-2)"} stroke={isSel || isHover ? "var(--os-accent-cyan)" : "var(--os-border)"} strokeWidth={isSel ? 2.5 : 1.5} style={{ transition: reduced ? undefined : "r 140ms ease" }} />
-                <text textAnchor="middle" dy={isOrch ? "-0.15em" : "-0.05em"} fontSize={isOrch ? 30 : 24} style={{ pointerEvents: "none" }}>
-                  {AGENT_ICON[id] ?? "◆"}
+                <circle r={r} fill={ctx.selected ? "color-mix(in srgb, var(--os-accent-cyan, #35c0c9) 26%, var(--os-surface-2))" : "var(--os-surface-2)"} stroke={ctx.selected || ctx.hovered ? "var(--os-accent-cyan, #35c0c9)" : "var(--os-border)"} strokeWidth={ctx.selected ? 2.5 : 1.5} style={{ transition: reduced ? undefined : "r 140ms ease" }} />
+                <text textAnchor="middle" dy={isOrch ? "-0.02em" : "0.04em"} fontSize={isOrch ? 34 : 26} style={{ pointerEvents: "none" }}>
+                  {AGENT_ICON[n.id] ?? "◆"}
                 </text>
-                <text textAnchor="middle" dy={isOrch ? "1.5em" : "1.7em"} fontSize={isOrch ? 12 : 10} fill="var(--os-text-2)" style={{ pointerEvents: "none", fontWeight: 600 }}>
-                  {AGENT_ROLE[id] ?? ""}
+                <text textAnchor="middle" dy={isOrch ? "1.7em" : "1.9em"} fontSize={isOrch ? 13 : 11} fill="var(--os-text-2)" style={{ pointerEvents: "none", fontWeight: 600 }}>
+                  {AGENT_ROLE[n.id] ?? ""}
                 </text>
-                {/* identity name below the node */}
-                <text y={r + 20} textAnchor="middle" fontSize={isOrch ? 15 : 13} fill="var(--os-text)" style={{ pointerEvents: "none", fontWeight: 600 }}>
+                {/* identity name below the node — always readable (no zoom needed) */}
+                <text y={r + 22} textAnchor="middle" fontSize={isOrch ? 16 : 14} fill="var(--os-text)" style={{ pointerEvents: "none", fontWeight: 600 }}>
                   {def.nameHe}
                 </text>
                 {/* status dot */}
-                <circle cx={r * 0.72} cy={-r * 0.72} r={7} fill={ringColor} stroke="var(--os-surface-2)" strokeWidth={2} />
-              </g>
+                <circle cx={r * 0.72} cy={-r * 0.72} r={7} fill={ring} stroke="var(--os-surface-2)" strokeWidth={2} />
+              </>
             );
-          })}
-        </svg>
+          }}
+        />
+
+        <div className="tvg-source">ליבת תזמור + 6 סוכנים · {activeHandoffs.length > 0 ? `${activeHandoffs.length} העברות פעילות` : "אין העברות פעילות"}</div>
 
         {selectedDef && (
           <aside className="tvg-inspector" data-testid="agent-network-details" style={stack("var(--os-space-2)")}>
@@ -232,7 +265,9 @@ export function AgentNetworkPanel({ usages = [] }: { usages?: AgentNoteUsage[] }
               </OsButton>
             </div>
             <div style={{ ...row, gap: 6 }}>
-              <span style={{ ...muted, fontSize: "var(--os-text-2xs, 11px)" }}>{selectedDef.codeName}</span>
+              <span style={{ ...muted, fontSize: "var(--os-text-2xs, 11px)" }}>
+                {selectedDef.codeName} · {AGENT_ROLE[selectedDef.id]}
+              </span>
               <StatusChip
                 status={(statuses[selectedDef.id] ?? "IDLE") === "ERROR" ? "חסום" : (statuses[selectedDef.id] ?? "IDLE") === "WAITING" ? "דורש אישור" : (statuses[selectedDef.id] ?? "IDLE") === "SUCCESS" ? "הושלם" : "מושבת"}
                 label={STATUS_META[statuses[selectedDef.id] ?? "IDLE"].label}
@@ -248,6 +283,18 @@ export function AgentNetworkPanel({ usages = [] }: { usages?: AgentNoteUsage[] }
             <div style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-danger, #c0392b)" }}>
               <b>חסום:</b> {selectedDef.prohibitedDomains.join(", ")}
             </div>
+            {/* Real handoffs involving this agent (only if a real trace exists). */}
+            <div style={{ fontSize: "var(--os-text-2xs, 11px)" }}>
+              <b>העברות פעילות:</b>{" "}
+              {activeHandoffs.filter((h) => h.from === selectedDef.id || h.to === selectedDef.id).length === 0 ? (
+                <span style={muted}>אין העברה פעילה</span>
+              ) : (
+                activeHandoffs
+                  .filter((h) => h.from === selectedDef.id || h.to === selectedDef.id)
+                  .map((h) => `${getAgentDefinition(h.from)?.nameHe ?? h.from} → ${getAgentDefinition(h.to)?.nameHe ?? h.to}`)
+                  .join(", ")
+              )}
+            </div>
             {/* Cross-view: Agent→Note usage only when a REAL trace exists. */}
             <div style={{ fontSize: "var(--os-text-2xs, 11px)" }} data-testid="agent-note-usage">
               <b>שימוש במסמכי Obsidian:</b>{" "}
@@ -259,15 +306,27 @@ export function AgentNetworkPanel({ usages = [] }: { usages?: AgentNoteUsage[] }
         )}
       </div>
 
-      {/* Bounded loop as a visual flow (4 steps) — the real canonical loop structure. */}
+      {/* Bounded loop as a visual flow (4 steps) — real structure; agent steps tinted by REAL status. */}
       <div data-testid="agent-loop-strip" style={{ ...row, fontSize: "var(--os-text-2xs, 11px)", gap: 0, alignItems: "stretch" }}>
         <span style={{ ...muted, alignSelf: "center", paddingInlineEnd: 8 }}>לולאה חסומה ({LOOP_OBJECTIVE_HE}):</span>
-        {["1 · Hunter קורא", "2 · המשך משתמש", "3 · Fixer מציע", "4 · אישור אנושי"].map((s, i, arr) => (
-          <span key={i} style={{ display: "inline-flex", alignItems: "center" }}>
-            <span style={{ padding: "4px 10px", border: "1px solid var(--os-border)", borderRadius: 999, background: "var(--os-surface-2)" }}>{s}</span>
-            {i < arr.length - 1 && <span aria-hidden style={{ color: "var(--os-text-2)", padding: "0 4px" }}>→</span>}
-          </span>
-        ))}
+        {[
+          { label: "1 · Hunter קורא", agent: "ag-hunter" },
+          { label: "2 · המשך משתמש", agent: null },
+          { label: "3 · Fixer מציע", agent: "ag-fixer" },
+          { label: "4 · אישור אנושי", agent: null },
+        ].map((s, i, arr) => {
+          const st = s.agent ? statuses[s.agent] ?? "IDLE" : "IDLE";
+          const dot = s.agent && st !== "IDLE" ? STATUS_META[st].color : null;
+          return (
+            <span key={i} style={{ display: "inline-flex", alignItems: "center" }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", border: "1px solid var(--os-border)", borderRadius: 999, background: "var(--os-surface-2)" }}>
+                {dot && <span aria-hidden style={{ width: 7, height: 7, borderRadius: 999, background: dot }} />}
+                {s.label}
+              </span>
+              {i < arr.length - 1 && <span aria-hidden style={{ color: "var(--os-text-2)", padding: "0 4px" }}>→</span>}
+            </span>
+          );
+        })}
       </div>
 
       {/* Accessible agent list — keyboard alternative to the canvas. */}
@@ -278,7 +337,7 @@ export function AgentNetworkPanel({ usages = [] }: { usages?: AgentNoteUsage[] }
             const def = getAgentDefinition(id)!;
             return (
               <li key={id}>
-                <button type="button" onClick={() => setSelected(id)} style={{ background: "none", border: "none", color: "var(--os-text)", cursor: "pointer", padding: 0, font: "inherit", textAlign: "start" }}>
+                <button type="button" onClick={() => selectAndFocus(id)} style={{ background: "none", border: "none", color: "var(--os-text)", cursor: "pointer", padding: 0, font: "inherit", textAlign: "start" }}>
                   <b>{def.nameHe}</b> <span style={muted}>({def.codeName})</span> — {STATUS_META[statuses[id] ?? "IDLE"].label}
                 </button>
               </li>

@@ -1,10 +1,11 @@
 // Shared premium force-directed graph engine (d3-force + d3-zoom + d3-drag).
-// Real physics: many-body repulsion, spring links, collision, centering; node drag
-// with reheat; zoom/pan; programmatic fit + focus; selected-neighbor emphasis; semantic
-// zoom labels. Positions are updated IMPERATIVELY on each tick (no React re-render per
-// frame) for performance. Rendering of each node is delegated to the caller.
+// Real physics: many-body repulsion, spring links, collision, centering, optional
+// functional-region cluster forces; node drag with reheat; zoom/pan; programmatic fit +
+// focus; selected-neighbor emphasis; semantic-zoom labels. The viewBox adapts to the
+// container's aspect ratio (fills tall/narrow mobile canvases). Positions are updated
+// IMPERATIVELY per tick (no React re-render per frame). Node + edge rendering is delegated.
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ReactElement, ReactNode } from "react";
+import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY, type Simulation } from "d3-force";
 import { select } from "d3-selection";
 import "d3-transition"; // augments Selection.prototype.transition for smooth camera tweens
@@ -17,6 +18,8 @@ export interface FGNodeBase {
 export interface FGEdge {
   source: string;
   target: string;
+  /** Caller-defined edge kind (e.g. "supported" | "active") — drives edgeAppearance. */
+  kind?: string;
 }
 interface SimNode extends FGNodeBase {
   x?: number;
@@ -34,10 +37,20 @@ export interface NodeRenderCtx {
   dim: boolean;
   degree: number;
 }
+export interface EdgeStyle {
+  stroke?: string;
+  opacity?: number;
+  width?: number;
+  dashed?: boolean;
+  /** animate a one-directional signal along the edge (real active handoff only). */
+  signal?: boolean;
+  testId?: string;
+}
 export interface ForceGraphApi {
   fit: () => void;
   focus: (id: string) => void;
   zoomBy: (factor: number) => void;
+  reset: () => void;
 }
 
 export interface ForceGraphProps<N extends FGNodeBase> {
@@ -52,8 +65,19 @@ export interface ForceGraphProps<N extends FGNodeBase> {
   degreeOf: (id: string) => number;
   isDimmed?: (id: string) => boolean;
   /** Optional community/cluster key per node — drives spatial separation (cluster forces).
-   *  Real, deterministic (folder / connected component) — never fabricated. */
+   *  Real, deterministic (folder / connected component / functional role) — never fabricated. */
   clusterOf?: (id: string) => string;
+  /** Optional custom anchor per cluster key (relative 0..1 of the viewBox). Falls back to an
+   *  evenly-spaced ring. Lets a caller place e.g. a coordination cluster at the centre. */
+  clusterAnchor?: (key: string) => { x: number; y: number } | undefined;
+  clusterStrength?: number;
+  linkDistance?: number;
+  linkStrength?: number;
+  chargeStrength?: number;
+  /** Per-edge visual style (dashed supported edges, animated active signals, testids). */
+  edgeAppearance?: (edge: FGEdge, ctx: { active: boolean; dim: boolean; hovered: boolean }) => EdgeStyle | undefined;
+  /** When true the engine does not render its own labels — the caller draws them in renderNode. */
+  hideEngineLabels?: boolean;
   /** Fit the settled graph to the viewport once on mount (fills the canvas → no dead space). */
   autoFit?: boolean;
   reducedMotion?: boolean;
@@ -62,8 +86,7 @@ export interface ForceGraphProps<N extends FGNodeBase> {
   testId?: string;
 }
 
-const WIDTH = 1000;
-const HEIGHT = 640;
+const DEFAULT_DIMS = { w: 900, h: 640 };
 
 export function ForceGraph<N extends FGNodeBase>({
   nodes,
@@ -77,6 +100,13 @@ export function ForceGraph<N extends FGNodeBase>({
   degreeOf,
   isDimmed,
   clusterOf,
+  clusterAnchor,
+  clusterStrength,
+  linkDistance,
+  linkStrength,
+  chargeStrength,
+  edgeAppearance,
+  hideEngineLabels,
   autoFit,
   reducedMotion = false,
   onReady,
@@ -92,6 +122,23 @@ export function ForceGraph<N extends FGNodeBase>({
   const zoomRef = useRef<ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
+  // The viewBox tracks the container's PIXEL size so 1 unit ≈ 1 CSS px: node radii become
+  // real px targets and the layout fills the actual canvas shape (tall/narrow mobile too).
+  const [dims, setDims] = useState(DEFAULT_DIMS);
+
+  useEffect(() => {
+    const el = svgRef.current?.parentElement;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => {
+      const cr = entries[0]?.contentRect;
+      if (!cr || cr.width === 0 || cr.height === 0) return;
+      const w = Math.round(cr.width);
+      const h = Math.round(cr.height);
+      setDims((prev) => (Math.abs(prev.w - w) > 24 || Math.abs(prev.h - h) > 24 ? { w, h } : prev));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const adjacency = useMemo(() => {
     const m = new Map<string, Set<string>>();
@@ -104,7 +151,7 @@ export function ForceGraph<N extends FGNodeBase>({
     return m;
   }, [edges]);
 
-  // Build / rebuild the simulation when the graph data changes (NOT on selection).
+  // Build / rebuild the simulation when the graph data (or viewBox shape) changes.
   useEffect(() => {
     const prev = posRef.current;
     const simNodes: SimNode[] = nodes.map((n) => {
@@ -116,27 +163,32 @@ export function ForceGraph<N extends FGNodeBase>({
     const simLinks = edges.filter((e) => byId.has(e.source) && byId.has(e.target)).map((e) => ({ source: e.source, target: e.target }));
 
     const sim = forceSimulation<SimNode>(simNodes)
-      .force("charge", forceManyBody<SimNode>().strength(-360).distanceMax(520))
-      .force("link", forceLink<SimNode, { source: string; target: string }>(simLinks).id((d) => d.id).distance(120).strength(0.25))
-      .force("collide", forceCollide<SimNode>().radius((d) => nodeRadius(nodes.find((x) => x.id === d.id)!, degreeOf(d.id)) + 14))
-      .force("center", forceCenter(WIDTH / 2, HEIGHT / 2))
+      .force("charge", forceManyBody<SimNode>().strength(chargeStrength ?? -360).distanceMax(640))
+      .force("link", forceLink<SimNode, { source: string; target: string }>(simLinks).id((d) => d.id).distance(linkDistance ?? 120).strength(linkStrength ?? 0.22))
+      .force("collide", forceCollide<SimNode>().radius((d) => nodeRadius(nodes.find((x) => x.id === d.id)!, degreeOf(d.id)) + 16))
+      .force("center", forceCenter(dims.w / 2, dims.h / 2))
       .alpha(1)
       .alphaDecay(reducedMotion ? 0.2 : 0.028);
 
-    // Cluster forces: pull each community toward its own anchor so clusters separate
-    // spatially (the multi-region "brain" look). Anchors are deterministic (cluster order
-    // → evenly spaced ring), so the layout is stable across reloads.
+    // Cluster forces: pull each community toward its anchor so clusters separate spatially
+    // (the multi-region "intelligence" look). Anchors are deterministic → stable layout.
     if (clusterOf) {
       const clusterKeys = [...new Set(nodes.map((n) => clusterOf(n.id)))];
       if (clusterKeys.length > 1) {
         const anchor = new Map<string, { x: number; y: number }>();
         clusterKeys.forEach((k, i) => {
-          const a = (i / clusterKeys.length) * Math.PI * 2 - Math.PI / 2;
-          anchor.set(k, { x: WIDTH / 2 + Math.cos(a) * WIDTH * 0.26, y: HEIGHT / 2 + Math.sin(a) * HEIGHT * 0.3 });
+          const custom = clusterAnchor?.(k);
+          if (custom) {
+            anchor.set(k, { x: custom.x * dims.w, y: custom.y * dims.h });
+          } else {
+            const a = (i / clusterKeys.length) * Math.PI * 2 - Math.PI / 2;
+            anchor.set(k, { x: dims.w / 2 + Math.cos(a) * dims.w * 0.26, y: dims.h / 2 + Math.sin(a) * dims.h * 0.3 });
+          }
         });
+        const st = clusterStrength ?? 0.08;
         sim
-          .force("clusterX", forceX<SimNode>((d) => anchor.get(clusterOf(d.id))?.x ?? WIDTH / 2).strength(0.08))
-          .force("clusterY", forceY<SimNode>((d) => anchor.get(clusterOf(d.id))?.y ?? HEIGHT / 2).strength(0.08));
+          .force("clusterX", forceX<SimNode>((d) => anchor.get(clusterOf(d.id))?.x ?? dims.w / 2).strength(st))
+          .force("clusterY", forceY<SimNode>((d) => anchor.get(clusterOf(d.id))?.y ?? dims.h / 2).strength(st));
       }
     }
 
@@ -165,11 +217,11 @@ export function ForceGraph<N extends FGNodeBase>({
     }
     simRef.current = sim;
 
-    // node drag
+    // node drag (mouse + touch — d3-drag handles both pointer types)
     const dragBehavior = d3drag<SVGGElement, unknown>()
-      .on("start", (event, _d) => {
+      .on("start", (event) => {
         const id = (event.sourceEvent.currentTarget as SVGGElement).dataset.nodeId!;
-        if (!reducedMotion) sim.alphaTarget(0.25).restart();
+        if (!reducedMotion) sim.alphaTarget(0.28).restart();
         const p = byId.get(id);
         if (p) {
           p.fx = p.x;
@@ -200,9 +252,9 @@ export function ForceGraph<N extends FGNodeBase>({
       sim.stop();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, edges, reducedMotion]);
+  }, [nodes, edges, reducedMotion, dims.w, dims.h]);
 
-  // zoom / pan
+  // zoom / pan + camera API
   useEffect(() => {
     if (!svgRef.current || !gRef.current) return;
     const svgSel = select(svgRef.current);
@@ -227,18 +279,19 @@ export function ForceGraph<N extends FGNodeBase>({
         const maxY = Math.max(...ys);
         const w = maxX - minX || 1;
         const h = maxY - minY || 1;
-        const k = Math.min(3, Math.max(0.35, 0.82 * Math.min(WIDTH / (w + 160), HEIGHT / (h + 160))));
-        const tx = WIDTH / 2 - k * (minX + maxX) / 2;
-        const ty = HEIGHT / 2 - k * (minY + maxY) / 2;
+        const k = Math.min(2.4, Math.max(0.35, 0.94 * Math.min(dims.w / (w + 130), dims.h / (h + 130))));
+        const tx = dims.w / 2 - (k * (minX + maxX)) / 2;
+        const ty = dims.h / 2 - (k * (minY + maxY)) / 2;
         svgSel.transition().duration(reducedMotion ? 0 : 450).call(z.transform as never, zoomIdentity.translate(tx, ty).scale(k));
       },
       focus: (id: string) => {
         const p = posRef.current.get(id);
         if (!p || p.x == null) return;
         const k = 1.5;
-        svgSel.transition().duration(reducedMotion ? 0 : 450).call(z.transform as never, zoomIdentity.translate(WIDTH / 2 - k * p.x, HEIGHT / 2 - k * p.y!).scale(k));
+        svgSel.transition().duration(reducedMotion ? 0 : 450).call(z.transform as never, zoomIdentity.translate(dims.w / 2 - k * p.x, dims.h / 2 - k * p.y!).scale(k));
       },
       zoomBy: (factor: number) => svgSel.transition().duration(180).call(z.scaleBy as never, factor),
+      reset: () => svgSel.transition().duration(reducedMotion ? 0 : 400).call(z.transform as never, zoomIdentity),
     };
     onReady?.(api);
     // Fit once after the simulation has had time to settle → the graph fills the canvas.
@@ -248,27 +301,22 @@ export function ForceGraph<N extends FGNodeBase>({
       svgSel.on(".zoom", null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reducedMotion]);
+  }, [reducedMotion, dims.w, dims.h]);
 
   const neighbors = selectedId ? (adjacency.get(selectedId) ?? new Set<string>()) : null;
+  const svgStyle: CSSProperties = { width: "100%", height: "100%", display: "block", cursor: "grab", touchAction: "none" };
 
   return (
-    <svg
-      ref={svgRef}
-      data-testid={testId}
-      role="img"
-      aria-label={ariaLabel}
-      viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-      style={{ width: "100%", height: "100%", display: "block", cursor: "grab", touchAction: "none" }}
-      onClick={(e) => {
-        if (e.target === svgRef.current) onSelect(null);
-      }}
-    >
+    <svg ref={svgRef} data-testid={testId} role="img" aria-label={ariaLabel} viewBox={`0 0 ${dims.w} ${dims.h}`} preserveAspectRatio="xMidYMid meet" style={svgStyle} onClick={(e) => {
+      if (e.target === svgRef.current) onSelect(null);
+    }}>
       <g ref={gRef}>
         {edges.map((e, i) => {
           const active = selectedId != null && (e.source === selectedId || e.target === selectedId);
+          const edgeHovered = hovered != null && (e.source === hovered || e.target === hovered);
           const filteredOut = (isDimmed?.(e.source) ?? false) || (isDimmed?.(e.target) ?? false);
           const dim = filteredOut || (selectedId != null && !active);
+          const ap = edgeAppearance?.(e, { active, dim, hovered: edgeHovered });
           return (
             <line
               key={i}
@@ -276,9 +324,12 @@ export function ForceGraph<N extends FGNodeBase>({
                 if (el) edgeEls.current.set(i, el);
                 else edgeEls.current.delete(i);
               }}
-              stroke={active ? "var(--os-accent-cyan, #35c0c9)" : "var(--os-border)"}
-              strokeOpacity={dim ? 0.08 : active ? 0.85 : 0.22}
-              strokeWidth={active ? 2 : 1}
+              stroke={ap?.stroke ?? (active ? "var(--os-accent-cyan, #35c0c9)" : "var(--os-border)")}
+              strokeOpacity={ap?.opacity ?? (dim ? 0.08 : active ? 0.85 : 0.22)}
+              strokeWidth={ap?.width ?? (active ? 2 : 1)}
+              strokeDasharray={ap?.dashed ? "4 4" : undefined}
+              className={ap?.signal && !reducedMotion ? "tvg-signal" : undefined}
+              data-testid={ap?.testId}
             />
           );
         })}
@@ -290,7 +341,7 @@ export function ForceGraph<N extends FGNodeBase>({
           const filteredOut = isDimmed?.(n.id) ?? false;
           const dim = filteredOut || (selectedId != null && !selected && !neighbor);
           const p = posRef.current.get(n.id);
-          const showLabel = selected || isHover || neighbor || degree >= 4 || zoomLevel > 1.6;
+          const showLabel = !hideEngineLabels && (selected || isHover || neighbor || degree >= 4 || zoomLevel > 1.6);
           return (
             <g
               key={n.id}
@@ -300,7 +351,7 @@ export function ForceGraph<N extends FGNodeBase>({
                 else nodeEls.current.delete(n.id);
               }}
               transform={p?.x != null ? `translate(${p.x} ${p.y})` : undefined}
-              style={{ cursor: "pointer", opacity: dim ? 0.28 : 1, transition: reducedMotion ? undefined : "opacity 180ms ease" }}
+              style={{ cursor: "pointer", opacity: dim ? 0.3 : 1, transition: reducedMotion ? undefined : "opacity 180ms ease" }}
               onClick={(e) => {
                 e.stopPropagation();
                 onSelect(n.id);
