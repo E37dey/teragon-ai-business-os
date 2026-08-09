@@ -17,6 +17,21 @@ export function sha256(s) {
   return crypto.createHash("sha256").update(String(s), "utf8").digest("hex");
 }
 
+/** HMAC-SHA256 (hex) — the write-capability MAC. TERAGON mirrors this with Web Crypto. */
+export function hmacSha256(key, msg) {
+  return crypto.createHmac("sha256", String(key)).update(String(msg), "utf8").digest("hex");
+}
+
+/**
+ * Canonical write-capability message. MUST match TERAGON's adapter byte-for-byte.
+ * Binds the capability to exactly one op / path / mutation / content / expiry.
+ */
+export function writeCapabilityMessage(op, path, mutationId, contentHash, exp) {
+  return [op, path, mutationId, contentHash, String(exp)].join("\n");
+}
+
+const WRITE_CAP_MAX_TTL_MS = 10 * 60 * 1000; // reject capabilities dated too far ahead
+
 /**
  * Validate a Vault-relative Markdown path. Defense-in-depth (the plugin re-checks
  * via app.vault): rejects traversal, absolute paths, `.obsidian` internals, non-Markdown.
@@ -79,10 +94,14 @@ const WRITE_PATHS = new Set(["/write/create", "/write/update", "/write/append"])
 
 export function createBridge(opts) {
   const token = opts.token;
+  // SEPARATE write-authorization secret (NOT the pairing token). Writes require a
+  // per-request HMAC capability keyed by this. A holder of only the pairing token
+  // cannot mint one, so the pairing token alone can never mutate the Vault.
+  const writeKey = typeof opts.writeKey === "string" ? opts.writeKey : "";
   const origins = new Set(opts.allowedOrigins ?? []);
   const vault = opts.vault;
   const maxNotes = opts.maxNotes ?? DEFAULT_MAX_NOTES;
-  const canWrite = typeof vault.applyWrite === "function";
+  const canWrite = typeof vault.applyWrite === "function" && writeKey.length > 0;
   // Idempotency ledger for this bridge instance (per plugin load / session).
   const appliedMutations = new Map();
 
@@ -123,23 +142,39 @@ export function createBridge(opts) {
     const rel = safeVaultNotePath(typeof body.path === "string" ? body.path : "");
     if (!rel) return send(res, 400, { error: "bad_request", cid }, cors);
 
-    // Idempotency: never apply the same mutationId twice (no duplicate append).
-    if (appliedMutations.has(mutationId)) {
-      return send(res, 200, { ...appliedMutations.get(mutationId), idempotent: true, cid }, cors);
-    }
-
+    // Op-specific schema → the exact bytes that authorization binds to.
     let input;
+    let contentHash;
     if (op === "create") {
       if (typeof body.content !== "string") return send(res, 400, { error: "bad_request", cid }, cors);
       input = { op, rel, content: body.content };
+      contentHash = sha256(body.content);
     } else if (op === "update") {
       if (typeof body.content !== "string" || typeof body.expectedHash !== "string") return send(res, 400, { error: "bad_request", cid }, cors);
       input = { op, rel, content: body.content, expectedHash: body.expectedHash };
+      contentHash = sha256(body.content);
     } else if (op === "append") {
       if (typeof body.block !== "string" || typeof body.expectedHash !== "string") return send(res, 400, { error: "bad_request", cid }, cors);
       input = { op, rel, block: body.block, expectedHash: body.expectedHash };
+      contentHash = sha256(body.block);
     } else {
       return send(res, 404, { error: "not_found", cid }, cors);
+    }
+
+    // WRITE AUTHORIZATION (REQUIRED). The pairing token alone is INSUFFICIENT to mutate.
+    // A single-use, short-lived HMAC capability — keyed by the SEPARATE writeKey and bound
+    // to exactly this op/path/mutationId/contentHash/expiry — must verify first.
+    const exp = body.exp;
+    const capability = body.capability;
+    if (typeof capability !== "string" || typeof exp !== "number") return send(res, 403, { error: "write_unauthorized", cid }, cors);
+    const now = Date.now();
+    if (!(exp > now) || exp > now + WRITE_CAP_MAX_TTL_MS) return send(res, 403, { error: "write_unauthorized", cid }, cors);
+    const expected = hmacSha256(writeKey, writeCapabilityMessage(op, rel, mutationId, contentHash, exp));
+    if (!timingSafeEq(capability, expected)) return send(res, 403, { error: "write_unauthorized", cid }, cors);
+
+    // Idempotency (only after the capability verified): never apply the same mutationId twice.
+    if (appliedMutations.has(mutationId)) {
+      return send(res, 200, { ...appliedMutations.get(mutationId), idempotent: true, cid }, cors);
     }
 
     const result = await Promise.resolve(vault.applyWrite(input));

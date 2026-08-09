@@ -27,10 +27,14 @@ function makeSnippet(text: string, at: number): string {
 export default class TeragonVaultBridge extends Plugin {
   private bridge: { close: () => Promise<void> } | null = null;
   private token = "";
+  private writeKey = "";
 
   async onload(): Promise<void> {
     // Dev-only: a fresh strong random pairing token per load; revealed once via a command.
     this.token = generateToken();
+    // SEPARATE write-authorization secret (NOT the pairing token). Revealed via its own
+    // command; required (as an HMAC capability) for any Vault mutation.
+    this.writeKey = generateToken();
     const vault = {
       getName: () => this.app.vault.getName(),
       listNotes: () =>
@@ -100,7 +104,7 @@ export default class TeragonVaultBridge extends Plugin {
         return { ok: true, path: file.path, hash: sha256(next) };
       },
     };
-    this.bridge = createBridge({ token: this.token, allowedOrigins: ALLOWED_ORIGINS, vault });
+    this.bridge = createBridge({ token: this.token, writeKey: this.writeKey, allowedOrigins: ALLOWED_ORIGINS, vault });
     await (this.bridge as unknown as { start: (p: number) => Promise<unknown> }).start(DEFAULT_PORT);
 
     this.addCommand({
@@ -111,6 +115,14 @@ export default class TeragonVaultBridge extends Plugin {
         new Notice("TERAGON pairing token copied. Paste it into TERAGON. Do not share or commit it.");
       },
     });
+    this.addCommand({
+      id: "show-write-key",
+      name: "Copy TERAGON write key (once)",
+      callback: () => {
+        void navigator.clipboard?.writeText(this.writeKey);
+        new Notice("TERAGON write key copied. Required to AUTHORIZE approved writes — the pairing token alone cannot write. Do not share or commit it.");
+      },
+    });
     // token is NEVER logged
     console.info(`[teragon-vault-bridge] ${BRIDGE_VERSION} listening on 127.0.0.1:${DEFAULT_PORT} (read + approved-write)`);
   }
@@ -119,5 +131,6 @@ export default class TeragonVaultBridge extends Plugin {
     await this.bridge?.close();
     this.bridge = null;
     this.token = "";
+    this.writeKey = "";
   }
 }
