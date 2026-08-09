@@ -145,7 +145,9 @@ export async function executeWriteProposal(
 
   const res = await write;
   if (!res.ok || !res.data) {
-    return { ...p, state: res.code === "CONFLICT" ? "CONFLICT" : "FAILED", failureCode: res.code };
+    // The human's in-Obsidian decision (and other faults) map to terminal states.
+    const state: WriteProposalState = res.code === "CONFLICT" ? "CONFLICT" : res.code === "REJECTED" ? "REJECTED" : "FAILED";
+    return { ...p, state, failureCode: res.code };
   }
 
   // POST-WRITE VERIFICATION — read the note back through the read-only capability.

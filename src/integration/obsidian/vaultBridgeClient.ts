@@ -29,6 +29,8 @@ export type BridgeErrorCode =
   | "EXISTS" // 409 — create target already exists
   | "TOO_LARGE" // 413 — request body over the bound
   | "WRITE_UNAUTHORIZED" // 403 — missing/invalid write capability (pairing token alone is insufficient)
+  | "REJECTED" // 403 — the human rejected the write inside Obsidian
+  | "EXPIRED" // 403 — the human did not confirm in Obsidian in time
   | "ERROR"; // any other unexpected condition
 
 export type BridgeCode = "OK" | BridgeErrorCode;
@@ -208,9 +210,19 @@ async function mintCapability(writeKey: string, op: string, path: string, mutati
  * Single bounded POST to a WRITE capability endpoint. Never throws — fail-closed,
  * sanitized, typed. 409 is refined into CONFLICT vs EXISTS from the response body.
  */
-async function bridgePost<T>(path: string, token: string, body: unknown, baseUrl: string): Promise<BridgeResult<T>> {
+// A staged write blocks on a human confirmation inside Obsidian — allow far longer.
+const WRITE_STAGE_TIMEOUT_MS = 130_000;
+
+function map403(error: string | undefined): BridgeErrorCode {
+  if (error === "write_unauthorized") return "WRITE_UNAUTHORIZED";
+  if (error === "write_rejected") return "REJECTED";
+  if (error === "write_expired") return "EXPIRED";
+  return "ORIGIN_REJECTED";
+}
+
+async function bridgePost<T>(path: string, token: string, body: unknown, baseUrl: string, timeoutMs: number = REQUEST_TIMEOUT_MS): Promise<BridgeResult<T>> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(baseUrl + path, {
       method: "POST",
@@ -229,7 +241,7 @@ async function bridgePost<T>(path: string, token: string, body: unknown, baseUrl
     let code: BridgeErrorCode;
     if (res.status === 409) code = (data as { error?: string } | undefined)?.error === "already_exists" ? "EXISTS" : "CONFLICT";
     else if (res.status === 413) code = "TOO_LARGE";
-    else if (res.status === 403) code = (data as { error?: string } | undefined)?.error === "write_unauthorized" ? "WRITE_UNAUTHORIZED" : "ORIGIN_REJECTED";
+    else if (res.status === 403) code = map403((data as { error?: string } | undefined)?.error);
     else code = mapStatus(res.status);
     return { ok: false, code, status: res.status, data: data as T };
   } catch (err) {
@@ -243,20 +255,24 @@ async function bridgePost<T>(path: string, token: string, body: unknown, baseUrl
 // Each write requires BOTH the pairing token (connection) AND a write capability minted
 // from the SEPARATE writeKey. The pairing token alone can never mutate the Vault.
 
-/** POST /write/create — create a NEW Markdown note (fails EXISTS if present). */
+// Each write STAGES an intent; the request blocks until a human approves/rejects it
+// inside Obsidian (or it times out). The pairing token + capability get you to the
+// human prompt; only the in-Obsidian decision can cause a mutation.
+
+/** POST /write/create — stage a NEW Markdown note (fails EXISTS if present). */
 export async function createNote(path: string, content: string, token: string, writeKey: string, meta: WriteMeta, baseUrl: string = OBSIDIAN_BRIDGE_URL): Promise<BridgeResult<WriteResult>> {
   const { exp, capability } = await mintCapability(writeKey, "create", path, meta.mutationId, await sha256Hex(content));
-  return bridgePost<WriteResult>("/write/create", token, { mutationId: meta.mutationId, correlationId: meta.correlationId, path, content, exp, capability }, baseUrl);
+  return bridgePost<WriteResult>("/write/create", token, { mutationId: meta.mutationId, correlationId: meta.correlationId, path, content, exp, capability }, baseUrl, WRITE_STAGE_TIMEOUT_MS);
 }
 
-/** POST /write/update — overwrite an existing note, guarded by expectedHash (conflict). */
+/** POST /write/update — stage an overwrite, guarded by expectedHash (conflict). */
 export async function updateNote(path: string, content: string, expectedHash: string, token: string, writeKey: string, meta: WriteMeta, baseUrl: string = OBSIDIAN_BRIDGE_URL): Promise<BridgeResult<WriteResult>> {
   const { exp, capability } = await mintCapability(writeKey, "update", path, meta.mutationId, await sha256Hex(content));
-  return bridgePost<WriteResult>("/write/update", token, { mutationId: meta.mutationId, correlationId: meta.correlationId, path, content, expectedHash, exp, capability }, baseUrl);
+  return bridgePost<WriteResult>("/write/update", token, { mutationId: meta.mutationId, correlationId: meta.correlationId, path, content, expectedHash, exp, capability }, baseUrl, WRITE_STAGE_TIMEOUT_MS);
 }
 
-/** POST /write/append — append a Markdown block, guarded by expectedHash (conflict). */
+/** POST /write/append — stage an append, guarded by expectedHash (conflict). */
 export async function appendNote(path: string, block: string, expectedHash: string, token: string, writeKey: string, meta: WriteMeta, baseUrl: string = OBSIDIAN_BRIDGE_URL): Promise<BridgeResult<WriteResult>> {
   const { exp, capability } = await mintCapability(writeKey, "append", path, meta.mutationId, await sha256Hex(block));
-  return bridgePost<WriteResult>("/write/append", token, { mutationId: meta.mutationId, correlationId: meta.correlationId, path, block, expectedHash, exp, capability }, baseUrl);
+  return bridgePost<WriteResult>("/write/append", token, { mutationId: meta.mutationId, correlationId: meta.correlationId, path, block, expectedHash, exp, capability }, baseUrl, WRITE_STAGE_TIMEOUT_MS);
 }
