@@ -13,6 +13,7 @@ import {
   type WriteOperation,
   type WriteProposal,
 } from "@/integration/obsidian/obsidianWrite";
+import { hasObsidianWriteKey, setObsidianWriteKey } from "@/integration/obsidian/obsidianCredential";
 
 const stack = (gap = "var(--os-space-3)"): CSSProperties => ({ display: "grid", gap });
 const row: CSSProperties = { display: "flex", flexWrap: "wrap", gap: "var(--os-space-2)", alignItems: "center" };
@@ -119,6 +120,17 @@ export function WriteProposeModal({
   const [busy, setBusy] = useState(false);
   const [proposal, setProposal] = useState<WriteProposal | null>(null);
   const [result, setResult] = useState<WriteProposal | null>(null);
+  const [writePaired, setWritePaired] = useState<boolean>(() => hasObsidianWriteKey());
+  const [writeKeyInput, setWriteKeyInput] = useState("");
+
+  const pairWriteKey = useCallback(() => {
+    const k = writeKeyInput.trim();
+    if (!k) return;
+    setObsidianWriteKey(k);
+    setWritePaired(true);
+    setWriteKeyInput("");
+    toast("הרשאת כתיבה אומתה", "success");
+  }, [writeKeyInput, toast]);
 
   const needsBase = op !== "create";
   const pathSafe = isSafeMarkdownPath(path.trim());
@@ -286,6 +298,35 @@ export function WriteProposeModal({
                 <pre style={{ ...preStyle, ...codeStyle }}>{proposal.appendBlock}</pre>
               </div>
             )}
+            {!writePaired && (
+              <div style={stack("var(--os-space-1)")} data-testid="obsidian-write-keypair">
+                <span style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-warning, #b8860b)" }}>
+                  נדרשת הרשאת כתיבה נפרדת: ב-Obsidian הפעילו “Copy TERAGON write key (once)” והדביקו כאן. אסימון
+                  ההתאמה לבדו אינו מספיק לכתיבה.
+                </span>
+                <div style={row}>
+                  <input
+                    data-testid="obsidian-write-key-input"
+                    type="password"
+                    autoComplete="off"
+                    style={{ ...inputStyle, ...codeStyle, maxWidth: 260 }}
+                    value={writeKeyInput}
+                    aria-label="מפתח הרשאת כתיבה"
+                    placeholder="מפתח כתיבה…"
+                    onChange={(e) => setWriteKeyInput(e.target.value)}
+                  />
+                  {writeKeyInput.trim() ? (
+                    <OsButton variant="primary" size="sm" onClick={pairWriteKey} data-testid="obsidian-write-key-pair">
+                      אמת הרשאת כתיבה
+                    </OsButton>
+                  ) : (
+                    <OsButton variant="primary" size="sm" disabled disabledReason="הדביקו את מפתח הכתיבה">
+                      אמת הרשאת כתיבה
+                    </OsButton>
+                  )}
+                </div>
+              </div>
+            )}
             <div style={row}>
               <OsButton variant="ghost" onClick={reject} data-testid="obsidian-write-reject">
                 דחה
@@ -294,8 +335,12 @@ export function WriteProposeModal({
                 <OsButton variant="approve" disabled disabledReason="כותב…">
                   כותב…
                 </OsButton>
-              ) : (
+              ) : writePaired ? (
                 <OsButton variant="approve" onClick={approveAndWrite} data-testid="obsidian-write-approve">
+                  אשר כתיבה ל-Obsidian
+                </OsButton>
+              ) : (
+                <OsButton variant="approve" disabled disabledReason="נדרשת הרשאת כתיבה (מפתח כתיבה)">
                   אשר כתיבה ל-Obsidian
                 </OsButton>
               )}
