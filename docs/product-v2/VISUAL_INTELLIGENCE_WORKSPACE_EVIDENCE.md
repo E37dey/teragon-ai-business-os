@@ -73,13 +73,14 @@ translate) and **programmatic focus** (animated camera to a node at scale 1.5); 
 (selected halo, neighbors bright + edges emphasized, unrelated dimmed); **semantic-zoom labels** (selected /
 hovered / neighbor / high-degree, more on zoom-in — not all labels permanent); degree-based node sizing/coloring.
 
-**Live validation (real browser, throwaway harness with 20 nodes / 30 edges, since a fresh session is unpaired):**
-the engine rendered 20 force-positioned nodes with hub sizing/coloring + hub labels and 30 edges; selecting a hub
-set `selected`, **dimmed 14 unrelated nodes**, kept the 6 neighbors bright with emphasized cyan edges + revealed
-labels; `fit()` produced `translate(204,133) scale(0.705)`; `focus("Customers")` produced `scale(1.5)` centered;
-all 20 node groups carry `data-node-id` with the d3-drag behavior attached. Harness removed after validation. The
-identical engine + `.tvg-canvas` shell + inspector are used by the live Knowledge Graph (unit-tested with real
-bridge-shaped data; earlier in the branch the live vault rendered 14 nodes / 32 edges).
+**Engine bring-up (initial, real browser, 20-node fixture) — later superseded by the live paired-Vault proof
+below:** the engine rendered 20 force-positioned nodes with hub sizing/coloring + hub labels and 30 edges;
+selecting a hub set `selected`, **dimmed 14 unrelated nodes**, kept the 6 neighbors bright with emphasized cyan
+edges + revealed labels; `fit()` produced `translate(204,133) scale(0.705)`; `focus("Customers")` produced
+`scale(1.5)` centered; all 20 node groups carry `data-node-id` with the d3-drag behavior attached. The **same
+production engine** is used by the live Knowledge Graph — where drag, pan, zoom, focus, fit and fullscreen were
+subsequently proven **on-screen against the real paired Vault** (see "Live paired Vault validation" below),
+including a **manual mouse drag** and **pan**.
 
 ## Cluster-aware layout (real communities, colored) — the "brain" look
 
@@ -91,9 +92,9 @@ own deterministic anchor so clusters occupy distinct regions, and (c) a compact 
 community by its highest-degree hub note (click → focus that hub). Orphans (degree 0) stay muted grey; hubs get a
 stronger glow. Structure only — a note's cluster/color is derived from real links, never fabricated. On load the
 graph **auto-fits** to the canvas (fills the space — no "tiny graph in empty space"). Touch: the SVG sets
-`touch-action:none` so pan/zoom/drag work on mobile. **Validated** (throwaway harness, 20 nodes): 2 real
-communities detected, spatially separated, two distinct cluster fills + hub glow, `autoFit` produced
-`scale 0.64` centered.
+`touch-action:none` so pan/zoom/drag work on mobile. **Validated on the live paired Vault:** 62 real notes →
+**6 communities** with distinct cluster colors + a named legend, spatially separated hubs/bridges/orphans, degree
+sizing, and `autoFit` framing the whole map (see live-validation section).
 
 ## Agent Network → Agent Intelligence Graph (exactly the 7 canonical agents, real force engine)
 
@@ -212,10 +213,17 @@ counts are real (from `metadataCache.resolvedLinks`), not fabricated.
   hover (no selection) highlights a node's neighborhood and dims the rest, restored on mouse-out, selection taking
   precedence; `fit()` is real-bounds (matches the reference `fit()`); drag-with-reheat, free pan, wheel zoom
   (0.3–3×), +/−/Fit/Reset, and camera focus were already present — these apply to **both** graphs.
-- **Note on animated-gesture capture:** the drag-motion / camera-tween *animations* and pixel screenshots require
-  the browser pane to be compositing; when the pane is hidden the browser pauses `requestAnimationFrame` (so the
-  d3 sim/transitions freeze) — the interaction *logic* above is proven via DOM/transform assertions, and the
-  identical engine's animated drag/fit/focus were validated on-screen earlier in this branch.
+- **Real drag + pan (manual, on the live paired Vault — closes the prior gap):** with the graph settled, a human
+  dragged a Projects-cluster node (`Milestones`) with the mouse. Verified against a captured baseline: the node
+  **displaced ~764px**, its edges followed, the simulation **reheated** and **all 62 nodes reacted and re-settled
+  naturally** (no hard snap-back — nodes did not revert to baseline), **147 edges preserved**. Dragging empty
+  canvas **panned** the camera (transform `107.7,162.2 → −158.5,30.3`) with node graph-coordinates intact.
+- **Fit after manipulation:** pressing **Fit** recomputed bounds to `scale 0.353` with **all 62 nodes inside the
+  viewport (0 outside), all 6 clusters visible, 147 edges intact — no layout corruption**.
+- **Zoom / focus / fullscreen (observed on screen, live Vault):** wheel + `+`/`−` changed scale (≈0.35 ↔ 1.0);
+  selecting a hub (`Company`) moved the camera and opened the inspector with real degree (8/5), brightened its
+  neighborhood and **dimmed 52 unrelated nodes**; **fullscreen** filled the viewport with no dashboard framing;
+  **mobile 375** rendered the clustered map with a bottom-sheet inspector on tap and **0 horizontal overflow**.
 
 ## Tests
 
@@ -223,15 +231,17 @@ counts are real (from `metadataCache.resolvedLinks`), not fabricated.
 401/403/405, no-writeKey), `tests/obsidian-graph/graphPanel.test.tsx` (disconnected/loaded/error, source
 attribution, select→details via the a11y list, readNote reuse, fail-closed), `tests/visual-workspace/visualWorkspace.test.tsx`
 (exactly 7 agents, real capabilities + reused engine, 6 supported edges + no fabricated active edges, cross-view
-honesty, mode switch). Full `vitest` **2709 passing** (12 `tests/platform/*` files fail to *load* on local Node
-v25 vite/rolldown `#!` shebang — pre-existing, unrelated; CI Node 22; 0 test failures, unchanged baseline).
-`typecheck`, `typecheck:tests`, `oxlint` all pass/CLEAN.
+honesty, mode switch), and `tests/cross-domain-memory/commandCenterMemory.test.ts` (regression for the Command
+Center `<MemoryBand>` crash — a stale old-schema `memoryRecords` row with no `links` array now contributes 0
+edges instead of throwing). Full `vitest` **2710 passing** (12 `tests/platform/*` files fail to *load* on local
+Node v25 vite/rolldown `#!` shebang — pre-existing, unrelated; CI Node 22; 0 test failures).
+`typecheck`, `typecheck:tests`, `oxlint` all pass/CLEAN; `scan:secrets` CLEAN.
 
 ## Limitations (honest — deferred)
 
-The interactive core is real, tested, and browser-validated. Still deferred (not fabricated as done): Agent↔Note
-cross-view edges await Phase-4 real agent Vault access (contract present, no fabricated data); a dedicated Trace
-panel and a visual write-back stepper; inlining the Phase-2 governed "ייבא לידע" import into the graph node
-inspector (available today from the read-only connection panel). The live Knowledge Graph with the new engine was
-validated via unit tests + an identical-engine throwaway browser harness (a fresh browser session is unpaired);
-re-pair Obsidian to see the live vault in the redesigned canvas. `HTTPS_TO_LOOPBACK = UNVALIDATED`.
+The interactive core is real, tested, and **validated on-screen against the live paired TERAGON OS Vault**
+(render, real manual drag + pan, zoom, focus, fullscreen, mobile, live refresh — see the live-validation section
+above). Still deferred (not fabricated as done): Agent↔Note cross-view edges await Phase-4 real agent Vault access
+(contract present, no fabricated data); a dedicated Trace panel and a visual write-back stepper; inlining the
+Phase-2 governed "ייבא לידע" import into the graph node inspector (available today from the read-only connection
+panel). `HTTPS_TO_LOOPBACK = UNVALIDATED`.
