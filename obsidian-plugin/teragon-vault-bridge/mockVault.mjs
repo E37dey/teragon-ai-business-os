@@ -8,5 +8,24 @@ export function mockVault(noteCount = 2) {
   return {
     getName: () => "Demo Vault (spike)",
     listNotes: () => notes,
+    // Read-only bounded search over filename/path (mock has no real text corpus).
+    searchNotes: (q) => {
+      const query = String(q).toLowerCase();
+      return notes
+        .filter((n) => n.path.toLowerCase().includes(query) || n.basename.toLowerCase().includes(query))
+        .map((n) => ({ path: n.path, basename: n.basename, snippet: `…${n.basename}…`, mtime: n.mtime }));
+    },
+    // Read-only single note; returns null for anything not in the mock set.
+    readNote: (rel) => {
+      const n = notes.find((x) => x.path === rel);
+      if (!n) return null;
+      return {
+        path: n.path,
+        basename: n.basename,
+        frontmatter: { synthetic: true },
+        mtime: n.mtime,
+        content: `# ${n.basename}\n\nSynthetic mock content for ${n.path}.\n`,
+      };
+    },
   };
 }
