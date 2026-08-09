@@ -185,6 +185,38 @@ no token → 401. Property **A/B/C/D** from Phase 3 remain intact — no visual 
 writeKey / HMAC, approves a mutation, or bypasses native Obsidian approval. The full Phase-1/2/3 obsidian +
 write-security suites stay green. `scan:secrets` → **CLEAN, 0 findings**.
 
+## Live paired Vault validation (real Obsidian, no harness)
+
+Validated the FINAL production UI against the **live** paired Vault (Obsidian Desktop · Vault **TERAGON OS** ·
+TERAGON at `http://127.0.0.1:4173` · production React+D3 `ForceGraph` · real `GET /graph`). Pairing used the
+proven **dev-only local handoff** (runtime token written to an OS temp file by a temporarily-patched *installed*
+plugin copy, relayed to the app over loopback, fetched by the app into its own `sessionStorage`) — the token is
+never printed / logged / committed / put in a URL / in evidence, and the `/graph` response was asserted to contain
+no token. After validation the handoff was cleared, the **clean plugin restored** (0 autopair refs, temp token
+not recreated), Obsidian reloaded, and the repo source (`obsidian-plugin/main.ts`) left **untouched**.
+
+**Real graph (synthetic 62-note test Vault, live):** `vaultName` **TERAGON OS** · **62 nodes** · **147 edges** ·
+`truncated:false` · **6 communities** (Development·7, Company·6, Sales·6, Customers·6, AI·6, Product·5) · largest
+hub **Company degree 13** (8 out / 5 in) · **3 orphans** (Scratchpad, Ideas, Archive Notes) · **5 bridge notes**
+(Growth Strategy, Customer Success, AI Operations, Secure Delivery, Data Platform) linking across clusters. All
+counts are real (from `metadataCache.resolvedLinks`), not fabricated.
+
+- **Live refresh (no app reload):** added a real `[[AI]]` wikilink to `Scratchpad.md` on disk → clicked **רענן**
+  → edges **147 → 148**, the new real edge `Scratchpad → AI` appeared, Scratchpad `linkCount` 0 → 1; note restored.
+- **Selection + emphasis:** selecting `Company` opened the inspector with its **real degree (8 out / 5 in)** and
+  **קרא מסמך / פתח ב-Obsidian**; **52 unrelated nodes dimmed** (target 0.3) with the 10-node neighborhood bright,
+  **135 / 148 edges dimmed** — selected-neighbor emphasis on real data.
+- **Read reuse:** **קרא מסמך** returned the real note body via the reused Phase-1 `readNote` path.
+- **Axe (wcag2a+aa)** on the live graph panel: **0 violations**.
+- **Interaction parity with the `agentnetwork.html` reference** was ported into the shared production engine:
+  hover (no selection) highlights a node's neighborhood and dims the rest, restored on mouse-out, selection taking
+  precedence; `fit()` is real-bounds (matches the reference `fit()`); drag-with-reheat, free pan, wheel zoom
+  (0.3–3×), +/−/Fit/Reset, and camera focus were already present — these apply to **both** graphs.
+- **Note on animated-gesture capture:** the drag-motion / camera-tween *animations* and pixel screenshots require
+  the browser pane to be compositing; when the pane is hidden the browser pauses `requestAnimationFrame` (so the
+  d3 sim/transitions freeze) — the interaction *logic* above is proven via DOM/transform assertions, and the
+  identical engine's animated drag/fit/focus were validated on-screen earlier in this branch.
+
 ## Tests
 
 `tests/obsidian-graph/bridgeGraph.test.ts` (nodes/edges from metadata, orphan+hub, truncation, no bodies/secrets,

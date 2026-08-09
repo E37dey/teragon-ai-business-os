@@ -303,7 +303,11 @@ export function ForceGraph<N extends FGNodeBase>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reducedMotion, dims.w, dims.h]);
 
+  // Emphasis source: selection takes precedence; otherwise HOVER highlights a node's
+  // neighborhood and dims the rest (restored on mouse-out) — matching the reference feel.
+  const hoverActive = selectedId == null && hovered != null;
   const neighbors = selectedId ? (adjacency.get(selectedId) ?? new Set<string>()) : null;
+  const hoverNeighbors = hoverActive ? (adjacency.get(hovered) ?? new Set<string>()) : null;
   const svgStyle: CSSProperties = { width: "100%", height: "100%", display: "block", cursor: "grab", touchAction: "none" };
 
   return (
@@ -314,8 +318,9 @@ export function ForceGraph<N extends FGNodeBase>({
         {edges.map((e, i) => {
           const active = selectedId != null && (e.source === selectedId || e.target === selectedId);
           const edgeHovered = hovered != null && (e.source === hovered || e.target === hovered);
+          const bright = active || (hoverActive && edgeHovered);
           const filteredOut = (isDimmed?.(e.source) ?? false) || (isDimmed?.(e.target) ?? false);
-          const dim = filteredOut || (selectedId != null && !active);
+          const dim = filteredOut || (selectedId != null && !active) || (hoverActive && !edgeHovered);
           const ap = edgeAppearance?.(e, { active, dim, hovered: edgeHovered });
           return (
             <line
@@ -324,9 +329,9 @@ export function ForceGraph<N extends FGNodeBase>({
                 if (el) edgeEls.current.set(i, el);
                 else edgeEls.current.delete(i);
               }}
-              stroke={ap?.stroke ?? (active ? "var(--os-accent-cyan, #35c0c9)" : "var(--os-border)")}
-              strokeOpacity={ap?.opacity ?? (dim ? 0.08 : active ? 0.85 : 0.22)}
-              strokeWidth={ap?.width ?? (active ? 2 : 1)}
+              stroke={ap?.stroke ?? (bright ? "var(--os-accent-cyan, #35c0c9)" : "var(--os-border)")}
+              strokeOpacity={ap?.opacity ?? (dim ? 0.08 : bright ? 0.85 : 0.22)}
+              strokeWidth={ap?.width ?? (bright ? 2 : 1)}
               strokeDasharray={ap?.dashed ? "4 4" : undefined}
               className={ap?.signal && !reducedMotion ? "tvg-signal" : undefined}
               data-testid={ap?.testId}
@@ -338,8 +343,9 @@ export function ForceGraph<N extends FGNodeBase>({
           const selected = n.id === selectedId;
           const isHover = n.id === hovered;
           const neighbor = neighbors?.has(n.id) ?? false;
+          const hoverNeighbor = hoverActive && (n.id === hovered || (hoverNeighbors?.has(n.id) ?? false));
           const filteredOut = isDimmed?.(n.id) ?? false;
-          const dim = filteredOut || (selectedId != null && !selected && !neighbor);
+          const dim = filteredOut || (selectedId != null && !selected && !neighbor) || (hoverActive && !hoverNeighbor);
           const p = posRef.current.get(n.id);
           const showLabel = !hideEngineLabels && (selected || isHover || neighbor || degree >= 4 || zoomLevel > 1.6);
           return (
