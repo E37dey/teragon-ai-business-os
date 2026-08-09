@@ -89,6 +89,26 @@ export interface NoteContent {
   readonly content: string;
   readonly truncated: boolean;
 }
+export interface GraphNode {
+  readonly id: string;
+  readonly path: string;
+  readonly basename: string;
+  readonly mtime: number | null;
+  readonly tags: string[];
+  readonly linkCount: number;
+}
+export interface GraphEdge {
+  readonly source: string;
+  readonly target: string;
+  readonly count: number;
+}
+export interface VaultGraph {
+  readonly nodes: GraphNode[];
+  readonly edges: GraphEdge[];
+  readonly count: number;
+  readonly edgeCount: number;
+  readonly truncated: boolean;
+}
 
 function mapStatus(status: number): BridgeErrorCode {
   if (status === 401) return "UNAUTHORIZED";
@@ -146,6 +166,11 @@ export async function listNotes(token: string, baseUrl: string = OBSIDIAN_BRIDGE
     return { ...r, data: { ...r.data, notes: r.data.notes.slice(0, MAX_NOTES), truncated: true } };
   }
   return r;
+}
+
+/** GET /graph — authenticated bounded knowledge graph (nodes + link edges). Read-only. */
+export function getVaultGraph(token: string, baseUrl: string = OBSIDIAN_BRIDGE_URL): Promise<BridgeResult<VaultGraph>> {
+  return bridgeGet<VaultGraph>("/graph", token, baseUrl);
 }
 
 /** GET /search/<query> — authenticated bounded local search. Empty query → empty result. */

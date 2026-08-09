@@ -8,6 +8,12 @@ export function mockVault(noteCount = 2) {
   return {
     getName: () => "Demo Vault (spike)",
     listNotes: () => notes,
+    // Bounded knowledge graph (mock: nodes only, no links).
+    getGraph: (maxNodes) => ({
+      nodes: notes.slice(0, maxNodes).map((n) => ({ id: n.path, path: n.path, basename: n.basename, mtime: n.mtime, tags: [], linkCount: 0 })),
+      edges: [],
+      truncated: notes.length > maxNodes,
+    }),
     // Read-only bounded search over filename/path (mock has no real text corpus).
     searchNotes: (q) => {
       const query = String(q).toLowerCase();

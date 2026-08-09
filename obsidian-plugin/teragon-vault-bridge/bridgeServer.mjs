@@ -11,6 +11,8 @@ export const BRIDGE_VERSION = "0.3.0-phase3";
 const MAX_WRITE_BYTES = 256 * 1024; // bounded write request body
 const DEFAULT_MAX_NOTES = 200;
 const MAX_NOTE_BYTES = 256 * 1024; // bounded note content; larger is truncated (never binary)
+const MAX_GRAPH_NODES = 300; // bounded knowledge-graph nodes (never a whole-vault dump)
+const MAX_GRAPH_EDGES = 1500; // bounded knowledge-graph edges
 
 /** Stable content hash shared by plugin + tests (TERAGON mirrors this with SHA-256). */
 export function sha256(s) {
@@ -244,6 +246,17 @@ export function createBridge(opts) {
         const all = vault.listNotes();
         const notes = all.slice(0, maxNotes).map((n) => ({ path: n.path, basename: n.basename, mtime: n.mtime ?? null }));
         return send(res, 200, { notes, count: notes.length, truncated: all.length > maxNotes, cid }, cors);
+      }
+      // Bounded knowledge-graph (nodes + link edges) from Vault metadata. READ-ONLY,
+      // no note bodies, Markdown-only, no writeKey — independent of the write capability.
+      if (pathname === "/graph") {
+        if (typeof vault.getGraph !== "function") {
+          return send(res, 200, { nodes: [], edges: [], count: 0, edgeCount: 0, truncated: false, cid }, cors);
+        }
+        const g = await Promise.resolve(vault.getGraph(MAX_GRAPH_NODES, MAX_GRAPH_EDGES));
+        const nodes = (g.nodes ?? []).slice(0, MAX_GRAPH_NODES);
+        const edges = (g.edges ?? []).slice(0, MAX_GRAPH_EDGES);
+        return send(res, 200, { nodes, edges, count: nodes.length, edgeCount: edges.length, truncated: !!g.truncated, cid }, cors);
       }
       if (pathname.startsWith("/note/")) {
         let decoded;

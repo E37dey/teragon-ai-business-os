@@ -125,6 +125,44 @@ export default class TeragonVaultBridge extends Plugin {
         }
         return out;
       },
+      // Bounded knowledge GRAPH from OFFICIAL metadata: getMarkdownFiles() + resolvedLinks.
+      // Nodes carry bounded metadata only (never bodies); edges are real Markdown-to-Markdown
+      // links. Highest-degree nodes are kept when the vault exceeds the node bound.
+      getGraph: (maxNodes: number, maxEdges: number) => {
+        const files = this.app.vault.getMarkdownFiles();
+        const mdPaths = new Set(files.map((f) => f.path));
+        const resolved = this.app.metadataCache.resolvedLinks ?? {};
+        const degree = new Map<string, number>();
+        const rawEdges: Array<{ source: string; target: string; count: number }> = [];
+        for (const src of Object.keys(resolved)) {
+          if (!mdPaths.has(src)) continue; // Markdown notes only
+          const targets = resolved[src] ?? {};
+          for (const tgt of Object.keys(targets)) {
+            if (tgt === src || !mdPaths.has(tgt)) continue; // only real note→note links
+            const count = targets[tgt] ?? 1;
+            rawEdges.push({ source: src, target: tgt, count });
+            degree.set(src, (degree.get(src) ?? 0) + count);
+            degree.set(tgt, (degree.get(tgt) ?? 0) + count);
+          }
+        }
+        let selected = files;
+        let truncated = false;
+        if (files.length > maxNodes) {
+          selected = [...files].sort((a, b) => (degree.get(b.path) ?? 0) - (degree.get(a.path) ?? 0)).slice(0, maxNodes);
+          truncated = true;
+        }
+        const selSet = new Set(selected.map((f) => f.path));
+        const nodes = selected.map((f) => {
+          const cache = this.app.metadataCache.getFileCache(f);
+          const inlineTags = (cache?.tags ?? []).map((t) => t.tag);
+          const fmTagsRaw = cache?.frontmatter?.tags;
+          const fmTags = Array.isArray(fmTagsRaw) ? fmTagsRaw.map((t) => `#${String(t).replace(/^#/, "")}`) : [];
+          const tags = Array.from(new Set([...inlineTags, ...fmTags])).slice(0, 12);
+          return { id: f.path, path: f.path, basename: f.basename, mtime: f.stat?.mtime ?? null, tags, linkCount: degree.get(f.path) ?? 0 };
+        });
+        const edges = rawEdges.filter((e) => selSet.has(e.source) && selSet.has(e.target));
+        return { nodes, edges: edges.slice(0, maxEdges), truncated: truncated || edges.length > maxEdges };
+      },
       // STAGE a write (Phase 3). Shows a LOCAL human confirmation in Obsidian and touches
       // app.vault ONLY on human approval — via OFFICIAL Vault APIs, conflict-guarded, never
       // .obsidian/absolute/../ /non-md (path pre-validated). No client secret can bypass this.
