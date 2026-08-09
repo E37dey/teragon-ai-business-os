@@ -35,11 +35,51 @@ function nodeRadius(linkCount: number): number {
 function folderOf(path: string): string {
   return path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "(שורש)";
 }
-function nodeFill(linkCount: number, selected: boolean): string {
-  if (selected) return "var(--os-accent-cyan, #35c0c9)";
-  if (linkCount === 0) return "var(--os-muted, #6b7686)";
-  if (linkCount >= 4) return "var(--os-accent-violet, #8b7bff)";
-  return "var(--os-accent-blue, #4a86e8)";
+// Glowing cluster palette (distinct hues → the multi-region "brain" look).
+const CLUSTER_PALETTE = ["#35c0c9", "#8b7bff", "#37b06a", "#e6a23c", "#4a86e8", "#e06699", "#2bb8a3", "#6d7bd6", "#d98a4a"];
+const ORPHAN_COLOR = "#6b7686";
+
+/** Deterministic community detection (label propagation). Real structure only — each node
+ *  adopts the most common label among its neighbors; ties + order broken lexicographically,
+ *  so communities are stable across reloads (no Math.random). Disconnected notes keep their
+ *  own label (their own single-node community). */
+function computeClusters(nodes: GraphNode[], edges: GraphEdge[]): Map<string, string> {
+  const ids = nodes.map((n) => n.id).sort();
+  const nbr = new Map<string, string[]>();
+  ids.forEach((id) => nbr.set(id, []));
+  for (const e of edges) {
+    if (nbr.has(e.source) && nbr.has(e.target)) {
+      nbr.get(e.source)!.push(e.target);
+      nbr.get(e.target)!.push(e.source);
+    }
+  }
+  const label = new Map<string, string>(ids.map((id) => [id, id]));
+  for (let iter = 0; iter < 8; iter++) {
+    let changed = false;
+    for (const id of ids) {
+      const neighbors = nbr.get(id)!;
+      if (neighbors.length === 0) continue;
+      const counts = new Map<string, number>();
+      for (const n of neighbors) {
+        const l = label.get(n)!;
+        counts.set(l, (counts.get(l) ?? 0) + 1);
+      }
+      let best = label.get(id)!;
+      let bestCount = -1;
+      for (const [l, c] of [...counts].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+        if (c > bestCount) {
+          bestCount = c;
+          best = l;
+        }
+      }
+      if (best !== label.get(id)) {
+        label.set(id, best);
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+  return label;
 }
 
 type Phase = "idle" | "loading" | "loaded" | "disconnected" | "error";
@@ -103,6 +143,43 @@ export function KnowledgeGraphPanel(): ReactElement {
     return m;
   }, [graph]);
   const degreeOf = useCallback((id: string) => degreeMap.get(id) ?? 0, [degreeMap]);
+
+  // Real, deterministic communities → per-cluster color + a named legend (hub of each
+  // community). Clusters drive spatial separation (cluster forces) and node color.
+  const clusters = useMemo(() => (graph ? computeClusters(graph.nodes, graph.edges) : new Map<string, string>()), [graph]);
+  const clusterColor = useMemo(() => {
+    const keys = [...new Set([...clusters.values()])].sort();
+    const m = new Map<string, string>();
+    keys.forEach((k, i) => m.set(k, CLUSTER_PALETTE[i % CLUSTER_PALETTE.length]!));
+    return m;
+  }, [clusters]);
+  const colorOf = useCallback(
+    (id: string, linkCount: number, selected: boolean): string => {
+      if (selected) return "#35c0c9";
+      if (linkCount === 0) return ORPHAN_COLOR;
+      return clusterColor.get(clusters.get(id) ?? "") ?? "#4a86e8";
+    },
+    [clusters, clusterColor],
+  );
+  const clusterOf = useCallback((id: string) => clusters.get(id) ?? "", [clusters]);
+  // Legend: each multi-note community named by its highest-degree hub note.
+  const legend = useMemo(() => {
+    if (!graph) return [] as Array<{ key: string; hubId: string; color: string; name: string; count: number }>;
+    const members = new Map<string, GraphNode[]>();
+    for (const nd of graph.nodes) {
+      const k = clusters.get(nd.id) ?? "";
+      if (!members.has(k)) members.set(k, []);
+      members.get(k)!.push(nd);
+    }
+    return [...members.entries()]
+      .map(([key, ms]) => {
+        const hub = [...ms].sort((a, b) => b.linkCount - a.linkCount)[0]!;
+        return { key, hubId: hub.id, color: clusterColor.get(key) ?? "#4a86e8", name: hub.basename, count: ms.length };
+      })
+      .filter((c) => c.count > 1)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+  }, [graph, clusters, clusterColor]);
 
   const allTags = useMemo(() => {
     const s = new Set<string>();
@@ -286,6 +363,8 @@ export function KnowledgeGraphPanel(): ReactElement {
                   onSelect={setSelected}
                   degreeOf={degreeOf}
                   isDimmed={isDimmed}
+                  clusterOf={clusterOf}
+                  autoFit
                   reducedMotion={reduced}
                   onReady={(api) => {
                     apiRef.current = api;
@@ -294,10 +373,12 @@ export function KnowledgeGraphPanel(): ReactElement {
                   labelFor={(n) => n.basename}
                   renderNode={(n, ctx) => {
                     const r = nodeRadius(n.linkCount);
-                    const fill = nodeFill(n.linkCount, ctx.selected);
+                    const fill = colorOf(n.id, n.linkCount, ctx.selected);
+                    const hub = n.linkCount >= 4;
                     return (
                       <>
-                        {(ctx.selected || ctx.hovered) && <circle r={r + 8} fill={fill} opacity={0.18} />}
+                        {/* per-node glow — stronger for hubs / selected / hovered (soft cluster luminance) */}
+                        {(ctx.selected || ctx.hovered || hub) && <circle r={r + (ctx.selected || ctx.hovered ? 9 : 6)} fill={fill} opacity={ctx.selected || ctx.hovered ? 0.22 : 0.13} />}
                         <circle r={r} fill={fill} stroke={ctx.selected ? "var(--os-text)" : "var(--os-surface-1)"} strokeWidth={ctx.selected ? 2.5 : 1.5} style={{ transition: reduced ? undefined : "r 140ms ease" }} />
                       </>
                     );
@@ -307,6 +388,21 @@ export function KnowledgeGraphPanel(): ReactElement {
                 <div className="tvg-source" data-testid="obsidian-graph-source">
                   מקור: <b>Obsidian</b> · {vaultName} · מפת קישורים חיה{graph.truncated ? " · תת-קבוצה (גרף גדול מהמכסה)" : ""}
                 </div>
+
+                {/* Cluster legend — real communities, each named by its hub note. */}
+                {legend.length > 1 && !selectedNode && (
+                  <div className="tvg-fadein" data-testid="obsidian-graph-legend" style={{ position: "absolute", bottom: 12, insetInlineEnd: 12, zIndex: 3, display: "grid", gap: 4, maxWidth: "46%", padding: "8px 10px", borderRadius: 10, background: "color-mix(in srgb, var(--os-surface-2) 82%, transparent)", backdropFilter: "blur(6px)", boxShadow: "inset 0 0 0 1px var(--os-border)", fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-text-2)" }}>
+                    <span style={{ fontWeight: 600, color: "var(--os-text)" }}>אשכולות ({legend.length})</span>
+                    {legend.map((c) => (
+                      <button key={c.key} type="button" onClick={() => selectAndFocus(c.hubId)} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", padding: 0, cursor: "pointer", color: "inherit", font: "inherit", textAlign: "start" }}>
+                        <span aria-hidden style={{ width: 9, height: 9, borderRadius: 999, background: c.color, boxShadow: `0 0 6px ${c.color}`, flex: "0 0 auto" }} />
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {c.name} <span style={muted}>· {c.count}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {selectedNode && (
                   <aside className="tvg-inspector" data-testid="obsidian-graph-details" style={stack("var(--os-space-2)")}>

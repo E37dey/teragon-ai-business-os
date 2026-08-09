@@ -81,6 +81,20 @@ all 20 node groups carry `data-node-id` with the d3-drag behavior attached. Harn
 identical engine + `.tvg-canvas` shell + inspector are used by the live Knowledge Graph (unit-tested with real
 bridge-shaped data; earlier in the branch the live vault rendered 14 nodes / 32 edges).
 
+## Cluster-aware layout (real communities, colored) — the "brain" look
+
+Nodes are grouped into **real, deterministic communities** via label propagation (each note adopts the most common
+label among its neighbors; ties + processing order broken lexicographically → stable across reloads, no
+`Math.random`; disconnected notes form their own single-note community). Communities drive: (a) **per-cluster
+color** from a glowing palette, (b) **spatial separation** — a weak `forceX/forceY` pulls each community toward its
+own deterministic anchor so clusters occupy distinct regions, and (c) a compact **legend** naming each multi-note
+community by its highest-degree hub note (click → focus that hub). Orphans (degree 0) stay muted grey; hubs get a
+stronger glow. Structure only — a note's cluster/color is derived from real links, never fabricated. On load the
+graph **auto-fits** to the canvas (fills the space — no "tiny graph in empty space"). Touch: the SVG sets
+`touch-action:none` so pan/zoom/drag work on mobile. **Validated** (throwaway harness, 20 nodes): 2 real
+communities detected, spatially separated, two distinct cluster fills + hub glow, `autoFit` produced
+`scale 0.64` centered.
+
 ## Agent Network (exactly the 7 canonical agents) — redesigned entities
 
 Reads the real `AGENT_DEFINITIONS` (no invented agents, no duplicate registry): `ag-orchestrator` (מנהל התזמור),

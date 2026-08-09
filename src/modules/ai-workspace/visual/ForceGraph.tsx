@@ -5,7 +5,7 @@
 // frame) for performance. Rendering of each node is delegated to the caller.
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
-import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, type Simulation } from "d3-force";
+import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY, type Simulation } from "d3-force";
 import { select } from "d3-selection";
 import "d3-transition"; // augments Selection.prototype.transition for smooth camera tweens
 import { zoom as d3zoom, zoomIdentity, type ZoomBehavior } from "d3-zoom";
@@ -51,6 +51,11 @@ export interface ForceGraphProps<N extends FGNodeBase> {
   labelFor: (node: N) => string;
   degreeOf: (id: string) => number;
   isDimmed?: (id: string) => boolean;
+  /** Optional community/cluster key per node — drives spatial separation (cluster forces).
+   *  Real, deterministic (folder / connected component) — never fabricated. */
+  clusterOf?: (id: string) => string;
+  /** Fit the settled graph to the viewport once on mount (fills the canvas → no dead space). */
+  autoFit?: boolean;
   reducedMotion?: boolean;
   onReady?: (api: ForceGraphApi) => void;
   ariaLabel?: string;
@@ -71,6 +76,8 @@ export function ForceGraph<N extends FGNodeBase>({
   labelFor,
   degreeOf,
   isDimmed,
+  clusterOf,
+  autoFit,
   reducedMotion = false,
   onReady,
   ariaLabel,
@@ -115,6 +122,23 @@ export function ForceGraph<N extends FGNodeBase>({
       .force("center", forceCenter(WIDTH / 2, HEIGHT / 2))
       .alpha(1)
       .alphaDecay(reducedMotion ? 0.2 : 0.028);
+
+    // Cluster forces: pull each community toward its own anchor so clusters separate
+    // spatially (the multi-region "brain" look). Anchors are deterministic (cluster order
+    // → evenly spaced ring), so the layout is stable across reloads.
+    if (clusterOf) {
+      const clusterKeys = [...new Set(nodes.map((n) => clusterOf(n.id)))];
+      if (clusterKeys.length > 1) {
+        const anchor = new Map<string, { x: number; y: number }>();
+        clusterKeys.forEach((k, i) => {
+          const a = (i / clusterKeys.length) * Math.PI * 2 - Math.PI / 2;
+          anchor.set(k, { x: WIDTH / 2 + Math.cos(a) * WIDTH * 0.26, y: HEIGHT / 2 + Math.sin(a) * HEIGHT * 0.3 });
+        });
+        sim
+          .force("clusterX", forceX<SimNode>((d) => anchor.get(clusterOf(d.id))?.x ?? WIDTH / 2).strength(0.08))
+          .force("clusterY", forceY<SimNode>((d) => anchor.get(clusterOf(d.id))?.y ?? HEIGHT / 2).strength(0.08));
+      }
+    }
 
     const paint = (): void => {
       for (const [id, el] of nodeEls.current) {
@@ -217,7 +241,10 @@ export function ForceGraph<N extends FGNodeBase>({
       zoomBy: (factor: number) => svgSel.transition().duration(180).call(z.scaleBy as never, factor),
     };
     onReady?.(api);
+    // Fit once after the simulation has had time to settle → the graph fills the canvas.
+    const fitTimer = autoFit ? setTimeout(() => api.fit(), reducedMotion ? 80 : 1100) : null;
     return () => {
+      if (fitTimer) clearTimeout(fitTimer);
       svgSel.on(".zoom", null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -232,7 +259,7 @@ export function ForceGraph<N extends FGNodeBase>({
       role="img"
       aria-label={ariaLabel}
       viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-      style={{ width: "100%", height: "100%", display: "block", cursor: "grab" }}
+      style={{ width: "100%", height: "100%", display: "block", cursor: "grab", touchAction: "none" }}
       onClick={(e) => {
         if (e.target === svgRef.current) onSelect(null);
       }}
