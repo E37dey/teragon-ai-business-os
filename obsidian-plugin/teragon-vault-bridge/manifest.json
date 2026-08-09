@@ -1,9 +1,9 @@
 {
   "id": "teragon-vault-bridge",
-  "name": "TERAGON Vault Bridge (Phase 1)",
-  "version": "0.2.0",
+  "name": "TERAGON Vault Bridge (Phase 3)",
+  "version": "0.3.0",
   "minAppVersion": "1.4.0",
-  "description": "Development-only, READ-ONLY loopback bridge that exposes bounded Vault metadata to TERAGON on 127.0.0.1. No writes, no sync, no external network.",
+  "description": "Development-only loopback bridge on 127.0.0.1: bounded read access + three human-approved, hash-guarded, idempotent Markdown write endpoints. No delete/rename/move, no sync, no external network.",
   "author": "TERAGON",
   "isDesktopOnly": true
 }

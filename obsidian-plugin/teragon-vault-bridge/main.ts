@@ -1,14 +1,13 @@
-// TERAGON Vault Bridge — Phase 0 Obsidian plugin (development-only, READ-ONLY).
-// Thin wrapper: on load it starts the shared loopback bridge (bridgeServer.mjs)
-// with an app.vault-backed read-only provider; on unload it closes the server and
-// releases the port. NOTE: this file is built by the Obsidian plugin toolchain
-// (esbuild) INSIDE Obsidian; it is intentionally OUTSIDE the TERAGON src/ tree and
-// is NOT compiled by the app. It has not been runtime-verified without an Obsidian
-// Desktop install (see OBSIDIAN_PHASE0_TRANSPORT_SPIKE.md); the transport + security
-// it relies on ARE verified via the shared bridgeServer.mjs tests + the live spike.
+// TERAGON Vault Bridge — Obsidian plugin. Thin wrapper: on load it starts the shared
+// loopback bridge (bridgeServer.mjs) with an app.vault-backed provider; on unload it
+// closes the server and releases the port. READS are GET-only. WRITES (Phase 3) go
+// through applyWrite via OFFICIAL Vault APIs only (create / process) — never raw fs —
+// and are human-approved, hash-guarded (conflict) and idempotent at the bridge layer.
+// This file is built by esbuild INSIDE Obsidian; it is intentionally OUTSIDE the
+// TERAGON src/ tree and is NOT compiled by the app.
 import { Plugin, Notice, TFile } from "obsidian";
 // eslint-disable-next-line import/extensions
-import { createBridge, generateToken, BRIDGE_VERSION } from "./bridgeServer.mjs";
+import { createBridge, generateToken, BRIDGE_VERSION, sha256 } from "./bridgeServer.mjs";
 
 const DEFAULT_PORT = 5200;
 // The TERAGON dev origin(s) allowed to call the bridge (explicit allowlist; no wildcard).
@@ -66,6 +65,40 @@ export default class TeragonVaultBridge extends Plugin {
         }
         return out;
       },
+      // Human-approved WRITE (Phase 3) via OFFICIAL Vault APIs only. create/update/append.
+      // Conflict guard: re-reads the CURRENT note and compares to the previewed hash before
+      // overwriting. Never touches .obsidian/absolute/../ /non-md (path pre-validated).
+      applyWrite: async (input: {
+        op: "create" | "update" | "append";
+        rel: string;
+        content?: string;
+        block?: string;
+        expectedHash?: string;
+      }): Promise<{ ok: boolean; code?: string; path?: string; hash?: string; currentHash?: string }> => {
+        const rel = input.rel;
+        if (input.op === "create") {
+          if (this.app.vault.getAbstractFileByPath(rel)) return { ok: false, code: "EXISTS" };
+          const created = await this.app.vault.create(rel, input.content ?? "");
+          return { ok: true, path: created.path, hash: sha256(input.content ?? "") };
+        }
+        const file = this.app.vault.getAbstractFileByPath(rel);
+        if (!(file instanceof TFile)) return { ok: false, code: "NOT_FOUND" };
+        if (file.extension !== "md" && file.extension !== "markdown") return { ok: false, code: "NOT_FOUND" };
+        // Re-read the real current note; refuse to overwrite if it changed since preview.
+        const current = await this.app.vault.read(file);
+        const currentHash = sha256(current);
+        if (currentHash !== input.expectedHash) return { ok: false, code: "CONFLICT", currentHash };
+        let next: string;
+        if (input.op === "update") {
+          next = input.content ?? "";
+        } else {
+          const block = input.block ?? "";
+          const sep = current.length === 0 || current.endsWith("\n") ? "" : "\n";
+          next = current + sep + block + (block.endsWith("\n") ? "" : "\n");
+        }
+        await this.app.vault.process(file, () => next);
+        return { ok: true, path: file.path, hash: sha256(next) };
+      },
     };
     this.bridge = createBridge({ token: this.token, allowedOrigins: ALLOWED_ORIGINS, vault });
     await (this.bridge as unknown as { start: (p: number) => Promise<unknown> }).start(DEFAULT_PORT);
@@ -79,7 +112,7 @@ export default class TeragonVaultBridge extends Plugin {
       },
     });
     // token is NEVER logged
-    console.info(`[teragon-vault-bridge] ${BRIDGE_VERSION} listening on 127.0.0.1:${DEFAULT_PORT} (read-only)`);
+    console.info(`[teragon-vault-bridge] ${BRIDGE_VERSION} listening on 127.0.0.1:${DEFAULT_PORT} (read + approved-write)`);
   }
 
   async onunload(): Promise<void> {

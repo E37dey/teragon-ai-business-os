@@ -1,20 +1,25 @@
-// TERAGON Vault Bridge — Phase 0 loopback HTTP bridge (transport/security spike).
-// SINGLE SOURCE, imported by: the Obsidian plugin (main.ts), the local spike
-// runner (run-spike.mjs), and the automated tests. READ-ONLY. GET-only.
-// Binds 127.0.0.1 ONLY. Bearer-token auth. Explicit Origin allowlist. No writes,
-// no arbitrary path params, no filesystem/shell. Fail-closed, sanitized errors.
+// TERAGON Vault Bridge — loopback HTTP bridge. SINGLE SOURCE, imported by the
+// Obsidian plugin (main.ts), the local spike runner, and the automated tests.
+// Binds 127.0.0.1 ONLY. Bearer-token auth. Explicit Origin allowlist (no wildcard).
+// READS are GET-only. WRITES (Phase 3) are three narrowly-scoped POST capability
+// endpoints — human-approved, hash-guarded (conflict), and idempotent (mutationId).
+// No generic filesystem API, no shell, no DELETE/RENAME/MOVE. Fail-closed, sanitized.
 import http from "node:http";
 import crypto from "node:crypto";
 
-export const BRIDGE_VERSION = "0.2.0-phase1";
-const MAX_BODY_BYTES = 8 * 1024; // GET has no body; anything larger is rejected
+export const BRIDGE_VERSION = "0.3.0-phase3";
+const MAX_WRITE_BYTES = 256 * 1024; // bounded write request body
 const DEFAULT_MAX_NOTES = 200;
 const MAX_NOTE_BYTES = 256 * 1024; // bounded note content; larger is truncated (never binary)
 
+/** Stable content hash shared by plugin + tests (TERAGON mirrors this with SHA-256). */
+export function sha256(s) {
+  return crypto.createHash("sha256").update(String(s), "utf8").digest("hex");
+}
+
 /**
- * Validate a Vault-relative Markdown path decoded from `/note/<encoded>`.
- * Read-only, defense-in-depth (the plugin re-checks existence via app.vault):
- * rejects traversal, absolute paths, `.obsidian` internals, and non-Markdown.
+ * Validate a Vault-relative Markdown path. Defense-in-depth (the plugin re-checks
+ * via app.vault): rejects traversal, absolute paths, `.obsidian` internals, non-Markdown.
  * @returns {string|null} the normalized relative path, or null if unsafe.
  */
 export function safeVaultNotePath(rel) {
@@ -38,22 +43,55 @@ function timingSafeEq(a, b) {
   return ba.length === bb.length && crypto.timingSafeEqual(ba, bb);
 }
 
-/**
- * @param {{ token:string, allowedOrigins?:string[], vault:{getName:()=>string, listNotes:()=>Array<{path:string,basename:string,mtime?:number}>}, maxNotes?:number }} opts
- */
+/** Read a bounded request body; resolves null if it exceeds the limit or errors.
+ * An over-limit body drains (up to a hard cap) so the caller can answer 413 cleanly. */
+function readBody(req, limit) {
+  return new Promise((resolve) => {
+    let size = 0;
+    let over = false;
+    let done = false;
+    const chunks = [];
+    const finish = (v) => {
+      if (!done) {
+        done = true;
+        resolve(v);
+      }
+    };
+    req.on("data", (c) => {
+      size += c.length;
+      if (size > limit) {
+        over = true;
+        if (size > limit * 4) {
+          finish(null);
+          req.destroy();
+        }
+        return;
+      }
+      chunks.push(c);
+    });
+    req.on("end", () => finish(over ? null : Buffer.concat(chunks).toString("utf8")));
+    req.on("error", () => finish(null));
+    req.on("aborted", () => finish(null));
+  });
+}
+
+const WRITE_PATHS = new Set(["/write/create", "/write/update", "/write/append"]);
+
 export function createBridge(opts) {
   const token = opts.token;
   const origins = new Set(opts.allowedOrigins ?? []);
   const vault = opts.vault;
   const maxNotes = opts.maxNotes ?? DEFAULT_MAX_NOTES;
+  const canWrite = typeof vault.applyWrite === "function";
+  // Idempotency ledger for this bridge instance (per plugin load / session).
+  const appliedMutations = new Map();
 
   function corsHeaders(origin) {
     const h = { Vary: "Origin" };
     if (origin && origins.has(origin)) {
       h["Access-Control-Allow-Origin"] = origin;
-      h["Access-Control-Allow-Methods"] = "GET, OPTIONS";
-      h["Access-Control-Allow-Headers"] = "Authorization";
-      // Chrome Private Network Access: allow the loopback preflight from a public/localhost page.
+      h["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
+      h["Access-Control-Allow-Headers"] = "Authorization, Content-Type";
       h["Access-Control-Allow-Private-Network"] = "true";
     }
     return h;
@@ -74,16 +112,52 @@ export function createBridge(opts) {
     return !!m && timingSafeEq(m[1], token);
   }
 
+  async function handleWrite(res, pathname, body, cors, cid) {
+    if (!canWrite) return send(res, 404, { error: "not_found", cid }, cors);
+    if (!body || typeof body !== "object") return send(res, 400, { error: "bad_request", cid }, cors);
+    const op = pathname.slice("/write/".length); // create | update | append
+    const mutationId = body.mutationId;
+    if (typeof mutationId !== "string" || mutationId.length < 8 || mutationId.length > 200) {
+      return send(res, 400, { error: "bad_request", cid }, cors);
+    }
+    const rel = safeVaultNotePath(typeof body.path === "string" ? body.path : "");
+    if (!rel) return send(res, 400, { error: "bad_request", cid }, cors);
+
+    // Idempotency: never apply the same mutationId twice (no duplicate append).
+    if (appliedMutations.has(mutationId)) {
+      return send(res, 200, { ...appliedMutations.get(mutationId), idempotent: true, cid }, cors);
+    }
+
+    let input;
+    if (op === "create") {
+      if (typeof body.content !== "string") return send(res, 400, { error: "bad_request", cid }, cors);
+      input = { op, rel, content: body.content };
+    } else if (op === "update") {
+      if (typeof body.content !== "string" || typeof body.expectedHash !== "string") return send(res, 400, { error: "bad_request", cid }, cors);
+      input = { op, rel, content: body.content, expectedHash: body.expectedHash };
+    } else if (op === "append") {
+      if (typeof body.block !== "string" || typeof body.expectedHash !== "string") return send(res, 400, { error: "bad_request", cid }, cors);
+      input = { op, rel, block: body.block, expectedHash: body.expectedHash };
+    } else {
+      return send(res, 404, { error: "not_found", cid }, cors);
+    }
+
+    const result = await Promise.resolve(vault.applyWrite(input));
+    if (!result || typeof result !== "object") return send(res, 500, { error: "internal_error", cid }, cors);
+    if (result.code === "CONFLICT") return send(res, 409, { error: "conflict", currentHash: result.currentHash ?? null, cid }, cors);
+    if (result.code === "EXISTS") return send(res, 409, { error: "already_exists", cid }, cors);
+    if (result.code === "NOT_FOUND") return send(res, 404, { error: "not_found", cid }, cors);
+    if (!result.ok) return send(res, 400, { error: "write_failed", cid }, cors);
+
+    const applied = { ok: true, applied: true, op, path: result.path, hash: result.hash, mutationId };
+    appliedMutations.set(mutationId, applied);
+    return send(res, 200, { ...applied, cid }, cors);
+  }
+
   const server = http.createServer(async (req, res) => {
     const cid = crypto.randomUUID();
     const origin = req.headers.origin;
     const cors = corsHeaders(origin);
-    // bounded body (GET should carry none)
-    let bodySize = 0;
-    req.on("data", (c) => {
-      bodySize += c.length;
-      if (bodySize > MAX_BODY_BYTES) req.destroy();
-    });
     try {
       // Reject any request that carries an Origin we do not explicitly allow.
       if (origin && !origins.has(origin)) return send(res, 403, { error: "origin_not_allowed", cid }, cors);
@@ -91,34 +165,48 @@ export function createBridge(opts) {
         res.writeHead(204, cors);
         return res.end();
       }
-      // Phase 0 is GET-only — no POST/PUT/PATCH/DELETE (no write path anywhere).
-      if (req.method !== "GET") return send(res, 405, { error: "method_not_allowed", cid }, { ...cors, Allow: "GET, OPTIONS" });
-
       const url = new URL(req.url || "/", "http://127.0.0.1");
-      // No arbitrary path/file params (no GET /file?path=...).
-      if (url.searchParams.has("path") || url.searchParams.has("file")) return send(res, 400, { error: "bad_request", cid }, cors);
-      const path = url.pathname;
+      const pathname = url.pathname;
 
-      // /health — generic bridge health, NO auth, NO vault content.
-      if (path === "/health") return send(res, 200, { ok: true, service: "teragon-vault-bridge", version: BRIDGE_VERSION, cid }, cors);
+      // /health — generic bridge health, NO auth, NO vault content. GET only.
+      if (pathname === "/health") {
+        if (req.method !== "GET") return send(res, 405, { error: "method_not_allowed", cid }, { ...cors, Allow: "GET, OPTIONS" });
+        return send(res, 200, { ok: true, service: "teragon-vault-bridge", version: BRIDGE_VERSION, cid }, cors);
+      }
 
-      // everything else requires the pairing token
+      // Everything else requires the pairing token.
       if (!isAuthed(req)) return send(res, 401, { error: "unauthorized", cid }, cors);
 
-      if (path === "/connection") {
-        return send(res, 200, { connected: true, vaultName: vault.getName(), version: BRIDGE_VERSION, readonly: true, cid }, cors);
+      // WRITE capability endpoints (Phase 3) — POST only, bounded body.
+      if (WRITE_PATHS.has(pathname)) {
+        if (req.method !== "POST") return send(res, 405, { error: "method_not_allowed", cid }, { ...cors, Allow: "POST, OPTIONS" });
+        const raw = await readBody(req, MAX_WRITE_BYTES);
+        if (raw === null) return send(res, 413, { error: "payload_too_large", cid }, cors);
+        let parsed;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          return send(res, 400, { error: "bad_request", cid }, cors);
+        }
+        return handleWrite(res, pathname, parsed, cors, cid);
       }
-      if (path === "/notes") {
+
+      // READ endpoints — GET only.
+      if (req.method !== "GET") return send(res, 405, { error: "method_not_allowed", cid }, { ...cors, Allow: "GET, OPTIONS" });
+      if (url.searchParams.has("path") || url.searchParams.has("file")) return send(res, 400, { error: "bad_request", cid }, cors);
+
+      if (pathname === "/connection") {
+        return send(res, 200, { connected: true, vaultName: vault.getName(), version: BRIDGE_VERSION, readonly: !canWrite, writeEnabled: canWrite, cid }, cors);
+      }
+      if (pathname === "/notes") {
         const all = vault.listNotes();
         const notes = all.slice(0, maxNotes).map((n) => ({ path: n.path, basename: n.basename, mtime: n.mtime ?? null }));
         return send(res, 200, { notes, count: notes.length, truncated: all.length > maxNotes, cid }, cors);
       }
-      // Bounded, validated single-note read (Phase 1). Path is carried in the URL
-      // PATHNAME (never a query param), base64url/percent-decoded then re-validated.
-      if (path.startsWith("/note/")) {
+      if (pathname.startsWith("/note/")) {
         let decoded;
         try {
-          decoded = decodeURIComponent(path.slice("/note/".length));
+          decoded = decodeURIComponent(pathname.slice("/note/".length));
         } catch {
           return send(res, 400, { error: "bad_request", cid }, cors);
         }
@@ -127,8 +215,8 @@ export function createBridge(opts) {
         if (typeof vault.readNote !== "function") return send(res, 404, { error: "not_found", cid }, cors);
         const note = await Promise.resolve(vault.readNote(rel));
         if (!note) return send(res, 404, { error: "not_found", cid }, cors);
-        const raw = typeof note.content === "string" ? note.content : "";
-        const truncated = raw.length > MAX_NOTE_BYTES;
+        const rawContent = typeof note.content === "string" ? note.content : "";
+        const truncated = rawContent.length > MAX_NOTE_BYTES;
         return send(
           res,
           200,
@@ -137,19 +225,17 @@ export function createBridge(opts) {
             basename: note.basename,
             frontmatter: note.frontmatter ?? null,
             mtime: note.mtime ?? null,
-            content: truncated ? raw.slice(0, MAX_NOTE_BYTES) : raw,
+            content: truncated ? rawContent.slice(0, MAX_NOTE_BYTES) : rawContent,
             truncated,
             cid,
           },
           cors,
         );
       }
-      // Bounded local search (Phase 1). Query carried in the URL PATHNAME (never a
-      // query param), percent-decoded, length-bounded. Read-only.
-      if (path.startsWith("/search/")) {
+      if (pathname.startsWith("/search/")) {
         let q;
         try {
-          q = decodeURIComponent(path.slice("/search/".length));
+          q = decodeURIComponent(pathname.slice("/search/".length));
         } catch {
           return send(res, 400, { error: "bad_request", cid }, cors);
         }
@@ -168,13 +254,11 @@ export function createBridge(opts) {
       }
       return send(res, 404, { error: "not_found", cid }, cors);
     } catch {
-      // sanitized: never leak a stack trace or the token
       return send(res, 500, { error: "internal_error", cid }, cors);
     }
   });
 
   return {
-    /** Bind LOOPBACK ONLY. port 0 = ephemeral (tests). */
     start(port = 0) {
       return new Promise((resolve, reject) => {
         server.once("error", reject);
