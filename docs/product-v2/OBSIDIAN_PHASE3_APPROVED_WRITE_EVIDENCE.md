@@ -6,18 +6,28 @@ Lets TERAGON write approved Markdown changes back to the connected real Obsidian
 > write proposal → exact preview/diff → explicit human approval → ONE bounded write → post-write verification.
 > No approval = no mutation. No agent-direct writes, no automatic writes, no delete/rename/move, no background sync.
 
-> **VERDICT: OBSIDIAN PHASE 3 — APPROVAL BOUNDARY SECURE + HUMAN-APPROVED WRITE BACK VALIDATED** against the
-> actual installed Obsidian Desktop 1.13.4 + synthetic vault `TERAGON OS`, from the real TERAGON browser.
-> **HTTPS_TO_LOOPBACK = UNVALIDATED.**
+> **VERDICT: OBSIDIAN PHASE 3 — HUMAN APPROVAL BOUNDARY SECURE.** Human approval is independently enforced inside
+> the Obsidian trust boundary; TERAGON client code cannot mint write authority by itself. Validated against the
+> actual installed Obsidian Desktop 1.13.4 + synthetic vault `TERAGON OS`. **HTTPS_TO_LOOPBACK = UNVALIDATED.**
 
-> **APPROVAL-BOUNDARY SECURITY FIX (pre-merge review).** An initial design authorized writes on the **pairing
-> Bearer token alone** — a live raw `POST /write/create` with only the pairing token + allowed Origin created a
-> file (approval bypass). **Fixed:** the pairing token now grants only connection/list/search/read/prepare; every
-> mutation additionally requires a **single-use HMAC write capability** keyed by a **SEPARATE `writeKey`** and
-> **bound to exactly one op / path / mutationId / contentHash / expiry**. A holder of only the pairing token
-> cannot mint one. **Proven live after the fix:** token-only write → **403 write_unauthorized** (file not
-> created); a valid capability → applied **once**; replay of the same capability → **idempotent** (no second
-> write); reuse of a capability for another path/op/content → **403**; an expired or wrong-key capability → **403**.
+> **APPROVAL-BOUNDARY SECURITY REVIEW (two findings, both fixed pre-merge).**
+>
+> **Finding 1 — pairing-token bypass (Property A).** An initial design authorized writes on the **pairing Bearer
+> token alone** (live: token-only `POST /write/create` created a file). **Fixed:** the pairing token grants only
+> connection/list/search/read/prepare; each mutation additionally requires a **single-use HMAC capability** keyed
+> by a **SEPARATE `writeKey`**, bound to exactly one op/path/mutationId/contentHash/expiry. Live after fix:
+> token-only → **403 write_unauthorized**; wrong-key/expired capability → **403**; capability reuse for another
+> path/op/content → **403**.
+>
+> **Finding 2 — reusable client secret ≠ human approval (Property B).** With the `writeKey` in the TERAGON JS
+> runtime, any TERAGON call path (app code / DevTools / injected JS) could mint a valid capability and write
+> **without the user approving** (live: a signed request applied with no proposal). A reusable client-side secret
+> is **not** an independent human-approval authority. **Fixed (Design A):** writes are **staged** to the plugin,
+> which shows a **LOCAL confirmation Modal inside Obsidian**; `app.vault` is touched **only** when the human clicks
+> Approve **there**, for that exact intent. **Proven live:** a fully-signed staged write with **no** in-Obsidian
+> click → **not applied** (Vault unchanged); a human-approved intent → **applied once** + read-back verified. So
+> **possession of the pairing token AND the writeKey is still insufficient** — the in-Obsidian human decision is
+> required, and it is enforced inside the trusted plugin, not the TERAGON client.
 
 ## Allowed operations
 
@@ -43,19 +53,24 @@ appendBlock, proposedHash, createdAt, requesterId/Name, correlationId, mutationI
 approvedAt, resultHash, failureCode }`. States: `PROPOSED → APPROVED → WRITTEN | CONFLICT | FAILED`, or
 `PROPOSED → REJECTED`. Creating a proposal performs **no** bridge write.
 
-## Write authorization (bridge-side) — the non-forgeable boundary
+## Write authorization — two independent layers, human approval enforced in-plugin
 
-- **Connection auth** = the pairing Bearer token. Grants **only** connection / list / search / read / request
-  preparation. It does **not** independently authorize any mutation.
-- **Write authorization** = a per-write **HMAC-SHA256 capability** keyed by a **SEPARATE `writeKey`** (a distinct
-  per-load secret, revealed via its own Obsidian command *"Copy TERAGON write key (once)"*, paired into TERAGON
-  `sessionStorage` under `teragon.obsidian.writeKey`, cleared on disconnect). The capability signs the canonical
-  message `op\npath\nmutationId\ncontentHash\nexp`, so it is **single-use** (mutationId ledger), **short-lived**
-  (`exp`, ≤10 min bound), **replay-rejected**, and **cannot** authorize a different op / path / content. The
-  plugin verifies it (constant-time) **before** touching `app.vault`. The bridge does **not** trust any
-  client-supplied `approved`/`approvedBy`/`proposalId` field — only the cryptographic capability.
-- A bridge started without a `writeKey` exposes **no** write capability at all (`/write/*` → 404,
-  `/connection.writeEnabled = false`).
+**Layer 1 — connection vs write secret.** The pairing Bearer token grants **only**
+connection/list/search/read/prepare. Each write additionally requires a **single-use HMAC-SHA256 capability**
+keyed by a **SEPARATE `writeKey`** (distinct per-load secret; its own Obsidian command *"Copy TERAGON write key
+(once)"*; paired into `sessionStorage` under `teragon.obsidian.writeKey`, cleared on disconnect). The capability
+signs `op\npath\nmutationId\ncontentHash\nexp` — **single-use** (mutationId ledger), **short-lived** (`exp`,
+≤10 min), **replay-rejected**, **non-transferable** to another op/path/content, verified constant-time. A bridge
+without a `writeKey` exposes no write capability (`/write/*` → 404). This defeats a **pairing-token-only** caller.
+
+**Layer 2 — in-Obsidian human confirmation (the authoritative gate).** Because the `writeKey` lives in the
+TERAGON runtime, Layer 1 alone cannot distinguish "the user approved" from "client code signed a request". So the
+write is **staged**, not applied: `POST /write/create|update|append` blocks in the plugin while a **local
+confirmation Modal is shown inside Obsidian** (operation, path, expected/proposed hashes, bounded preview). Only
+the human clicking **Approve there** causes `app.vault` to be touched — for that exact staged intent — after the
+conflict re-read. Reject / dismiss / timeout → `403 write_rejected` / `write_expired`, **no** mutation. The bridge
+trusts **no** client-supplied `approved`/`approvedBy`/`proposalId` claim; the authority is the human's in-Obsidian
+click, enforced inside the trusted plugin process — **outside** the reach of TERAGON JS.
 
 ## Approval boundary + identity (TERAGON-side)
 
@@ -67,10 +82,14 @@ governance identity (`CEO_USER_ID`/`CEO_NAME_HE` = `u-tzachi`/`צחי זוסטי
 a new Phase-3 hardcoded approver; the write UI does not impersonate independently of the workflow identity, and
 this identity has **no** bearing on bridge authorization (which is the cryptographic capability above).
 
-**Honest scope of the guarantee:** the capability proves *knowledge of the separate write secret* — i.e. it makes
-**possession of the pairing token alone insufficient to mutate the Vault** (the required property). The per-write
-*human* approval remains a TERAGON-side gate (the `writeKey` holder). A separate in-Obsidian human confirmation
-per write was not added; the bridge-side guarantee is "a second, write-specific secret is required."
+**Honest scope of the guarantee.** Human approval is **independently enforced inside the Obsidian trust
+boundary**: `app.vault` is touched only on the human's in-plugin click, which no TERAGON secret or call path can
+substitute for. The TERAGON-side "אשר כתיבה" is UX that *initiates* a staged intent; it is not the authority.
+**Runtime validation method (honest):** the **negative** path (fully-signed stage → no in-Obsidian click → not
+applied) was validated against the **real** Obsidian confirmation Modal; the **positive** path (approve → applied
+once) was validated with a **dev-only toggle** that simulates the human's click (reverted before commit), because
+Obsidian's native Modal cannot be auto-clicked by browser automation — the mechanism itself is additionally
+proven by the unit tests (`stageWrite` decision approve/reject/expire).
 
 ## Preview / diff
 
