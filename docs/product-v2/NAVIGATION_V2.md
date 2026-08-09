@@ -47,7 +47,7 @@ Primary everyday nav shrinks from 28 interleaved items to **~13 business routes*
 ### Naming fixes
 
 - `/memory` "זיכרון ארגוני · Obsidian" → **"זיכרון ארגוני (מקומי)"** until a real vault adapter exists
-  (see OBSIDIAN_MEMORY_REALITY.md — the integration is not connected).
+  (see OBSIDIAN_MEMORY_REALITY.md — corrected S13.7: a manual Obsidian import/export bridge is connected; no live vault sync).
 - Rename `/agents` surface to **"סביבת עבודת AI" (AI Workspace)** and merge the collaboration room into it
   (see AI_WORKSPACE_V2.md) so agents feel like one live surface, not two disconnected pages.
 

@@ -1,15 +1,37 @@
-# Obsidian Memory — Reality Investigation (S13.0)
+# Obsidian Memory — Reality Investigation (S13.0, **verdict corrected S13.7**)
 
-**Verdict: `OBSIDIAN MEMORY NOT CONNECTED`.**
-TERAGON is **not** connected to any real Obsidian vault. It never reads a `.obsidian`
-vault, never accesses the filesystem, and never writes `.md` files to disk. What exists
-is a browser-only Markdown **import/export** feature whose data lives in **IndexedDB**
-(local, per-browser) — not Obsidian, not a shared vault, and (by default) not Supabase.
+> **CORRECTION (S13.7):** the original S13.0 verdict "OBSIDIAN MEMORY NOT CONNECTED" was **imprecise**.
+> A **functional Obsidian import/export bridge does exist** and is wired into `/memory`. The accurate
+> classification is **`MANUAL_IMPORT + MANUAL_EXPORT` (Obsidian-compatible, governed)** — see below.
+> What remains true from S13.0 is the *narrower* fact: there is **no live vault sync** and **no direct
+> local-folder access**. The detailed file-level evidence below (no File System Access API, IndexedDB
+> storage, noop agent search port) is unchanged and still correct; only the top-line label is corrected.
 
-The classification is **LOCAL_ONLY** — more than a mockup (real IndexedDB persistence,
+**Corrected verdict: `OBSIDIAN — MANUAL IMPORT/EXPORT BRIDGE (functional, governed) · NOT a live vault sync`.**
+
+TERAGON **is** connected to Obsidian **through a manual, Obsidian-compatible Markdown/ZIP import and
+export** (`src/memory/import/*`, `src/memory/export/*`, `ObsidianVaultAdapter` in
+`src/memory/import/vaultAdapter.ts`), surfaced on `/memory` via `ImportPanel` + `ExportPanel`. It parses
+Obsidian frontmatter + wikilinks, imports through a secure staged pipeline that creates **proposals only**
+(writes to memory require explicit human approval), and exports an audited + checksummed download the user
+can place into their own vault. The app's own status line is honest and dual:
+`"ייבוא וייצוא Obsidian פעיל"` **and** `"גישה מקומית ישירה אינה פעילה"` (`src/memory/export/status.ts`).
+
+It is **not** a live two-way vault sync: it never opens an `.obsidian` folder handle (no File System Access
+API — grep 0 hits), never auto-syncs, and has no direct local-folder access. It is **user-triggered** (file
+picker in, browser download out), functional (real markdown/frontmatter/wikilink/ZIP engines + governed
+pipeline — not a mock), and browser-local. The underlying storage is **IndexedDB** (governed `memoryRecords`);
+Obsidian is the **file-format transport bridge**, architecturally distinct from IndexedDB storage. The
+separate `memoryEntries` local CRUD (PR D) has **no** Obsidian bridge — it is IndexedDB-only.
+
+---
+
+*(Original S13.0 investigation text retained below for the record.)*
+
+The S13.0 classification was **LOCAL_ONLY** — more than a mockup (real IndexedDB persistence,
 real markdown parse/serialize, real zip encode, governed proposal→approval flow), but
-**not** a live external integration. The "Obsidian" branding refers to Obsidian-*compatible*
-markdown/frontmatter format, not a live vault link. The app's own UI states this honestly:
+**not** a live external *vault-sync* integration. The "Obsidian" branding refers to Obsidian-*compatible*
+markdown/frontmatter format plus the manual import/export bridge, not a live vault link. The app's own UI states this honestly:
 `"גישה מקומית ישירה אינה פעילה"` (direct local access is not active) — `src/memory/export/status.ts:5-6`.
 
 ## Traced data flow (end-to-end)

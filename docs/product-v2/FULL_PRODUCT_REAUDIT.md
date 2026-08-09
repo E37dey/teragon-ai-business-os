@@ -93,6 +93,6 @@ activity timeline (PR C).
 
 ## G. Obsidian memory (summary — full detail in OBSIDIAN_MEMORY_REALITY)
 
-**OBSIDIAN MEMORY NOT CONNECTED.** No vault, no filesystem, no `.md` writes; storage is browser
+**OBSIDIAN — NO LIVE VAULT SYNC** (corrected S13.7: a **manual, functional Obsidian import/export bridge does exist**; what's absent is a *live vault sync* — no folder handle, no filesystem, no auto `.md` writes). Storage is browser
 **IndexedDB**; agent-side memory search is a **noop** (`wikiAgent.ts:54`). Classification LOCAL_ONLY. The
 code is honest about it; the **nav label over-promises**. Fix = rename now, real adapter later (PR D).
