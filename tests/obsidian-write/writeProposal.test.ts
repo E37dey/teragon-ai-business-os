@@ -13,30 +13,38 @@ import {
 
 function writableVault(initial: Record<string, string> = {}) {
   const files = new Map(Object.entries(initial));
+  let decision = "approve"; // simulated in-Obsidian human decision
+  const apply = (input: { op: string; rel: string; content?: string; block?: string; expectedHash?: string }) => {
+    const rel = input.rel;
+    if (input.op === "create") {
+      if (files.has(rel)) return { ok: false, code: "EXISTS" };
+      files.set(rel, input.content ?? "");
+      return { ok: true, path: rel, hash: sha256(input.content ?? "") };
+    }
+    if (!files.has(rel)) return { ok: false, code: "NOT_FOUND" };
+    const current = files.get(rel)!;
+    if (sha256(current) !== input.expectedHash) return { ok: false, code: "CONFLICT", currentHash: sha256(current) };
+    let next: string;
+    if (input.op === "update") next = input.content ?? "";
+    else {
+      const sep = current.length === 0 || current.endsWith("\n") ? "" : "\n";
+      next = current + sep + (input.block ?? "") + ((input.block ?? "").endsWith("\n") ? "" : "\n");
+    }
+    files.set(rel, next);
+    return { ok: true, path: rel, hash: sha256(next) };
+  };
   return {
     getName: () => "WriteVault",
     listNotes: () => [...files.keys()].map((p) => ({ path: p, basename: p, mtime: 1 })),
     readNote: (rel: string) => (files.has(rel) ? { path: rel, basename: rel, frontmatter: null, mtime: 1, content: files.get(rel) } : null),
-    applyWrite: (input: { op: string; rel: string; content?: string; block?: string; expectedHash?: string }) => {
-      const rel = input.rel;
-      if (input.op === "create") {
-        if (files.has(rel)) return { ok: false, code: "EXISTS" };
-        files.set(rel, input.content ?? "");
-        return { ok: true, path: rel, hash: sha256(input.content ?? "") };
-      }
-      if (!files.has(rel)) return { ok: false, code: "NOT_FOUND" };
-      const current = files.get(rel)!;
-      if (sha256(current) !== input.expectedHash) return { ok: false, code: "CONFLICT", currentHash: sha256(current) };
-      let next: string;
-      if (input.op === "update") next = input.content ?? "";
-      else {
-        const sep = current.length === 0 || current.endsWith("\n") ? "" : "\n";
-        next = current + sep + (input.block ?? "") + ((input.block ?? "").endsWith("\n") ? "" : "\n");
-      }
-      files.set(rel, next);
-      return { ok: true, path: rel, hash: sha256(next) };
+    stageWrite: async (input: { op: string; rel: string; content?: string; block?: string; expectedHash?: string }) => {
+      if (decision === "reject") return { ok: false, code: "REJECTED" };
+      return apply(input);
     },
     _files: files,
+    _setDecision: (d: string) => {
+      decision = d;
+    },
   };
 }
 
@@ -74,6 +82,19 @@ describe("write proposal — no mutation before approval", () => {
     const afterExec = await exec(rejected); // not APPROVED → no-op
     expect(afterExec.state).toBe("REJECTED");
     expect(vault._files.has("R.md")).toBe(false);
+  });
+
+  it("if the human REJECTS inside Obsidian, the proposal ends REJECTED and the Vault is unchanged", async () => {
+    vault._setDecision("reject");
+    const before = new Map(vault._files);
+    const approved = approveWriteProposal(
+      await createWriteProposal({ operation: "create", vaultName: "WriteVault", path: "HumanReject.md", proposedContent: "x\n" }),
+      WHO,
+    );
+    const done = await exec(approved);
+    expect(done.state).toBe("REJECTED");
+    expect(vault._files).toEqual(before);
+    expect(vault._files.has("HumanReject.md")).toBe(false);
   });
 
   it("without a write key, an approved proposal is REFUSED (pairing token alone cannot write)", async () => {

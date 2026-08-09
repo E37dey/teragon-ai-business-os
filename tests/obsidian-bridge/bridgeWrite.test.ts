@@ -8,32 +8,43 @@ const TOKEN = "phase3-write-token";
 const WRITEKEY = "phase3-write-key-SEPARATE";
 const ALLOWED = "http://localhost:4173";
 
+// `stageWrite` models the plugin: it applies ONLY when the (simulated) in-Obsidian
+// human decision is "approve". "reject"/"expire" model no human approval.
 function writableVault(initial = {}) {
   const files = new Map(Object.entries(initial));
+  let decision = "approve";
+  const apply = (input) => {
+    const rel = input.rel;
+    if (input.op === "create") {
+      if (files.has(rel)) return { ok: false, code: "EXISTS" };
+      files.set(rel, input.content);
+      return { ok: true, path: rel, hash: sha256(input.content) };
+    }
+    if (!files.has(rel)) return { ok: false, code: "NOT_FOUND" };
+    const current = files.get(rel);
+    if (sha256(current) !== input.expectedHash) return { ok: false, code: "CONFLICT", currentHash: sha256(current) };
+    let next;
+    if (input.op === "update") next = input.content;
+    else {
+      const sep = current.length === 0 || current.endsWith("\n") ? "" : "\n";
+      next = current + sep + input.block + (input.block.endsWith("\n") ? "" : "\n");
+    }
+    files.set(rel, next);
+    return { ok: true, path: rel, hash: sha256(next) };
+  };
   return {
     getName: () => "WriteVault",
     listNotes: () => [...files.keys()].map((p) => ({ path: p, basename: p, mtime: 1 })),
     readNote: (rel) => (files.has(rel) ? { path: rel, basename: rel, frontmatter: null, mtime: 1, content: files.get(rel) } : null),
-    applyWrite: (input) => {
-      const rel = input.rel;
-      if (input.op === "create") {
-        if (files.has(rel)) return { ok: false, code: "EXISTS" };
-        files.set(rel, input.content);
-        return { ok: true, path: rel, hash: sha256(input.content) };
-      }
-      if (!files.has(rel)) return { ok: false, code: "NOT_FOUND" };
-      const current = files.get(rel);
-      if (sha256(current) !== input.expectedHash) return { ok: false, code: "CONFLICT", currentHash: sha256(current) };
-      let next;
-      if (input.op === "update") next = input.content;
-      else {
-        const sep = current.length === 0 || current.endsWith("\n") ? "" : "\n";
-        next = current + sep + input.block + (input.block.endsWith("\n") ? "" : "\n");
-      }
-      files.set(rel, next);
-      return { ok: true, path: rel, hash: sha256(next) };
+    stageWrite: async (input) => {
+      if (decision === "reject") return { ok: false, code: "REJECTED" };
+      if (decision === "expire") return { ok: false, code: "EXPIRED" };
+      return apply(input);
     },
     _files: files,
+    _setDecision: (d) => {
+      decision = d;
+    },
   };
 }
 
@@ -107,7 +118,36 @@ describe("APPROVAL BOUNDARY — pairing token alone cannot authorize a Vault mut
   });
 });
 
-describe("write with a valid capability — applied exactly once, idempotent replay", () => {
+describe("HUMAN APPROVAL BOUNDARY — a valid capability still cannot mutate without in-Obsidian approval", () => {
+  it("valid token + valid capability but the human REJECTS in Obsidian → 403, Vault unchanged", async () => {
+    vault._setDecision("reject");
+    const before = new Map(vault._files);
+    const r = await post("/write/create", signed("create", { mutationId: mid("hr"), path: "Rejected.md", content: "x\n" }));
+    expect(r.status).toBe(403);
+    expect((await r.json()).error).toBe("write_rejected");
+    expect(vault._files).toEqual(before);
+    expect(vault._files.has("Rejected.md")).toBe(false);
+  });
+
+  it("valid token + valid capability but the human never confirms (timeout) → 403, Vault unchanged", async () => {
+    vault._setDecision("expire");
+    const before = new Map(vault._files);
+    const r = await post("/write/create", signed("create", { mutationId: mid("he"), path: "Expired.md", content: "x\n" }));
+    expect(r.status).toBe(403);
+    expect((await r.json()).error).toBe("write_expired");
+    expect(vault._files).toEqual(before);
+  });
+
+  it("only the exact HUMAN-APPROVED intent is applied — and exactly once", async () => {
+    vault._setDecision("approve");
+    const r = await post("/write/create", signed("create", { mutationId: mid("ha"), path: "Approved.md", content: "# ok\n" }));
+    expect(r.status).toBe(200);
+    expect((await r.json()).applied).toBe(true);
+    expect(vault._files.get("Approved.md")).toBe("# ok\n");
+  });
+});
+
+describe("write with a valid capability + human approval — applied exactly once, idempotent replay", () => {
   it("create applies once; second create of same path → 409", async () => {
     const r = await post("/write/create", signed("create", { mutationId: mid("c1"), path: "New Note.md", content: "# New\n\nhi\n" }));
     expect(r.status).toBe(200);
