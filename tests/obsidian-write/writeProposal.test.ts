@@ -41,20 +41,21 @@ function writableVault(initial: Record<string, string> = {}) {
 }
 
 const WHO = { id: "u-tzachi", name: "צחי זוסטייהם" };
+const WRITEKEY = "service-write-key";
 let bridge: { close: () => Promise<void>; start: (p: number) => Promise<{ port: number }> };
 let base: string;
 let vault: ReturnType<typeof writableVault>;
 
 beforeEach(async () => {
   vault = writableVault({ "Existing.md": "# Existing\n\nline1\n" });
-  bridge = createBridge({ token: "t", allowedOrigins: [], vault });
+  bridge = createBridge({ token: "t", writeKey: WRITEKEY, allowedOrigins: [], vault });
   base = `http://127.0.0.1:${(await bridge.start(0)).port}`;
 });
 afterEach(async () => {
   await bridge.close();
 });
 
-const exec = (p: WriteProposal) => executeWriteProposal(p, { token: "t", baseUrl: base });
+const exec = (p: WriteProposal) => executeWriteProposal(p, { token: "t", writeKey: WRITEKEY, baseUrl: base });
 
 describe("write proposal — no mutation before approval", () => {
   it("proposing performs NO bridge write", async () => {
@@ -73,6 +74,18 @@ describe("write proposal — no mutation before approval", () => {
     const afterExec = await exec(rejected); // not APPROVED → no-op
     expect(afterExec.state).toBe("REJECTED");
     expect(vault._files.has("R.md")).toBe(false);
+  });
+
+  it("without a write key, an approved proposal is REFUSED (pairing token alone cannot write)", async () => {
+    const approved = approveWriteProposal(
+      await createWriteProposal({ operation: "create", vaultName: "WriteVault", path: "NoKey.md", proposedContent: "x\n" }),
+      WHO,
+    );
+    // token present, writeKey explicitly empty → service refuses before any write
+    const done = await executeWriteProposal(approved, { token: "t", writeKey: null, baseUrl: base });
+    expect(done.state).toBe("FAILED");
+    expect(done.failureCode).toBe("WRITE_UNAUTHORIZED");
+    expect(vault._files.has("NoKey.md")).toBe(false);
   });
 });
 

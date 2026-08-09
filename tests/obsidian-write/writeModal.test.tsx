@@ -16,6 +16,7 @@ vi.mock("@/integration/obsidian/obsidianWrite", async (importOriginal) => {
 });
 
 import { createWriteProposal, executeWriteProposal } from "@/integration/obsidian/obsidianWrite";
+import { clearObsidianWriteKey, setObsidianWriteKey } from "@/integration/obsidian/obsidianCredential";
 import { WriteProposeModal } from "@/modules/memory/obsidian/WriteProposeModal";
 
 const mkProposal = vi.mocked(createWriteProposal);
@@ -61,9 +62,14 @@ async function toPreview() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sessionStorage.clear();
+  setObsidianWriteKey("test-write-key"); // write authorization present for the approve-path tests
   mkProposal.mockResolvedValue({ ...FAKE });
 });
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  sessionStorage.clear();
+});
 
 describe("WriteProposeModal", () => {
   it("propose shows a preview + not-sync warning and does NOT write before approval", async () => {
@@ -88,6 +94,15 @@ describe("WriteProposeModal", () => {
     await toPreview();
     fireEvent.click(screen.getByTestId("obsidian-write-reject"));
     await waitFor(() => expect(screen.getByTestId("obsidian-write-result")).toBeTruthy());
+    expect(mkExec).not.toHaveBeenCalled();
+  });
+
+  it("without a paired write key, approval is GATED (write-key pairing shown, no approve)", async () => {
+    clearObsidianWriteKey();
+    renderModal();
+    await toPreview();
+    expect(screen.getByTestId("obsidian-write-keypair")).toBeTruthy();
+    expect(screen.queryByTestId("obsidian-write-approve")).toBeNull();
     expect(mkExec).not.toHaveBeenCalled();
   });
 
