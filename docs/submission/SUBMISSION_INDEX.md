@@ -62,3 +62,10 @@ evaluator should read it. Start here, then the [root README](../../README.md).
 ## Roadmap
 
 - **[docs/PRODUCT_ROADMAP.md](../PRODUCT_ROADMAP.md)** — final academic QA complete; submission packaging is the active checkpoint; future ideas deferred.
+
+## Product V2 (final — frozen base `a0d7abe`)
+
+- **[PRODUCT_V2_DEMO_SCRIPT_HE.md](PRODUCT_V2_DEMO_SCRIPT_HE.md)** — the final ~4:30–5:00 human demo script (13-station flow with exact spoken Hebrew + emergency-cut lines) for frozen Product V2.
+- **[EVALUATOR_FAQ_HE.md](EVALUATOR_FAQ_HE.md)** — includes the final "עדכון Product V2 (סופי)" section (real-vs-demo, persistence, autonomy, Prime Agent, approval, Supabase scope, org isolation, memory sync, Tested-MVP-vs-Pilot, next step).
+- **[FINAL_SUBMISSION_CHECKLIST.md](FINAL_SUBMISSION_CHECKLIST.md)** — includes the Product V2 Final Freeze section (frozen SHA, PR A–E, taxonomy, CI, test total; "evaluator demo rehearsed" honestly UNCHECKED).
+- **[../product-v2/PRODUCT_V2_FINAL_FREEZE.md](../product-v2/PRODUCT_V2_FINAL_FREEZE.md)** — architecture freeze, inventory, trust boundaries, Prime Agent NO-GO/deferred decision.
