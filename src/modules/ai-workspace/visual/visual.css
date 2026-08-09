@@ -1,0 +1,9 @@
+/* Restrained agent-network motion — communicates state, not decoration. */
+@keyframes teragon-agent-pulse {
+  0%, 100% { stroke-opacity: 0.95; }
+  50% { stroke-opacity: 0.3; }
+}
+.agent-status-pulse { animation: teragon-agent-pulse 1.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .agent-status-pulse { animation: none; }
+}
