@@ -73,7 +73,8 @@ describe("ObsidianVaultPanel", () => {
     renderPanel();
     await connect();
     expect(screen.getByTestId("obsidian-vault-name").textContent).toBe("TERAGON OS");
-    expect(screen.getByTestId("obsidian-readonly").textContent).toBe("כן");
+    // read-only connection (no writeEnabled) → write shown as disabled
+    expect(screen.getByTestId("obsidian-readonly").textContent).toContain("קריאה בלבד");
     expect(getObsidianToken()).toBe("paste-token");
   });
 

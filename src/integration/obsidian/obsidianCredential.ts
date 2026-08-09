@@ -14,6 +14,10 @@
 // perspective (entered once, read only to build the Authorization header).
 
 const TOKEN_KEY = "teragon.obsidian.pairingToken";
+// SEPARATE write-authorization secret. Session-scoped, cleared on disconnect. The
+// pairing token grants read/prepare; this key is additionally required to authorize
+// (via an HMAC capability) any Vault mutation — so a read-paired caller cannot write.
+const WRITE_KEY = "teragon.obsidian.writeKey";
 
 function safeSession(): Storage | null {
   try {
@@ -46,12 +50,13 @@ export function setObsidianToken(token: string): void {
   }
 }
 
-/** Remove the local credential (called on disconnect). */
+/** Remove BOTH local credentials (called on disconnect). */
 export function clearObsidianToken(): void {
   const s = safeSession();
   if (!s) return;
   try {
     s.removeItem(TOKEN_KEY);
+    s.removeItem(WRITE_KEY);
   } catch {
     /* nothing to clear */
   }
@@ -60,4 +65,43 @@ export function clearObsidianToken(): void {
 /** True when a token is currently paired locally. */
 export function hasObsidianToken(): boolean {
   return getObsidianToken() !== null;
+}
+
+/** Read the paired write key (authorizes approved writes; separate from the token). */
+export function getObsidianWriteKey(): string | null {
+  const s = safeSession();
+  if (!s) return null;
+  try {
+    const v = s.getItem(WRITE_KEY);
+    return v && v.length > 0 ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Persist the write key (session-scoped). */
+export function setObsidianWriteKey(key: string): void {
+  const s = safeSession();
+  if (!s) return;
+  try {
+    s.setItem(WRITE_KEY, key);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+/** Remove only the write key (revoke write authorization, keep the connection). */
+export function clearObsidianWriteKey(): void {
+  const s = safeSession();
+  if (!s) return;
+  try {
+    s.removeItem(WRITE_KEY);
+  } catch {
+    /* nothing to clear */
+  }
+}
+
+/** True when a write key is currently paired locally. */
+export function hasObsidianWriteKey(): boolean {
+  return getObsidianWriteKey() !== null;
 }
