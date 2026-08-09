@@ -79,7 +79,11 @@ export function commandCenterMemoryBand(input: CommandCenterMemoryInput): Comman
     .slice(0, 5);
   return {
     approvedCount: approved.length,
-    linkCount: approved.reduce((sum, m) => sum + m.links.length, 0),
+    // `links` is a required field on the current MemoryRecord shape, but persisted
+    // IndexedDB data can hold records from an OLDER memory schema (no `links` array —
+    // e.g. an early record using `wikiLinks`/`backlinks`). Such a record has no readable
+    // current-shape wikilinks, so it honestly contributes 0 edges — never crash the route.
+    linkCount: approved.reduce((sum, m) => sum + (Array.isArray(m.links) ? m.links.length : 0), 0),
     updatedToday: approved.filter((m) => isOnDay(m.updatedAt, input.todayIso)).length,
     pendingProposals,
     unresolvedContradictions,
