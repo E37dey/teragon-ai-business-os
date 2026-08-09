@@ -28,6 +28,7 @@ export type BridgeErrorCode =
   | "CONFLICT" // 409 — note changed since preview (hash mismatch); do not overwrite
   | "EXISTS" // 409 — create target already exists
   | "TOO_LARGE" // 413 — request body over the bound
+  | "WRITE_UNAUTHORIZED" // 403 — missing/invalid write capability (pairing token alone is insufficient)
   | "ERROR"; // any other unexpected condition
 
 export type BridgeCode = "OK" | BridgeErrorCode;
@@ -181,6 +182,28 @@ export async function sha256Hex(content: string): Promise<string> {
     .join("");
 }
 
+/** HMAC-SHA256 hex — mirrors the plugin's `hmacSha256` (write-capability MAC). */
+async function hmacSha256Hex(key: string, msg: string): Promise<string> {
+  const cryptoKey = await crypto.subtle.importKey("raw", new TextEncoder().encode(key), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(msg));
+  return Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+// MUST match the plugin's writeCapabilityMessage byte-for-byte.
+function writeCapabilityMessage(op: string, path: string, mutationId: string, contentHash: string, exp: number): string {
+  return [op, path, mutationId, contentHash, String(exp)].join("\n");
+}
+const WRITE_CAP_TTL_MS = 5 * 60 * 1000; // capability lifetime (short-lived)
+
+/** Mint a single-use write capability bound to exactly this op/path/mutation/content. */
+async function mintCapability(writeKey: string, op: string, path: string, mutationId: string, contentHash: string): Promise<{ exp: number; capability: string }> {
+  const exp = Date.now() + WRITE_CAP_TTL_MS;
+  const capability = await hmacSha256Hex(writeKey, writeCapabilityMessage(op, path, mutationId, contentHash, exp));
+  return { exp, capability };
+}
+
 /**
  * Single bounded POST to a WRITE capability endpoint. Never throws — fail-closed,
  * sanitized, typed. 409 is refined into CONFLICT vs EXISTS from the response body.
@@ -206,6 +229,7 @@ async function bridgePost<T>(path: string, token: string, body: unknown, baseUrl
     let code: BridgeErrorCode;
     if (res.status === 409) code = (data as { error?: string } | undefined)?.error === "already_exists" ? "EXISTS" : "CONFLICT";
     else if (res.status === 413) code = "TOO_LARGE";
+    else if (res.status === 403) code = (data as { error?: string } | undefined)?.error === "write_unauthorized" ? "WRITE_UNAUTHORIZED" : "ORIGIN_REJECTED";
     else code = mapStatus(res.status);
     return { ok: false, code, status: res.status, data: data as T };
   } catch (err) {
@@ -216,17 +240,23 @@ async function bridgePost<T>(path: string, token: string, body: unknown, baseUrl
   }
 }
 
+// Each write requires BOTH the pairing token (connection) AND a write capability minted
+// from the SEPARATE writeKey. The pairing token alone can never mutate the Vault.
+
 /** POST /write/create — create a NEW Markdown note (fails EXISTS if present). */
-export function createNote(path: string, content: string, token: string, meta: WriteMeta, baseUrl: string = OBSIDIAN_BRIDGE_URL): Promise<BridgeResult<WriteResult>> {
-  return bridgePost<WriteResult>("/write/create", token, { mutationId: meta.mutationId, correlationId: meta.correlationId, path, content }, baseUrl);
+export async function createNote(path: string, content: string, token: string, writeKey: string, meta: WriteMeta, baseUrl: string = OBSIDIAN_BRIDGE_URL): Promise<BridgeResult<WriteResult>> {
+  const { exp, capability } = await mintCapability(writeKey, "create", path, meta.mutationId, await sha256Hex(content));
+  return bridgePost<WriteResult>("/write/create", token, { mutationId: meta.mutationId, correlationId: meta.correlationId, path, content, exp, capability }, baseUrl);
 }
 
 /** POST /write/update — overwrite an existing note, guarded by expectedHash (conflict). */
-export function updateNote(path: string, content: string, expectedHash: string, token: string, meta: WriteMeta, baseUrl: string = OBSIDIAN_BRIDGE_URL): Promise<BridgeResult<WriteResult>> {
-  return bridgePost<WriteResult>("/write/update", token, { mutationId: meta.mutationId, correlationId: meta.correlationId, path, content, expectedHash }, baseUrl);
+export async function updateNote(path: string, content: string, expectedHash: string, token: string, writeKey: string, meta: WriteMeta, baseUrl: string = OBSIDIAN_BRIDGE_URL): Promise<BridgeResult<WriteResult>> {
+  const { exp, capability } = await mintCapability(writeKey, "update", path, meta.mutationId, await sha256Hex(content));
+  return bridgePost<WriteResult>("/write/update", token, { mutationId: meta.mutationId, correlationId: meta.correlationId, path, content, expectedHash, exp, capability }, baseUrl);
 }
 
 /** POST /write/append — append a Markdown block, guarded by expectedHash (conflict). */
-export function appendNote(path: string, block: string, expectedHash: string, token: string, meta: WriteMeta, baseUrl: string = OBSIDIAN_BRIDGE_URL): Promise<BridgeResult<WriteResult>> {
-  return bridgePost<WriteResult>("/write/append", token, { mutationId: meta.mutationId, correlationId: meta.correlationId, path, block, expectedHash }, baseUrl);
+export async function appendNote(path: string, block: string, expectedHash: string, token: string, writeKey: string, meta: WriteMeta, baseUrl: string = OBSIDIAN_BRIDGE_URL): Promise<BridgeResult<WriteResult>> {
+  const { exp, capability } = await mintCapability(writeKey, "append", path, meta.mutationId, await sha256Hex(block));
+  return bridgePost<WriteResult>("/write/append", token, { mutationId: meta.mutationId, correlationId: meta.correlationId, path, block, expectedHash, exp, capability }, baseUrl);
 }

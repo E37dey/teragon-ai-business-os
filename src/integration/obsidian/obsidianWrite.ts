@@ -14,7 +14,7 @@ import {
   type BridgeCode,
   type WriteMeta,
 } from "./vaultBridgeClient";
-import { getObsidianToken } from "./obsidianCredential";
+import { getObsidianToken, getObsidianWriteKey } from "./obsidianCredential";
 import { CEO_USER_ID } from "@/repositories/seed";
 import { CEO_NAME_HE } from "@/memory/adapters/legacyBridge";
 
@@ -126,19 +126,22 @@ export function rejectWriteProposal(p: WriteProposal): WriteProposal {
  */
 export async function executeWriteProposal(
   p: WriteProposal,
-  opts: { token?: string | null; baseUrl?: string } = {},
+  opts: { token?: string | null; writeKey?: string | null; baseUrl?: string } = {},
 ): Promise<WriteProposal> {
   if (p.state !== "APPROVED") return p; // only an approved, not-yet-written proposal may execute
   const token = opts.token ?? getObsidianToken();
   if (!token) return { ...p, state: "FAILED", failureCode: "UNAUTHORIZED" };
+  // Write authorization: the SEPARATE write key is required — the pairing token alone cannot mutate.
+  const writeKey = opts.writeKey ?? getObsidianWriteKey();
+  if (!writeKey) return { ...p, state: "FAILED", failureCode: "WRITE_UNAUTHORIZED" };
   const meta: WriteMeta = { mutationId: p.mutationId, correlationId: p.correlationId };
 
   const write =
     p.operation === "create"
-      ? createNote(p.path, p.proposedContent ?? "", token, meta, opts.baseUrl)
+      ? createNote(p.path, p.proposedContent ?? "", token, writeKey, meta, opts.baseUrl)
       : p.operation === "update"
-        ? updateNote(p.path, p.proposedContent ?? "", p.baseHash ?? "", token, meta, opts.baseUrl)
-        : appendNote(p.path, p.appendBlock ?? "", p.baseHash ?? "", token, meta, opts.baseUrl);
+        ? updateNote(p.path, p.proposedContent ?? "", p.baseHash ?? "", token, writeKey, meta, opts.baseUrl)
+        : appendNote(p.path, p.appendBlock ?? "", p.baseHash ?? "", token, writeKey, meta, opts.baseUrl);
 
   const res = await write;
   if (!res.ok || !res.data) {
