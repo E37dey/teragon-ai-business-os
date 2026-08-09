@@ -8,6 +8,7 @@ import { invalidateCollections } from "@/app/data/hooks";
 import { obsidianErrorMessage, useObsidianVault } from "@/integration/obsidian/useObsidianVault";
 import { OBSIDIAN_BRIDGE_URL, type BridgeCode, type NoteContent, type SearchHit } from "@/integration/obsidian/vaultBridgeClient";
 import { classifyObsidianNote, createObsidianImportProposal, type ClassifyResult } from "@/integration/obsidian/obsidianImport";
+import { WriteProposeModal } from "./WriteProposeModal";
 
 const stack = (gap = "var(--os-space-3)"): CSSProperties => ({ display: "grid", gap });
 const row: CSSProperties = { display: "flex", flexWrap: "wrap", gap: "var(--os-space-2)", alignItems: "center" };
@@ -438,8 +439,10 @@ export function ObsidianVaultPanel(): ReactElement {
   const [pairingOpen, setPairingOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [importNote, setImportNote] = useState<NoteContent | null>(null);
+  const [writeOpen, setWriteOpen] = useState(false);
 
   const connected = vault.phase === "connected" && vault.info !== null;
+  const writeEnabled = connected && vault.info?.writeEnabled === true;
 
   const handleConnect = useCallback(
     async (token: string) => {
@@ -494,7 +497,7 @@ export function ObsidianVaultPanel(): ReactElement {
     <Panel data-testid="obsidian-panel" style={stack()}>
       <SectionTitle
         title="Obsidian"
-        subtitle="כספת מקומית · קריאה בלבד"
+        subtitle={writeEnabled ? "כספת מקומית · קריאה + כתיבה באישור" : "כספת מקומית · קריאה בלבד"}
         action={
           connected ? (
             <StatusChip status="פעיל" label="מחובר" />
@@ -517,7 +520,7 @@ export function ObsidianVaultPanel(): ReactElement {
           </div>
           <div style={metaRow}>
             <span style={muted}>מצב</span>
-            <span>חיבור מקומי · קריאה בלבד</span>
+            <span>{writeEnabled ? "חיבור מקומי · קריאה + כתיבה באישור" : "חיבור מקומי · קריאה בלבד"}</span>
           </div>
           <div style={metaRow}>
             <span style={muted}>גשר</span>
@@ -528,8 +531,8 @@ export function ObsidianVaultPanel(): ReactElement {
             <span style={codeStyle}>{vault.info.version}</span>
           </div>
           <div style={metaRow}>
-            <span style={muted}>קריאה בלבד</span>
-            <span data-testid="obsidian-readonly">{vault.info.readonly ? "כן" : "לא"}</span>
+            <span style={muted}>כתיבה</span>
+            <span data-testid="obsidian-readonly">{writeEnabled ? "באישור אנושי בלבד" : "מושבתת (קריאה בלבד)"}</span>
           </div>
           <div style={metaRow}>
             <span style={muted}>בדיקת חיבור אחרונה</span>
@@ -545,6 +548,11 @@ export function ObsidianVaultPanel(): ReactElement {
             <OsButton variant="cyan" onClick={vault.openVault} data-testid="obsidian-open-btn">
               פתח ב-Obsidian
             </OsButton>
+            {writeEnabled && (
+              <OsButton variant="violet" onClick={() => setWriteOpen(true)} data-testid="obsidian-write-btn">
+                הצע כתיבה ל-Obsidian
+              </OsButton>
+            )}
             <OsButton variant="danger" onClick={handleDisconnect} data-testid="obsidian-disconnect-btn">
               נתק
             </OsButton>
@@ -586,6 +594,9 @@ export function ObsidianVaultPanel(): ReactElement {
       )}
       {connected && vault.info && importNote && (
         <ImportPreviewModal note={importNote} vaultName={vault.info.vaultName} onClose={() => setImportNote(null)} />
+      )}
+      {writeEnabled && vault.info && writeOpen && (
+        <WriteProposeModal vaultName={vault.info.vaultName} onLoadCurrent={onRead} onClose={() => setWriteOpen(false)} />
       )}
     </Panel>
   );
