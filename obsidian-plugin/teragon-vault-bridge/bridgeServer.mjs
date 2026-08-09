@@ -101,7 +101,9 @@ export function createBridge(opts) {
   const origins = new Set(opts.allowedOrigins ?? []);
   const vault = opts.vault;
   const maxNotes = opts.maxNotes ?? DEFAULT_MAX_NOTES;
-  const canWrite = typeof vault.applyWrite === "function" && writeKey.length > 0;
+  // Writes are STAGED to the plugin, which requires a LOCAL HUMAN CONFIRMATION inside
+  // Obsidian before app.vault is touched. No client-held secret can authorize a write.
+  const canWrite = typeof vault.stageWrite === "function" && writeKey.length > 0;
   // Idempotency ledger for this bridge instance (per plugin load / session).
   const appliedMutations = new Map();
 
@@ -177,8 +179,13 @@ export function createBridge(opts) {
       return send(res, 200, { ...appliedMutations.get(mutationId), idempotent: true, cid }, cors);
     }
 
-    const result = await Promise.resolve(vault.applyWrite(input));
+    // STAGE the intent — the plugin blocks here until a HUMAN approves it INSIDE Obsidian
+    // (or rejects / times out). The pairing token + writeKey get you this far; only the
+    // in-Obsidian human decision can cause app.vault to be touched.
+    const result = await Promise.resolve(vault.stageWrite(input));
     if (!result || typeof result !== "object") return send(res, 500, { error: "internal_error", cid }, cors);
+    if (result.code === "REJECTED") return send(res, 403, { error: "write_rejected", cid }, cors);
+    if (result.code === "EXPIRED") return send(res, 403, { error: "write_expired", cid }, cors);
     if (result.code === "CONFLICT") return send(res, 409, { error: "conflict", currentHash: result.currentHash ?? null, cid }, cors);
     if (result.code === "EXISTS") return send(res, 409, { error: "already_exists", cid }, cors);
     if (result.code === "NOT_FOUND") return send(res, 404, { error: "not_found", cid }, cors);
