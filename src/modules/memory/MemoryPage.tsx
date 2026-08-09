@@ -49,6 +49,7 @@ import { obsidianStatus } from "@/memory/export/status";
 import { recomputeBacklinks } from "@/memory/markdown/wikilinks";
 import { LinkGraphView } from "./components/LinkGraph";
 import { MemoryEntriesWorkspace } from "./MemoryEntriesWorkspace";
+import { ObsidianVaultPanel } from "./obsidian/ObsidianVaultPanel";
 import { NoteView } from "./components/NoteView";
 import { ProposalQueue, type ProposalControls } from "./components/ProposalQueue";
 
@@ -402,6 +403,10 @@ export default function MemoryPage(): ReactElement {
           נשמר מקומית במכשיר זה (IndexedDB) — אינו מחובר לכספת Obsidian או לשירות ענן.
         </div>
       </div>
+
+      {/* S14.2 (Phase 1) — compact READ-ONLY connection to a local Obsidian Vault
+          (distinct from IndexedDB memory; no auto-import). */}
+      <ObsidianVaultPanel />
 
       {/* S13.4 (PR D) — the real, durable local-memory CRUD is the primary surface. */}
       <MemoryEntriesWorkspace />
