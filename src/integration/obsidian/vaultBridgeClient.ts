@@ -25,6 +25,9 @@ export type BridgeErrorCode =
   | "ORIGIN_REJECTED" // 403 — origin/security rejection
   | "NOT_FOUND" // 404 — note/route not present
   | "BAD_REQUEST" // 400 — rejected path/query
+  | "CONFLICT" // 409 — note changed since preview (hash mismatch); do not overwrite
+  | "EXISTS" // 409 — create target already exists
+  | "TOO_LARGE" // 413 — request body over the bound
   | "ERROR"; // any other unexpected condition
 
 export type BridgeCode = "OK" | BridgeErrorCode;
@@ -41,6 +44,18 @@ export interface ConnectionInfo {
   readonly vaultName: string;
   readonly version: string;
   readonly readonly: boolean;
+  readonly writeEnabled?: boolean;
+}
+export interface WriteMeta {
+  readonly mutationId: string;
+  readonly correlationId: string;
+}
+export interface WriteResult {
+  readonly applied: boolean;
+  readonly op: string;
+  readonly path: string;
+  readonly hash: string;
+  readonly idempotent?: boolean;
 }
 export interface NoteMeta {
   readonly path: string;
@@ -156,4 +171,62 @@ export function openInObsidian(vaultName: string, path?: string): void {
   let uri = `obsidian://open?vault=${encodeURIComponent(vaultName)}`;
   if (path) uri += `&file=${encodeURIComponent(path)}`;
   if (typeof window !== "undefined") window.open(uri, "_self");
+}
+
+/** SHA-256 hex of a string — mirrors the plugin's `sha256` for conflict/verify. */
+export async function sha256Hex(content: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(content));
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/**
+ * Single bounded POST to a WRITE capability endpoint. Never throws — fail-closed,
+ * sanitized, typed. 409 is refined into CONFLICT vs EXISTS from the response body.
+ */
+async function bridgePost<T>(path: string, token: string, body: unknown, baseUrl: string): Promise<BridgeResult<T>> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(baseUrl + path, {
+      method: "POST",
+      cache: "no-store",
+      signal: controller.signal,
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    let data: unknown;
+    try {
+      data = await res.json();
+    } catch {
+      data = undefined;
+    }
+    if (res.status === 200) return { ok: true, code: "OK", status: 200, data: data as T };
+    let code: BridgeErrorCode;
+    if (res.status === 409) code = (data as { error?: string } | undefined)?.error === "already_exists" ? "EXISTS" : "CONFLICT";
+    else if (res.status === 413) code = "TOO_LARGE";
+    else code = mapStatus(res.status);
+    return { ok: false, code, status: res.status, data: data as T };
+  } catch (err) {
+    const name = (err as { name?: string } | null)?.name;
+    return { ok: false, code: name === "AbortError" ? "TIMEOUT" : "UNAVAILABLE", status: null };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** POST /write/create — create a NEW Markdown note (fails EXISTS if present). */
+export function createNote(path: string, content: string, token: string, meta: WriteMeta, baseUrl: string = OBSIDIAN_BRIDGE_URL): Promise<BridgeResult<WriteResult>> {
+  return bridgePost<WriteResult>("/write/create", token, { mutationId: meta.mutationId, correlationId: meta.correlationId, path, content }, baseUrl);
+}
+
+/** POST /write/update — overwrite an existing note, guarded by expectedHash (conflict). */
+export function updateNote(path: string, content: string, expectedHash: string, token: string, meta: WriteMeta, baseUrl: string = OBSIDIAN_BRIDGE_URL): Promise<BridgeResult<WriteResult>> {
+  return bridgePost<WriteResult>("/write/update", token, { mutationId: meta.mutationId, correlationId: meta.correlationId, path, content, expectedHash }, baseUrl);
+}
+
+/** POST /write/append — append a Markdown block, guarded by expectedHash (conflict). */
+export function appendNote(path: string, block: string, expectedHash: string, token: string, meta: WriteMeta, baseUrl: string = OBSIDIAN_BRIDGE_URL): Promise<BridgeResult<WriteResult>> {
+  return bridgePost<WriteResult>("/write/append", token, { mutationId: meta.mutationId, correlationId: meta.correlationId, path, block, expectedHash }, baseUrl);
 }
