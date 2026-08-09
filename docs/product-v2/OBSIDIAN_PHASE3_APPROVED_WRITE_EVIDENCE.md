@@ -6,8 +6,18 @@ Lets TERAGON write approved Markdown changes back to the connected real Obsidian
 > write proposal → exact preview/diff → explicit human approval → ONE bounded write → post-write verification.
 > No approval = no mutation. No agent-direct writes, no automatic writes, no delete/rename/move, no background sync.
 
-> **VERDICT: OBSIDIAN PHASE 3 — HUMAN-APPROVED WRITE BACK VALIDATED** against the actual installed Obsidian
-> Desktop 1.13.4 + synthetic vault `TERAGON OS`, from the real TERAGON browser. **HTTPS_TO_LOOPBACK = UNVALIDATED.**
+> **VERDICT: OBSIDIAN PHASE 3 — APPROVAL BOUNDARY SECURE + HUMAN-APPROVED WRITE BACK VALIDATED** against the
+> actual installed Obsidian Desktop 1.13.4 + synthetic vault `TERAGON OS`, from the real TERAGON browser.
+> **HTTPS_TO_LOOPBACK = UNVALIDATED.**
+
+> **APPROVAL-BOUNDARY SECURITY FIX (pre-merge review).** An initial design authorized writes on the **pairing
+> Bearer token alone** — a live raw `POST /write/create` with only the pairing token + allowed Origin created a
+> file (approval bypass). **Fixed:** the pairing token now grants only connection/list/search/read/prepare; every
+> mutation additionally requires a **single-use HMAC write capability** keyed by a **SEPARATE `writeKey`** and
+> **bound to exactly one op / path / mutationId / contentHash / expiry**. A holder of only the pairing token
+> cannot mint one. **Proven live after the fix:** token-only write → **403 write_unauthorized** (file not
+> created); a valid capability → applied **once**; replay of the same capability → **idempotent** (no second
+> write); reuse of a capability for another path/op/content → **403**; an expired or wrong-key capability → **403**.
 
 ## Allowed operations
 
@@ -33,14 +43,34 @@ appendBlock, proposedHash, createdAt, requesterId/Name, correlationId, mutationI
 approvedAt, resultHash, failureCode }`. States: `PROPOSED → APPROVED → WRITTEN | CONFLICT | FAILED`, or
 `PROPOSED → REJECTED`. Creating a proposal performs **no** bridge write.
 
-## Approval boundary + identity
+## Write authorization (bridge-side) — the non-forgeable boundary
+
+- **Connection auth** = the pairing Bearer token. Grants **only** connection / list / search / read / request
+  preparation. It does **not** independently authorize any mutation.
+- **Write authorization** = a per-write **HMAC-SHA256 capability** keyed by a **SEPARATE `writeKey`** (a distinct
+  per-load secret, revealed via its own Obsidian command *"Copy TERAGON write key (once)"*, paired into TERAGON
+  `sessionStorage` under `teragon.obsidian.writeKey`, cleared on disconnect). The capability signs the canonical
+  message `op\npath\nmutationId\ncontentHash\nexp`, so it is **single-use** (mutationId ledger), **short-lived**
+  (`exp`, ≤10 min bound), **replay-rejected**, and **cannot** authorize a different op / path / content. The
+  plugin verifies it (constant-time) **before** touching `app.vault`. The bridge does **not** trust any
+  client-supplied `approved`/`approvedBy`/`proposalId` field — only the cryptographic capability.
+- A bridge started without a `writeKey` exposes **no** write capability at all (`/write/*` → 404,
+  `/connection.writeEnabled = false`).
+
+## Approval boundary + identity (TERAGON-side)
 
 Explicit **"אשר כתיבה ל-Obsidian"** transitions `PROPOSED → APPROVED` and permits **exactly one** write attempt
 (service state guard: only an `APPROVED`, not-yet-written proposal executes; a `WRITTEN` proposal cannot execute
 again — plus the plugin's `mutationId` idempotency). **"דחה"** performs no bridge write. Records
 `approvedBy/approvedAt/proposalId/correlationId`. Approver/requester identity is the existing product-wide
 governance identity (`CEO_USER_ID`/`CEO_NAME_HE` = `u-tzachi`/`צחי זוסטייהם`) — an **existing demo fixture**, not
-a new Phase-3 hardcoded approver; the write UI does not impersonate independently of the workflow identity.
+a new Phase-3 hardcoded approver; the write UI does not impersonate independently of the workflow identity, and
+this identity has **no** bearing on bridge authorization (which is the cryptographic capability above).
+
+**Honest scope of the guarantee:** the capability proves *knowledge of the separate write secret* — i.e. it makes
+**possession of the pairing token alone insufficient to mutate the Vault** (the required property). The per-write
+*human* approval remains a TERAGON-side gate (the `writeKey` holder). A separate in-Obsidian human confirmation
+per write was not added; the bridge-side guarantee is "a second, write-specific secret is required."
 
 ## Preview / diff
 
@@ -78,11 +108,14 @@ the plugin's returned hash (for APPEND, also asserts the block is present). Only
 
 ## Security tests (bridge unit + live plugin)
 
+**Approval boundary:** pairing token + valid Origin + valid payload but **no capability → 403 write_unauthorized,
+Vault unchanged** (create/update/append); wrong-key capability → 403; expired capability → 403; capability reused
+for another path/op/content → 403; a `writeKey`-less bridge → writes 404.
 `missing token → 401` · `wrong token → 401` · `disallowed Origin → 403` (no wildcard CORS) · `GET/PUT/PATCH/DELETE`
 on a write endpoint `→ 405` · `../` / absolute / `.obsidian` / non-Markdown path `→ 400` · malformed JSON /
 missing `mutationId` / missing op fields `→ 400` · oversized body `→ 413` · duplicate `mutationId` **blocked** ·
 stale expected hash `→ 409 conflict` · reads remain **GET-only** (`POST /notes`, `DELETE /note/x` → 405) · bridge
-unavailable → fail closed. No raw stack traces; no token in logs/docs/errors.
+unavailable → fail closed. No raw stack traces; no token/writeKey in logs/docs/errors.
 
 ## Memory relationship + agents
 
