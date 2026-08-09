@@ -10,6 +10,17 @@ paid service) and must never be labelled as such.
 
 ---
 
+## 0. Product V2 freeze relationship (important)
+
+The **Product V2 academic submission remains FROZEN at `b4937822413c0a603071b6c424402ca8adc66512`**. This
+live Obsidian Vault Connection is **POST-FREEZE / POST-SUBMISSION** product work — a *future* phased effort,
+**not** part of the accepted Tested-MVP. The capability included in the frozen submission is the **manual
+Obsidian-compatible import/export bridge only**; this document must not be read as changing that. The
+already-accepted **Tested-MVP** classification (and its "no automatic Obsidian/cloud sync" statement) stays
+as-is — live Vault connectivity is explicitly *not* claimed to have been part of Product V2.
+
+---
+
 ## 1. Current state (what exists today — reuse, don't duplicate)
 
 | Capability | Where | Reuse |
@@ -57,12 +68,18 @@ never described as synchronization.
 
 ## 3. Responsibilities & trust boundary
 
-**Obsidian plugin ("TERAGON Vault Bridge")** — the *only* code with Vault access:
-- Bind an HTTP(S) server to **`127.0.0.1` only** (never `0.0.0.0`); a user-set port.
-- Require a **pairing token** (generated in plugin settings, shown once) on every request (`Authorization: Bearer`), plus an **Origin allowlist** + Host-header check (anti-CSRF / anti-DNS-rebind).
-- Expose ONLY the narrow capability API (§4). **No** raw filesystem, **no** shell/command execution, **no** `.obsidian/` config access, **no** delete.
-- Confine every path to the Vault root (and optionally a user-set subfolder): normalize, reject `..`, absolute paths, and `.obsidian/`.
-- Use `app.vault` for all reads/writes; never `fs` directly.
+**Loopback security contract (binding for every phase):**
+- **Bind `127.0.0.1` only** — never `0.0.0.0`; **no LAN, no public exposure**; a user-set port.
+- **Strong random pairing token** (generated in plugin settings): sent **only** in the `Authorization: Bearer`
+  header — **never** in a query string / URL. **Rotatable and revocable** from plugin settings. Stored only
+  where required (TERAGON: session memory), **never committed, never logged**.
+- **Explicit Origin allowlist** (no `Access-Control-Allow-Origin: *`); reject unexpected Origin, unauthenticated
+  requests, and malformed requests; validate the Host header (anti-CSRF / anti-DNS-rebind).
+- **Bounded request/body sizes**; **no CSRF-style write path through GET** (and Phase 1 exposes no writes at all).
+- Expose ONLY the narrow capability API (§4). **No** raw filesystem, **no** shell/command/plugin-command
+  execution, **no** `.obsidian/` config access, **no** delete/rename.
+- Confine every path to the Vault root (and optionally a user-set subfolder): normalize, reject `..`, absolute
+  paths, `.obsidian/`, and symlink/path escape. Use `app.vault` APIs for all access; **never** `fs` directly.
 
 **TERAGON (browser)** — orchestration/presentation + approval:
 - Store the bridge URL + token in **sessionStorage/in-memory** (not logs, not IndexedDB by default).
@@ -164,13 +181,28 @@ with a locally-trusted cert; (c) document the loopback-http exception. Browser F
 
 ---
 
-## 12. Implementation phases (smallest first)
+## 12. Implementation phases (refined — smallest first; PROPOSED, not implemented)
 
-- **Phase 0 (this checkpoint):** architecture doc only. *(done)*
-- **Phase 1 — READ-ONLY MVP (smallest):** the plugin (loopback server + token + path-guard + `getConnectionInfo`/`listNotes`/`readNote`/`searchNotes`); TERAGON `bridgeClient` + `ObsidianConnectionPanel` in `/memory` (connect/status/search/open-in-obsidian/"ייבא לידע" via the **existing** `importVault`→proposal). No writes.
-- **Phase 2 — approved write:** `proposeWrite`/`applyApprovedWrite` (create/update/append) with preview + approval; audit + lastWrite.
-- **Phase 3 — agent read adapter:** wire `MemorySearchPort` → `obsidianReadForAgents` (read-only).
-- **Phase 4 (optional):** mtime-based manual refresh / change detection (still user-triggered — **not** continuous sync).
+- **Phase 0 — TRANSPORT / SECURITY SPIKE ONLY (the required first step).** Prove the browser↔loopback
+  transport and its security before any product feature. The spike tests **only**: (1) the plugin starts a
+  local **read-only** bridge; (2) `GET /health` from TERAGON; (3) authenticated `GET /connection`;
+  (4) authenticated `GET /notes`; (5) it works in the **actual target browser on Windows**; (6) the
+  Origin/CORS policy is enforced (rejects unexpected Origin); (7) **no mixed-content / private-network
+  browser block**; (8) plugin shutdown **closes the port**; (9) an unavailable bridge **fails closed**.
+  **No** memory import, **no** agent integration, **no** writes, **no** product UI beyond a temporary
+  diagnostic state. **If HTTPS→local-HTTP is blocked in the target browser/deployment, do NOT work around
+  browser security** — document alternative transports (plugin HTTPS with a locally-trusted cert;
+  `http://localhost` demo build; or a different channel) and re-review **before** Phase 1.
+- **Phase 1 — read-only Vault connection:** connection status · vault name · list/search/read note · open in
+  Obsidian · disconnect. Still **no writes, no import**.
+- **Phase 2 — governed import into `memoryRecords`:** "ייבא לידע" feeds read notes into the **existing**
+  `ObsidianVaultAdapter.importVault()` → proposal → human approval → `memoryRecords`.
+- **Phase 3 — approved write proposals:** `proposeWrite`/`applyApprovedWrite` (create/update/append) with
+  preview + explicit human approval; audit + lastWrite.
+- **Phase 4 — optional, bounded agent READ access:** wire `MemorySearchPort` → a read-only Obsidian adapter.
+- **Never:** automatic synchronization / continuous sync.
+
+Each phase is a separate reviewed PR. Phase 0 must pass before Phase 1 is scoped.
 
 ## 13. Exact files/modules that would be added (Phase 1)
 
@@ -230,5 +262,9 @@ token/Origin enforcement.
 plugin ("TERAGON Vault Bridge") exposing a loopback, token-authenticated capability API over `app.vault`**,
 called by a typed TERAGON `bridgeClient`; `obsidian://` for navigation only. Windows-compatible; least-
 privilege; all writes human-approved; agents read-only; the three memory stores stay distinct; no automatic
-sync, no remote AI. **Smallest first step = Phase 1 (read-only) reusing the existing governed import
-pipeline.** Do **not** implement until this architecture is reviewed.
+sync, no remote AI. **Smallest first step = Phase 0 — a transport/security SPIKE only** (health + auth +
+Origin + Windows browser + fail-closed), gating everything after it; no product feature until the spike
+passes. This is **post-freeze** work; Product V2 stays frozen at `b4937822`. Do **not** implement until this
+architecture is reviewed.
+
+**OBSIDIAN LIVE CONNECTION — ARCHITECTURE APPROVED. IMPLEMENTATION — PHASE 0 TRANSPORT SPIKE ONLY.**
