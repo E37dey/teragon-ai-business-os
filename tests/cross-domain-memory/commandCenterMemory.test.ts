@@ -94,6 +94,35 @@ describe("command-center memory band selectors", () => {
     expect(band.learningProposalsWaiting).toBe(1);
   });
 
+  it("does not crash on a stale memory record missing the `links` array (old schema)", () => {
+    // REGRESSION: the Command Center (<MemoryBand>) crashed with
+    // "Cannot read properties of undefined (reading 'length')" because a persisted
+    // memoryRecords row came from an OLDER memory schema (keys like `wikiLinks`/
+    // `backlinks`/`bodyMarkdown`, no current `links: string[]`). Such a record has no
+    // readable current-shape wikilinks → it must contribute 0 edges, never throw.
+    const stale = {
+      id: "memr-1",
+      title: "Alpha Note",
+      markdown: "",
+      frontmatter: {},
+      folder: "",
+      tags: [],
+      // no `links` array — plus foreign old-schema fields we intentionally ignore
+      wikiLinks: ["X", "Y"],
+      backlinks: ["Z"],
+      createdAt: base.createdAt,
+      updatedAt: "2026-07-23T09:00:00.000Z",
+    } as unknown as MemoryRecord;
+    const band = commandCenterMemoryBand({
+      ...emptyInput(),
+      memoryRecords: [stale, mem("mem-2", "2026-07-22T09:00:00.000Z", ["א", "ב"])],
+    });
+    expect(band.approvedCount).toBe(2);
+    // stale record → 0 known links; mem-2 → 2. Never NaN, never throw.
+    expect(band.linkCount).toBe(2);
+    expect(band.recentApproved.map((r) => r.id)).toEqual(["memr-1", "mem-2"]);
+  });
+
   it("never throws on garbage-shaped records", () => {
     const band = commandCenterMemoryBand({
       ...emptyInput(),

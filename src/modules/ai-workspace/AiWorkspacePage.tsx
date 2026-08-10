@@ -22,6 +22,7 @@ import {
 import { HideShellRail } from "@/app/rail";
 import { AgentActionsPanel } from "@/modules/agents-ui/AgentActionsPanel";
 import { AgentLoopPanel } from "./AgentLoopPanel";
+import { VisualIntelligenceWorkspace } from "./visual/VisualIntelligenceWorkspace";
 import { AGENT_IDS, getAgentDefinition } from "@/agents/definitions";
 import {
   runAgentAction,
@@ -224,6 +225,11 @@ export default function AiWorkspacePage(): ReactElement {
             ))
           )}
         </div>
+      </Panel>
+
+      {/* B1.5 VISUAL INTELLIGENCE WORKSPACE — interactive Agent Network + live Knowledge Graph. */}
+      <Panel variant="panel" style={{ padding: "var(--os-space-5)" }} data-testid="workspace-visual">
+        <VisualIntelligenceWorkspace />
       </Panel>
 
       {/* B2. GUIDED, HUMAN-CONTROLLED bounded loop — secondary to the attention area. */}
