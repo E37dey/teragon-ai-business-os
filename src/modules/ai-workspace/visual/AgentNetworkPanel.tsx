@@ -14,7 +14,9 @@ import { getRepository } from "@/repositories";
 import { LOOP_OBJECTIVE_HE } from "@/modules/ai-workspace/agentLoop";
 import { ForceGraph, type FGEdge, type ForceGraphApi } from "./ForceGraph";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
-import type { AgentNoteUsage } from "./crossView";
+import { deriveAgentNoteUsages, type AgentNoteUsage } from "./crossView";
+import { AgentObsidianPanel } from "./AgentObsidianPanel";
+import { subscribeRetrievals } from "@/agents/obsidian/retrievalTrace";
 import "./visual.css";
 
 const stack = (gap = "var(--os-space-3)"): CSSProperties => ({ display: "grid", gap });
@@ -87,12 +89,17 @@ interface AgentNode {
   id: string;
 }
 
-export function AgentNetworkPanel({ usages = [] }: { usages?: AgentNoteUsage[] }): ReactElement {
+export function AgentNetworkPanel({ usages = [], onSelectAgent, highlightAgentId }: { usages?: AgentNoteUsage[]; onSelectAgent?: (id: string | null) => void; highlightAgentId?: string | null }): ReactElement {
   const reduced = usePrefersReducedMotion();
   const [selected, setSelected] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, AgentStatus>>({});
   const [fullscreen, setFullscreen] = useState(false);
   const apiRef = useRef<ForceGraphApi | null>(null);
+  // Phase-4 cross-selection: when a note is selected in split mode, the workspace passes the
+  // agent that REALLY read it; we emphasize that agent (dim the rest + focus).
+  useEffect(() => {
+    if (highlightAgentId) apiRef.current?.focus(highlightAgentId);
+  }, [highlightAgentId]);
 
   const nodes = useMemo<AgentNode[]>(() => AGENT_IDS.map((id) => ({ id })), []);
   const [handoffRows, setHandoffRows] = useState<HandoffRecord[]>([]);
@@ -147,13 +154,24 @@ export function AgentNetworkPanel({ usages = [] }: { usages?: AgentNoteUsage[] }
     if (agentId) setStatuses((s) => ({ ...s, [agentId]: statusFromResult(r) }));
   }, []);
 
-  const selectAndFocus = useCallback((id: string | null) => {
-    setSelected(id);
-    if (id) apiRef.current?.focus(id);
-  }, []);
+  const selectAndFocus = useCallback(
+    (id: string | null) => {
+      setSelected(id);
+      onSelectAgent?.(id);
+      if (id) apiRef.current?.focus(id);
+    },
+    [onSelectAgent],
+  );
 
   const selectedDef = selected ? getAgentDefinition(selected) : null;
-  const selectedUsages = selected ? usages.filter((u) => u.agentId === selected) : [];
+  // Agent→Note usages are LIVE: seed from the prop, then re-derive on every real retrieval
+  // trace (a note read by an allowed agent) so the relationship appears the moment it occurs.
+  const [liveUsages, setLiveUsages] = useState<AgentNoteUsage[]>(usages);
+  useEffect(() => {
+    setLiveUsages(deriveAgentNoteUsages());
+    return subscribeRetrievals(() => setLiveUsages(deriveAgentNoteUsages()));
+  }, []);
+  const selectedUsages = selected ? liveUsages.filter((u) => u.agentId === selected) : [];
 
   const agentRadius = useCallback((id: string) => (id === "ag-orchestrator" ? 60 : 42), []);
 
@@ -194,6 +212,7 @@ export function AgentNetworkPanel({ usages = [] }: { usages?: AgentNoteUsage[] }
           selectedId={selected}
           onSelect={selectAndFocus}
           degreeOf={(id) => degreeMap.get(id) ?? 0}
+          isDimmed={highlightAgentId ? (id) => id !== highlightAgentId && id !== "ag-orchestrator" : undefined}
           nodeRadius={(n) => agentRadius(n.id)}
           labelFor={(n) => getAgentDefinition(n.id)?.nameHe ?? n.id}
           clusterOf={(id) => AGENT_REGION[id] ?? "coordination"}
@@ -223,9 +242,11 @@ export function AgentNetworkPanel({ usages = [] }: { usages?: AgentNoteUsage[] }
             const ring = STATUS_META[st].color;
             const pulsing = st === "RUNNING" || st === "WAITING";
             const coordinating = isOrch && activeSet.has(n.id);
+            const crossHi = highlightAgentId === n.id; // cross-selected from a note (real read)
             return (
               <>
                 <title>{`${def.nameHe} (${def.codeName})\n${AGENT_ROLE[n.id] ?? ""} · ${STATUS_META[st].label}\n${def.purposeHe}`}</title>
+                {crossHi && <circle r={r + 13} fill="none" stroke="var(--os-accent-cyan, #35c0c9)" strokeWidth={3} strokeOpacity={0.95} className={reduced ? undefined : "agent-status-pulse"} />}
                 {/* orchestrator coordination core — layered nucleus + energy ring */}
                 {isOrch && <circle r={r + 22} fill="var(--os-accent-cyan, #35c0c9)" opacity={0.06} />}
                 {isOrch && <circle r={r + 14} fill="var(--os-accent-cyan, #35c0c9)" opacity={0.09} />}
@@ -295,10 +316,26 @@ export function AgentNetworkPanel({ usages = [] }: { usages?: AgentNoteUsage[] }
                   .join(", ")
               )}
             </div>
-            {/* Cross-view: Agent→Note usage only when a REAL trace exists. */}
+            {/* Cross-view: Agent→Note usage only when a REAL retrieval trace exists.
+                Accessible text equivalent of the relationship (never canvas-only). */}
             <div style={{ fontSize: "var(--os-text-2xs, 11px)" }} data-testid="agent-note-usage">
               <b>שימוש במסמכי Obsidian:</b>{" "}
-              {selectedUsages.length === 0 ? <span style={muted}>אין שימוש מתועד במסמך זה</span> : selectedUsages.map((u) => `${u.vaultName}·${u.path}`).join(", ")}
+              {selectedUsages.length === 0 ? (
+                <span style={muted}>אין שימוש מתועד במסמך זה</span>
+              ) : (
+                <ul style={{ margin: "2px 0 0", paddingInlineStart: "1rem" }}>
+                  {selectedUsages.map((u) => (
+                    <li key={u.correlationId ?? u.path}>
+                      {selectedDef.nameHe} קרא את <b>{u.basename}</b> מ-Obsidian · <span style={{ ...muted, fontFamily: "var(--os-font-mono, monospace)", direction: "ltr", unicodeBidi: "isolate" }}>{u.vaultName}·{u.path}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            {/* Phase-4 bounded live Obsidian read — allowed agents only; denied agents get a notice. */}
+            <div style={{ fontSize: "var(--os-text-2xs, 11px)" }}>
+              <b>קריאה חיה מ-Obsidian (מבוקרת):</b>
+              <AgentObsidianPanel agentId={selectedDef.id} />
             </div>
             {/* Real action engine — reused, not reimplemented. */}
             <AgentActionsPanel agentId={selectedDef.id} onResult={onResult} />
