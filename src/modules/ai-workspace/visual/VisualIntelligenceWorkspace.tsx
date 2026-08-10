@@ -8,6 +8,7 @@ import type { CSSProperties, ReactElement } from "react";
 import { OsButton, SectionTitle } from "@/design-system";
 import { KnowledgeGraphPanel } from "@/modules/memory/obsidian/KnowledgeGraphPanel";
 import { AgentNetworkPanel } from "./AgentNetworkPanel";
+import { CrossViewRelations } from "./CrossViewRelations";
 import { deriveAgentNoteUsages } from "./crossView";
 
 const stack = (gap = "var(--os-space-4)"): CSSProperties => ({ display: "grid", gap });
@@ -39,9 +40,13 @@ export function VisualIntelligenceWorkspace(): ReactElement {
       {mode === "agents" && <AgentNetworkPanel usages={usages} />}
       {mode === "graph" && <KnowledgeGraphPanel />}
       {mode === "split" && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: "var(--os-space-5)", alignItems: "start" }}>
-          <AgentNetworkPanel usages={usages} />
-          <KnowledgeGraphPanel />
+        <div style={stack("var(--os-space-4)")}>
+          {/* The real, live Agent→Note relationship spanning both graphs (real traces only). */}
+          <CrossViewRelations />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))", gap: "var(--os-space-5)", alignItems: "start" }}>
+            <AgentNetworkPanel usages={usages} />
+            <KnowledgeGraphPanel />
+          </div>
         </div>
       )}
     </div>
