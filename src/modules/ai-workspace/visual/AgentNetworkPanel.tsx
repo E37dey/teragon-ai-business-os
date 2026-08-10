@@ -14,7 +14,9 @@ import { getRepository } from "@/repositories";
 import { LOOP_OBJECTIVE_HE } from "@/modules/ai-workspace/agentLoop";
 import { ForceGraph, type FGEdge, type ForceGraphApi } from "./ForceGraph";
 import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
-import type { AgentNoteUsage } from "./crossView";
+import { deriveAgentNoteUsages, type AgentNoteUsage } from "./crossView";
+import { AgentObsidianPanel } from "./AgentObsidianPanel";
+import { subscribeRetrievals } from "@/agents/obsidian/retrievalTrace";
 import "./visual.css";
 
 const stack = (gap = "var(--os-space-3)"): CSSProperties => ({ display: "grid", gap });
@@ -153,7 +155,14 @@ export function AgentNetworkPanel({ usages = [] }: { usages?: AgentNoteUsage[] }
   }, []);
 
   const selectedDef = selected ? getAgentDefinition(selected) : null;
-  const selectedUsages = selected ? usages.filter((u) => u.agentId === selected) : [];
+  // Agent→Note usages are LIVE: seed from the prop, then re-derive on every real retrieval
+  // trace (a note read by an allowed agent) so the relationship appears the moment it occurs.
+  const [liveUsages, setLiveUsages] = useState<AgentNoteUsage[]>(usages);
+  useEffect(() => {
+    setLiveUsages(deriveAgentNoteUsages());
+    return subscribeRetrievals(() => setLiveUsages(deriveAgentNoteUsages()));
+  }, []);
+  const selectedUsages = selected ? liveUsages.filter((u) => u.agentId === selected) : [];
 
   const agentRadius = useCallback((id: string) => (id === "ag-orchestrator" ? 60 : 42), []);
 
@@ -295,10 +304,26 @@ export function AgentNetworkPanel({ usages = [] }: { usages?: AgentNoteUsage[] }
                   .join(", ")
               )}
             </div>
-            {/* Cross-view: Agent→Note usage only when a REAL trace exists. */}
+            {/* Cross-view: Agent→Note usage only when a REAL retrieval trace exists.
+                Accessible text equivalent of the relationship (never canvas-only). */}
             <div style={{ fontSize: "var(--os-text-2xs, 11px)" }} data-testid="agent-note-usage">
               <b>שימוש במסמכי Obsidian:</b>{" "}
-              {selectedUsages.length === 0 ? <span style={muted}>אין שימוש מתועד במסמך זה</span> : selectedUsages.map((u) => `${u.vaultName}·${u.path}`).join(", ")}
+              {selectedUsages.length === 0 ? (
+                <span style={muted}>אין שימוש מתועד במסמך זה</span>
+              ) : (
+                <ul style={{ margin: "2px 0 0", paddingInlineStart: "1rem" }}>
+                  {selectedUsages.map((u) => (
+                    <li key={u.correlationId ?? u.path}>
+                      {selectedDef.nameHe} קרא את <b>{u.basename}</b> מ-Obsidian · <span style={{ ...muted, fontFamily: "var(--os-font-mono, monospace)", direction: "ltr", unicodeBidi: "isolate" }}>{u.vaultName}·{u.path}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            {/* Phase-4 bounded live Obsidian read — allowed agents only; denied agents get a notice. */}
+            <div style={{ fontSize: "var(--os-text-2xs, 11px)" }}>
+              <b>קריאה חיה מ-Obsidian (מבוקרת):</b>
+              <AgentObsidianPanel agentId={selectedDef.id} />
             </div>
             {/* Real action engine — reused, not reimplemented. */}
             <AgentActionsPanel agentId={selectedDef.id} onResult={onResult} />
