@@ -84,9 +84,12 @@ function computeClusters(nodes: GraphNode[], edges: GraphEdge[]): Map<string, st
 
 type Phase = "idle" | "loading" | "loaded" | "disconnected" | "error";
 
-export function KnowledgeGraphPanel(): ReactElement {
+export function KnowledgeGraphPanel({ onSelectNote, highlightPaths }: { onSelectNote?: (path: string | null) => void; highlightPaths?: readonly string[] } = {}): ReactElement {
   const { toast } = useToast();
   const reduced = usePrefersReducedMotion();
+  // Phase-4 cross-selection: when an agent is selected in split mode, the workspace passes
+  // the note paths that agent REALLY read; we emphasize them (dim the rest + focus).
+  const highlightSet = useMemo(() => new Set(highlightPaths ?? []), [highlightPaths]);
   const [phase, setPhase] = useState<Phase>("idle");
   const [graph, setGraph] = useState<VaultGraph | null>(null);
   const [vaultName, setVaultName] = useState<string>("");
@@ -203,7 +206,18 @@ export function KnowledgeGraphPanel(): ReactElement {
     }
     return ids;
   }, [graph, tagFilter, folderFilter, connectedOnly]);
-  const isDimmed = useCallback((id: string) => !visibleNodeIds.has(id), [visibleNodeIds]);
+  const isDimmed = useCallback(
+    (id: string) => !visibleNodeIds.has(id) || (highlightSet.size > 0 && !highlightSet.has(id)),
+    [visibleNodeIds, highlightSet],
+  );
+
+  // Cross-selection from the workspace: focus the highlighted note (real agent read).
+  useEffect(() => {
+    if (highlightSet.size > 0 && phase === "loaded") {
+      const first = [...highlightSet][0];
+      if (first) apiRef.current?.focus(first);
+    }
+  }, [highlightSet, phase]);
 
   const searchMatches = useMemo(() => {
     if (!graph || !query.trim()) return [];
@@ -211,10 +225,14 @@ export function KnowledgeGraphPanel(): ReactElement {
     return graph.nodes.filter((nd) => nd.basename.toLowerCase().includes(q) || nd.path.toLowerCase().includes(q)).slice(0, 20);
   }, [graph, query]);
 
-  const selectAndFocus = useCallback((id: string) => {
-    setSelected(id);
-    apiRef.current?.focus(id);
-  }, []);
+  const selectAndFocus = useCallback(
+    (id: string) => {
+      setSelected(id);
+      onSelectNote?.(id);
+      apiRef.current?.focus(id);
+    },
+    [onSelectNote],
+  );
 
   const selectedNode = graph?.nodes.find((n) => n.id === selected) ?? null;
   const selectedEdges = useMemo(() => {
@@ -360,7 +378,10 @@ export function KnowledgeGraphPanel(): ReactElement {
                   nodes={graph.nodes}
                   edges={graph.edges}
                   selectedId={selected}
-                  onSelect={setSelected}
+                  onSelect={(id) => {
+                    setSelected(id);
+                    onSelectNote?.(id);
+                  }}
                   degreeOf={degreeOf}
                   isDimmed={isDimmed}
                   clusterOf={clusterOf}

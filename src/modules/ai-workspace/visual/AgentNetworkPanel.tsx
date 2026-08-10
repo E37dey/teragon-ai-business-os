@@ -89,12 +89,17 @@ interface AgentNode {
   id: string;
 }
 
-export function AgentNetworkPanel({ usages = [] }: { usages?: AgentNoteUsage[] }): ReactElement {
+export function AgentNetworkPanel({ usages = [], onSelectAgent, highlightAgentId }: { usages?: AgentNoteUsage[]; onSelectAgent?: (id: string | null) => void; highlightAgentId?: string | null }): ReactElement {
   const reduced = usePrefersReducedMotion();
   const [selected, setSelected] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, AgentStatus>>({});
   const [fullscreen, setFullscreen] = useState(false);
   const apiRef = useRef<ForceGraphApi | null>(null);
+  // Phase-4 cross-selection: when a note is selected in split mode, the workspace passes the
+  // agent that REALLY read it; we emphasize that agent (dim the rest + focus).
+  useEffect(() => {
+    if (highlightAgentId) apiRef.current?.focus(highlightAgentId);
+  }, [highlightAgentId]);
 
   const nodes = useMemo<AgentNode[]>(() => AGENT_IDS.map((id) => ({ id })), []);
   const [handoffRows, setHandoffRows] = useState<HandoffRecord[]>([]);
@@ -149,10 +154,14 @@ export function AgentNetworkPanel({ usages = [] }: { usages?: AgentNoteUsage[] }
     if (agentId) setStatuses((s) => ({ ...s, [agentId]: statusFromResult(r) }));
   }, []);
 
-  const selectAndFocus = useCallback((id: string | null) => {
-    setSelected(id);
-    if (id) apiRef.current?.focus(id);
-  }, []);
+  const selectAndFocus = useCallback(
+    (id: string | null) => {
+      setSelected(id);
+      onSelectAgent?.(id);
+      if (id) apiRef.current?.focus(id);
+    },
+    [onSelectAgent],
+  );
 
   const selectedDef = selected ? getAgentDefinition(selected) : null;
   // Agent→Note usages are LIVE: seed from the prop, then re-derive on every real retrieval
@@ -203,6 +212,7 @@ export function AgentNetworkPanel({ usages = [] }: { usages?: AgentNoteUsage[] }
           selectedId={selected}
           onSelect={selectAndFocus}
           degreeOf={(id) => degreeMap.get(id) ?? 0}
+          isDimmed={highlightAgentId ? (id) => id !== highlightAgentId && id !== "ag-orchestrator" : undefined}
           nodeRadius={(n) => agentRadius(n.id)}
           labelFor={(n) => getAgentDefinition(n.id)?.nameHe ?? n.id}
           clusterOf={(id) => AGENT_REGION[id] ?? "coordination"}
@@ -232,9 +242,11 @@ export function AgentNetworkPanel({ usages = [] }: { usages?: AgentNoteUsage[] }
             const ring = STATUS_META[st].color;
             const pulsing = st === "RUNNING" || st === "WAITING";
             const coordinating = isOrch && activeSet.has(n.id);
+            const crossHi = highlightAgentId === n.id; // cross-selected from a note (real read)
             return (
               <>
                 <title>{`${def.nameHe} (${def.codeName})\n${AGENT_ROLE[n.id] ?? ""} · ${STATUS_META[st].label}\n${def.purposeHe}`}</title>
+                {crossHi && <circle r={r + 13} fill="none" stroke="var(--os-accent-cyan, #35c0c9)" strokeWidth={3} strokeOpacity={0.95} className={reduced ? undefined : "agent-status-pulse"} />}
                 {/* orchestrator coordination core — layered nucleus + energy ring */}
                 {isOrch && <circle r={r + 22} fill="var(--os-accent-cyan, #35c0c9)" opacity={0.06} />}
                 {isOrch && <circle r={r + 14} fill="var(--os-accent-cyan, #35c0c9)" opacity={0.09} />}
