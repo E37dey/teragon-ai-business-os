@@ -17,10 +17,12 @@ import {
   type WorkflowState,
   type WorkflowStatus,
 } from "@/agents/workflow/knowledgeWorkflow";
-import { getWorkflowEvents, subscribeWorkflowEvents, type WorkflowEvent } from "@/agents/workflow/workflowEvents";
+import { getAllWorkflowEvents, getWorkflowEvents, subscribeWorkflowEvents, type WorkflowEvent } from "@/agents/workflow/workflowEvents";
+import { getWorkflowPack } from "@/agents/workflow/workflowPacks";
 import { deriveWorkflowHighlights } from "./workflowHighlights";
 import { AgentNetworkPanel } from "./AgentNetworkPanel";
 import { GovernedActionPanel } from "./GovernedActionPanel";
+import { WorkflowPackPicker } from "./WorkflowPackPicker";
 import { KnowledgeGraphPanel } from "@/modules/memory/obsidian/KnowledgeGraphPanel";
 import "./visual.css";
 
@@ -56,7 +58,9 @@ function eventIcon(t: WorkflowEvent["type"]): string {
 const DEFAULT_INTENT = "בנה לי תקציר והמלצות על AI Operations לפי הידע ב-Obsidian";
 
 export function WorkflowMode(): ReactElement {
-  const [intent, setIntent] = useState(DEFAULT_INTENT);
+  const [searchParams] = useSearchParams();
+  // ?pack=<id> configures the workflow: its trusted intent template prefills the (editable) input.
+  const [intent, setIntent] = useState(() => getWorkflowPack(searchParams.get("pack"))?.intentTemplate || DEFAULT_INTENT);
   const [wf, setWf] = useState<WorkflowState | null>(null);
   const [busy, setBusy] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<WorkflowEvent | null>(null);
@@ -69,17 +73,35 @@ export function WorkflowMode(): ReactElement {
   // Phase-7 deep link: a Command Center Action-Inbox item opens /ai-workspace?run=<id>. When there
   // is no live workflow, show that run's REAL recorded timeline read-only (runtime-only — present
   // only for the current session). Interactive continuation still requires a live in-session run.
-  const [searchParams] = useSearchParams();
   const focusRun = searchParams.get("run");
   const events = wf ? getWorkflowEvents(wf.workflowRunId) : focusRun ? getWorkflowEvents(focusRun) : [];
   const readOnlyFocus = !wf && !!focusRun && events.length > 0;
+
+  // Phase-8 workflow packs: ?pack=<id> (or the picker) CONFIGURES this workflow — never auto-starts.
+  // ?run (Phase-7 focus) wins over ?pack for display. Pack config is trusted; it sets the governed
+  // target/verb and prefills the (editable) business intent.
+  const [selectedPackId, setSelectedPackId] = useState<string | null>(searchParams.get("pack"));
+  const pack = getWorkflowPack(selectedPackId);
+  const isRecovery = pack?.id === "operational-recovery";
+  // Operational Recovery context: the most recent FAILED run in this session's event log.
+  const recoveryFailed = isRecovery ? [...getAllWorkflowEvents()].reverse().find((e) => e.type === "WORKFLOW_FAILED") ?? null : null;
+  const recoveryFailedRunId = recoveryFailed?.workflowRunId ?? null;
+  const packTargetPath = pack?.governedActionSupported ? pack.targetStrategy?.path : undefined;
+
+  const selectPack = useCallback((id: string) => {
+    setSelectedPackId(id);
+    const p = getWorkflowPack(id);
+    if (p?.intentTemplate) setIntent(p.intentTemplate);
+  }, []);
 
   const start = useCallback(async () => {
     if (runningRef.current || !intent.trim()) return;
     runningRef.current = true;
     setBusy(true);
     setSelectedEvent(null);
-    const s0 = startKnowledgeWorkflow(intent);
+    // Operational Recovery: an explicit retry is a genuinely NEW bounded run linked via retryOf —
+    // it never overwrites the original failed run (which stays as evidence).
+    const s0 = startKnowledgeWorkflow(intent, recoveryFailedRunId ? { retryOf: recoveryFailedRunId } : {});
     setWf(s0);
     const s1 = await runKnowledgeWorkflowToGate(s0); // one bounded pass to the human gate
     // Never overwrite a cancellation the user issued during the in-flight pass: if the run is
@@ -87,7 +109,7 @@ export function WorkflowMode(): ReactElement {
     setWf((prev) => (prev && isWorkflowTerminal(prev.status) ? prev : s1));
     setBusy(false);
     runningRef.current = false;
-  }, [intent]);
+  }, [intent, recoveryFailedRunId]);
 
   const accept = useCallback(() => {
     setWf((s) => (s ? acceptRecommendation(s) : s));
@@ -105,12 +127,33 @@ export function WorkflowMode(): ReactElement {
 
   return (
     <div style={stack("var(--os-space-4)")}>
+      {/* Phase-8 — business workflow packs. Selecting a pack only configures the workflow below. */}
+      {!wf && !readOnlyFocus && <WorkflowPackPicker selectedId={selectedPackId} onSelect={selectPack} />}
+
+      {/* Operational Recovery context — the real failed run this retry is based on (honest: retry is
+          an explicit NEW run, not a governed mutation). */}
+      {isRecovery && !wf && (
+        <div data-testid="recovery-context" role="status" style={{ ...stack("4px"), padding: "var(--os-space-3)", borderRadius: "var(--os-radius-md, 12px)", background: "var(--os-surface-1)", boxShadow: "inset 0 0 0 1px var(--os-border)", fontSize: "var(--os-text-2xs, 12px)" }}>
+          <b>התאוששות תפעולית</b>
+          {recoveryFailed ? (
+            <>
+              <div style={muted}>הרצה מקורית שנכשלה: <span style={code2xs}>{recoveryFailedRunId}</span></div>
+              <div style={{ color: "var(--os-danger, #c0392b)" }}>סיבה: {recoveryFailed.detailHe}</div>
+              <div style={muted}>הפעלה מחדש תיצור הרצה חדשה (retryOf) — ההרצה המקורית נשמרת כראיה. אין הפעלה אוטומטית.</div>
+            </>
+          ) : (
+            <div style={muted}>אין כרגע הרצה שנכשלה בהפעלה הנוכחית (היסטוריית ההרצות היא זמן-ריצה בלבד ונמחקת ברענון).</div>
+          )}
+        </div>
+      )}
+
       {/* Controls */}
       <div data-testid="workflow-controls" style={{ ...stack(), padding: "var(--os-space-3)", borderRadius: "var(--os-radius-md, 12px)", background: "var(--os-surface-1)", boxShadow: "inset 0 0 0 1px var(--os-border)" }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <b style={{ fontSize: "var(--os-text-sm, 13px)" }}>תהליך ידע רב-סוכני (חסום · בשליטת אנוש)</b>
+          <b style={{ fontSize: "var(--os-text-sm, 13px)" }}>{pack ? pack.nameHe : "תהליך ידע רב-סוכני"} (חסום · בשליטת אנוש)</b>
           <StatusChip status={chip.status} label={chip.label} />
           {wf?.currentAgentId && <span style={{ ...muted, fontSize: "var(--os-text-2xs, 11px)" }}>סוכן נוכחי: {getAgentDefinition(wf.currentAgentId)?.nameHe}</span>}
+          {wf?.retryOf && <span data-testid="workflow-retry-of" style={{ ...muted, fontSize: "var(--os-text-2xs, 11px)" }}>התאוששות · retryOf=<span style={code2xs}>{wf.retryOf}</span> → <span style={code2xs}>{wf.workflowRunId}</span></span>}
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 180 }}>
@@ -122,7 +165,7 @@ export function WorkflowMode(): ReactElement {
             </OsButton>
           ) : (
             <OsButton variant="primary" size="sm" onClick={start} data-testid="workflow-start">
-              התחל תהליך
+              {isRecovery ? "התחל מחדש" : "התחל תהליך"}
             </OsButton>
           )}
           {wf?.status === "WAITING_FOR_USER" && (
@@ -165,7 +208,7 @@ export function WorkflowMode(): ReactElement {
 
       {/* Phase-6 — governed action: recommendation → explicit proposal → human review → verified action.
           Keyed by the run id so a new workflow starts a fresh governed-action panel (no stale proposal). */}
-      {wf?.result && <GovernedActionPanel key={wf.workflowRunId} wf={wf} />}
+      {wf?.result && <GovernedActionPanel key={wf.workflowRunId} wf={wf} targetPath={packTargetPath} />}
 
       {/* Real, ordered Timeline — accessible log; select an event to cross-highlight the graphs. */}
       <div data-testid="workflow-timeline" role="log" aria-label="ציר זמן חי של התהליך" style={{ ...stack("2px"), padding: "var(--os-space-3)", borderRadius: "var(--os-radius-md, 12px)", background: "var(--os-surface-1)", boxShadow: "inset 0 0 0 1px var(--os-border)", maxHeight: "34vh", overflow: "auto" }}>

@@ -46,12 +46,16 @@ export interface WorkflowState {
   readonly completedAt: number | null;
   readonly stopReason: string | null;
   readonly nextActionHe: string | null;
+  /** Phase-8 Operational Recovery: the original (failed) run this run is an explicit retry of.
+   *  A retry is a genuinely NEW bounded run — never an overwrite of the original. */
+  readonly retryOf?: string | null;
 }
 
 export interface WorkflowCtx {
   readonly now?: number;
   readonly workflowRunId?: string;
   readonly correlationId?: string;
+  readonly retryOf?: string;
 }
 
 let runSeq = 0;
@@ -139,8 +143,9 @@ export function startKnowledgeWorkflow(intent: string, ctx: WorkflowCtx = {}): W
     completedAt: null,
     stopReason: null,
     nextActionHe: null,
+    retryOf: ctx.retryOf ?? null,
   };
-  ev(state, "WORKFLOW_STARTED", "התהליך התחיל");
+  ev(state, "WORKFLOW_STARTED", ctx.retryOf ? `התהליך התחיל (התאוששות מ-${ctx.retryOf})` : "התהליך התחיל");
   ev(state, "USER_REQUEST_RECEIVED", `בקשת משתמש: ${state.intent.slice(0, 120)}`);
   return state;
 }
