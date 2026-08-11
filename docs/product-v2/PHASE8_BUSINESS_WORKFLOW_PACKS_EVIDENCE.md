@@ -106,15 +106,41 @@ are covered by the Phase-6 suite the packs reuse unchanged.
 
 ## Accessibility / mobile
 
-<!-- filled from the live gate -->
+**Axe (WCAG 2.0/2.1 A/AA)**: the pack-picker (initial) state and the populated flagship state both
+**0 critical / 0 serious**. The two pack cards are keyboard-focusable `<button>`s (first card focused);
+availability is conveyed by text, not color alone. **Mobile** at **375px and 390px**: **0** horizontal
+overflow; pack cards, intent input, Start, proposal preview, diff, and Approve/Reject all usable.
 
-## Live runtime evidence
+## Live runtime evidence (paired vault + AUTOMATED native-decision simulation)
 
-<!-- filled from the live gate -->
+Verified live against the real paired vault (native decision driven by the dev-only flag — see
+Limitations):
+
+- **Deep link `?pack=governed-knowledge-capture`** — opened workflow mode, flagship **selected**,
+  intent **prefilled** from the trusted template, **0 events (NOT auto-started)**.
+- **Flagship run** — explicit Start → Wiki read the real **`AI Operations.md`** (source knowledge,
+  real attribution) → recommendation → explicit "הפוך להצעה" → proposal targeting **`Decisions
+  Log.md`** (from **trusted pack config**, not the source note) → TERAGON approve → native
+  confirmation → one bounded **append** → read-back verified ("בוצעה כתיבה אחת ואומתה בקריאה חוזרת",
+  `ACTION_VERIFIED` after `ACTION_EXECUTED`). Provenance: run `wf-msou3xij-1`, proposal `owp-3bc00da6…`,
+  mutation `mut-e4c3c546…`.
+- **On-disk truth** — `Decisions Log.md` received **exactly one** governed append (this run's block);
+  **`AI Operations.md` was untouched**. The pack config (target/verb) drove the write, not the note.
+- **Command Center** — the verified action appears in **recent activity** (completed count=1), **not**
+  the Action Inbox (reuses Phase-7 derivation; no duplicate Phase-8 signal). The "תעד ידע מבוקר"
+  launch CTA is present.
+- **Recovery** — Obsidian stopped → a real workflow **failed** (`WORKFLOW_FAILED`, no fabricated
+  result) → opening `?pack=operational-recovery` showed the exact failed run `wf-msou5sbm-2` + reason
+  ("Obsidian אינו זמין…") + "התחל מחדש", **not auto-started** → reconnect → explicit retry created a
+  NEW run `wf-msou8alw-3` linked via **`retryOf=wf-msou5sbm-2`** (original preserved) that reached the
+  gate. No governed mutation for the retry.
 
 ## Regression results
 
-<!-- filled from the live gate -->
+Full `vitest` **2793 passing** (Phase-8 suite 9; +9 over Phase 7's 2784); typecheck + typecheck:tests
+clean; `oxlint` 4 pre-existing warnings; `scan:secrets` CLEAN. Phase-3 A/B/C/D, Phase-4, Phase-5,
+Phase-6, Phase-7, Command Center + Visual Workspace suites all green. **7 agents / 14 actions
+unchanged.**
 
 ## Limitations (honest)
 

@@ -20,10 +20,10 @@ const seg: CSSProperties = { display: "inline-flex", gap: 4, padding: 4, borderR
 type Mode = "agents" | "graph" | "split" | "workflow";
 
 export function VisualIntelligenceWorkspace(): ReactElement {
-  // A Command Center Action-Inbox deep link (/ai-workspace?run=<id>) opens straight into the live
-  // workflow mode so the linked run's recorded timeline is shown.
+  // A Command Center deep link opens straight into the live workflow mode: ?run=<id> (Phase-7,
+  // show a recorded run) or ?pack=<id> (Phase-8, select a business workflow pack).
   const [searchParams] = useSearchParams();
-  const [mode, setMode] = useState<Mode>(searchParams.get("run") ? "workflow" : "agents");
+  const [mode, setMode] = useState<Mode>(searchParams.get("run") || searchParams.get("pack") ? "workflow" : "agents");
   // Live Agent↔Note usages (real retrieval traces) drive cross-selection in split mode.
   const [usages, setUsages] = useState(() => deriveAgentNoteUsages());
   useEffect(() => {
