@@ -3,7 +3,7 @@
 // recorded runtime events, and drives the two graphs from those real events (current agent
 // + selected timeline event → cross-highlight the agent and note it actually touched).
 // Everything shown corresponds to a real recorded event — no fake reasoning, no fake activity.
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { CSSProperties, ReactElement } from "react";
 import { OsButton, SearchInput, StatusChip } from "@/design-system";
 import { getAgentDefinition } from "@/agents/definitions";
@@ -16,9 +16,10 @@ import {
   type WorkflowState,
   type WorkflowStatus,
 } from "@/agents/workflow/knowledgeWorkflow";
-import { getWorkflowEvents, type WorkflowEvent } from "@/agents/workflow/workflowEvents";
+import { getWorkflowEvents, subscribeWorkflowEvents, type WorkflowEvent } from "@/agents/workflow/workflowEvents";
 import { deriveWorkflowHighlights } from "./workflowHighlights";
 import { AgentNetworkPanel } from "./AgentNetworkPanel";
+import { GovernedActionPanel } from "./GovernedActionPanel";
 import { KnowledgeGraphPanel } from "@/modules/memory/obsidian/KnowledgeGraphPanel";
 import "./visual.css";
 
@@ -38,6 +39,9 @@ const STATUS_CHIP: Record<WorkflowStatus, { label: string; status: "פעיל" | 
 
 // Only actions/provenance are ever shown — never hidden reasoning.
 function eventIcon(t: WorkflowEvent["type"]): string {
+  if (t.startsWith("PROPOSAL")) return "▤";
+  if (t.startsWith("ACTION")) return "✎";
+  if (t === "NATIVE_CONFIRMATION_REQUIRED") return "🔒";
   if (t.startsWith("HANDOFF")) return "→";
   if (t.startsWith("VAULT")) return "📄";
   if (t.startsWith("AGENT")) return "◆";
@@ -56,6 +60,10 @@ export function WorkflowMode(): ReactElement {
   const [busy, setBusy] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<WorkflowEvent | null>(null);
   const runningRef = useRef(false);
+  // Re-render when any workflow event is recorded — including the Phase-6 governed-action events
+  // emitted from the child panel — so the shared Timeline stays live.
+  const [, tick] = useReducer((x: number) => x + 1, 0);
+  useEffect(() => subscribeWorkflowEvents(() => tick()), []);
 
   const events = wf ? getWorkflowEvents(wf.workflowRunId) : [];
 
@@ -141,6 +149,9 @@ export function WorkflowMode(): ReactElement {
           </div>
         )}
       </div>
+
+      {/* Phase-6 — governed action: recommendation → explicit proposal → human review → verified action. */}
+      {wf?.result && <GovernedActionPanel wf={wf} />}
 
       {/* Real, ordered Timeline — accessible log; select an event to cross-highlight the graphs. */}
       <div data-testid="workflow-timeline" role="log" aria-label="ציר זמן חי של התהליך" style={{ ...stack("2px"), padding: "var(--os-space-3)", borderRadius: "var(--os-radius-md, 12px)", background: "var(--os-surface-1)", boxShadow: "inset 0 0 0 1px var(--os-border)", maxHeight: "34vh", overflow: "auto" }}>

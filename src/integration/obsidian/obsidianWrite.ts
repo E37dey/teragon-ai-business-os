@@ -42,6 +42,14 @@ export interface WriteProposal {
   readonly approvedAt: string | null;
   readonly resultHash: string | null;
   readonly failureCode: BridgeCode | null;
+  // Phase-6 provenance (optional — links a governed proposal back to the workflow that produced
+  // it). Never stores a secret or a full note body; only ids + short references for lineage.
+  // Optional so existing (Phase-3) proposal construction stays valid; createWriteProposal always
+  // populates them.
+  readonly workflowRunId?: string | null;
+  readonly originatingAgentId?: string | null;
+  readonly sourceNotePaths?: readonly string[];
+  readonly recommendationRef?: string | null;
 }
 
 export interface Identity {
@@ -74,6 +82,13 @@ export interface CreateProposalInput {
   baseContent?: string | null; // update/append current content (for diff + conflict)
   requester?: Identity;
   now?: string; // injectable timestamp (tests)
+  // Phase-6 provenance (optional) — carried onto the proposal for lineage. correlationId, when
+  // supplied, is REUSED (so the proposal shares the originating workflow's correlationId).
+  correlationId?: string;
+  workflowRunId?: string;
+  originatingAgentId?: string;
+  sourceNotePaths?: readonly string[];
+  recommendationRef?: string;
 }
 
 /** Build a TERAGON-side write proposal. Performs NO bridge write. */
@@ -96,7 +111,7 @@ export async function createWriteProposal(input: CreateProposalInput): Promise<W
     createdAt: input.now ?? new Date().toISOString(),
     requesterId: requester.id,
     requesterName: requester.name,
-    correlationId: uid("cid"),
+    correlationId: input.correlationId ?? uid("cid"),
     mutationId: uid("mut"),
     state: "PROPOSED",
     approvedById: null,
@@ -104,6 +119,10 @@ export async function createWriteProposal(input: CreateProposalInput): Promise<W
     approvedAt: null,
     resultHash: null,
     failureCode: null,
+    workflowRunId: input.workflowRunId ?? null,
+    originatingAgentId: input.originatingAgentId ?? null,
+    sourceNotePaths: input.sourceNotePaths ? [...input.sourceNotePaths] : [],
+    recommendationRef: input.recommendationRef ?? null,
   };
 }
 
