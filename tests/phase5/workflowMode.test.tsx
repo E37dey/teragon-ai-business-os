@@ -4,6 +4,7 @@ import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/app/queryClient";
 import { AuthProvider } from "@/auth/AuthProvider";
@@ -24,7 +25,8 @@ import { __resetRetrievalTraceForTests } from "@/agents/obsidian/retrievalTrace"
 const conn = { ok: true as const, code: "OK" as const, status: 200, data: { connected: true, vaultName: "TERAGON OS", version: "v", readonly: true, writeEnabled: false } };
 
 function wrap(node: React.ReactElement) {
-  return render(<AuthProvider><QueryClientProvider client={queryClient}><ToastProvider>{node}</ToastProvider></QueryClientProvider></AuthProvider>);
+  // WorkflowMode now reads the ?run= deep-link param (Phase 7), so it needs a Router context.
+  return render(<MemoryRouter><AuthProvider><QueryClientProvider client={queryClient}><ToastProvider>{node}</ToastProvider></QueryClientProvider></AuthProvider></MemoryRouter>);
 }
 
 beforeEach(() => {

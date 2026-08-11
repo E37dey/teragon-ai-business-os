@@ -5,6 +5,7 @@ import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/app/queryClient";
 import { AuthProvider } from "@/auth/AuthProvider";
@@ -17,12 +18,15 @@ import { AgentNetworkPanel } from "@/modules/ai-workspace/visual/AgentNetworkPan
 import { VisualIntelligenceWorkspace } from "@/modules/ai-workspace/visual/VisualIntelligenceWorkspace";
 
 function wrap(node: React.ReactElement) {
+  // VisualIntelligenceWorkspace now reads the ?run= deep-link param (Phase 7) → needs a Router.
   return render(
-    <AuthProvider>
-      <QueryClientProvider client={queryClient}>
-        <ToastProvider>{node}</ToastProvider>
-      </QueryClientProvider>
-    </AuthProvider>,
+    <MemoryRouter>
+      <AuthProvider>
+        <QueryClientProvider client={queryClient}>
+          <ToastProvider>{node}</ToastProvider>
+        </QueryClientProvider>
+      </AuthProvider>
+    </MemoryRouter>,
   );
 }
 

@@ -5,6 +5,7 @@
 // Everything shown corresponds to a real recorded event — no fake reasoning, no fake activity.
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { CSSProperties, ReactElement } from "react";
+import { useSearchParams } from "react-router-dom";
 import { OsButton, SearchInput, StatusChip } from "@/design-system";
 import { getAgentDefinition } from "@/agents/definitions";
 import {
@@ -65,7 +66,13 @@ export function WorkflowMode(): ReactElement {
   const [, tick] = useReducer((x: number) => x + 1, 0);
   useEffect(() => subscribeWorkflowEvents(() => tick()), []);
 
-  const events = wf ? getWorkflowEvents(wf.workflowRunId) : [];
+  // Phase-7 deep link: a Command Center Action-Inbox item opens /ai-workspace?run=<id>. When there
+  // is no live workflow, show that run's REAL recorded timeline read-only (runtime-only — present
+  // only for the current session). Interactive continuation still requires a live in-session run.
+  const [searchParams] = useSearchParams();
+  const focusRun = searchParams.get("run");
+  const events = wf ? getWorkflowEvents(wf.workflowRunId) : focusRun ? getWorkflowEvents(focusRun) : [];
+  const readOnlyFocus = !wf && !!focusRun && events.length > 0;
 
   const start = useCallback(async () => {
     if (runningRef.current || !intent.trim()) return;
@@ -149,6 +156,12 @@ export function WorkflowMode(): ReactElement {
           </div>
         )}
       </div>
+
+      {readOnlyFocus && (
+        <div role="status" data-testid="workflow-focus-readonly" style={{ padding: "var(--os-space-2) var(--os-space-3)", borderRadius: "var(--os-radius-md, 12px)", background: "var(--os-surface-1)", boxShadow: "inset 0 0 0 1px var(--os-border)", fontSize: "var(--os-text-2xs, 12px)", color: "var(--os-text-2)" }}>
+          תצוגת ציר-זמן בלבד עבור התהליך <span style={code2xs}>{focusRun}</span> (מההפעלה הנוכחית). להמשך אינטראקטיבי — התחילו תהליך חדש.
+        </div>
+      )}
 
       {/* Phase-6 — governed action: recommendation → explicit proposal → human review → verified action.
           Keyed by the run id so a new workflow starts a fresh governed-action panel (no stale proposal). */}

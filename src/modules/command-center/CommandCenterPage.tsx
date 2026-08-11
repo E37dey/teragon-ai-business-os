@@ -49,6 +49,7 @@ import { ApprovalPanel } from "@/components/approval";
 import { AgentNetworkLive } from "./AgentNetworkLive";
 import { ManagementBand } from "./ManagementBand";
 import { MemoryBand } from "./MemoryBand";
+import { OperationsBrief } from "./OperationsBrief";
 import { useCopilot } from "@/modules/ai-copilot/copilotApi";
 import { dashboardKpis, salesFunnel, recentActivity } from "@/domain/selectors";
 import {
@@ -425,6 +426,9 @@ function CommandCenterInner(): ReactElement {
           <DemoBadge />
         </div>
       </div>
+
+      {/* Phase 7 — executive AI-operations brief + action inbox (real signals only). */}
+      <OperationsBrief />
 
       {/* VC-C — four PRIMARY KPIs only: the operational counts that genuinely
           drive the operator's next action. Zero stays neutral (muted) because a
