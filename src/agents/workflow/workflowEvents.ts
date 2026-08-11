@@ -22,7 +22,19 @@ export type WorkflowEventType =
   | "USER_CONTINUED"
   | "WORKFLOW_COMPLETED"
   | "WORKFLOW_FAILED"
-  | "WORKFLOW_CANCELLED";
+  | "WORKFLOW_CANCELLED"
+  // Phase-6 governed action lifecycle (recommendation → proposal → human approval → verified
+  // Obsidian action). Emitted ONLY when the real state transition actually occurs.
+  | "PROPOSAL_CREATED"
+  | "PROPOSAL_REVIEW_REQUIRED"
+  | "PROPOSAL_APPROVED"
+  | "PROPOSAL_REJECTED"
+  | "ACTION_STAGED"
+  | "NATIVE_CONFIRMATION_REQUIRED"
+  | "ACTION_EXECUTED"
+  | "ACTION_VERIFIED"
+  | "ACTION_CONFLICT"
+  | "ACTION_FAILED";
 
 export interface WorkflowEvent {
   readonly id: string;
@@ -38,6 +50,9 @@ export interface WorkflowEvent {
   readonly notePath?: string;
   readonly vaultName?: string;
   readonly correlationId?: string;
+  /** Phase-6 governed-action lineage (ids only — never a secret or a note body) */
+  readonly proposalId?: string;
+  readonly mutationId?: string;
   /** honest, short, human-facing label — actions/provenance, NEVER hidden reasoning */
   readonly detailHe: string;
   readonly success: boolean;
