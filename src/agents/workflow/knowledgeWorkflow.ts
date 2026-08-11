@@ -64,6 +64,24 @@ function mkRunId(ctx?: WorkflowCtx): string {
   return `wf-${nowMs(ctx).toString(36)}-${runSeq.toString(36)}`;
 }
 
+// Runtime-only cancellation registry. A cancel requested from the UI (cancelWorkflow) marks
+// the run here so an IN-FLIGHT pass can observe it at a checkpoint and stop BEFORE running any
+// further step or emitting any further event (no read, no result after cancellation). Bounded
+// (run ids are unique-per-start and never recur, so clearing when large is safe).
+const CANCELLED_RUNS = new Set<string>();
+const CANCEL_EMITTED = new Set<string>();
+const COMPLETE_EMITTED = new Set<string>();
+function markCancelled(runId: string): void {
+  if (CANCELLED_RUNS.size > 64) {
+    CANCELLED_RUNS.clear();
+    CANCEL_EMITTED.clear();
+  }
+  CANCELLED_RUNS.add(runId);
+}
+function isRunCancelled(runId: string): boolean {
+  return CANCELLED_RUNS.has(runId);
+}
+
 let evSeq = 0;
 function ev(state: WorkflowState, type: WorkflowEventType, detailHe: string, extra: Partial<WorkflowEvent> = {}): void {
   evSeq += 1;
@@ -147,7 +165,23 @@ export async function runKnowledgeWorkflowToGate(state0: WorkflowState, ctx: Wor
   const step = (): void => {
     state = { ...state, stepCount: state.stepCount + 1, updatedAt: at };
   };
+  // Cancellation checkpoint: if a cancel was requested (from the UI) during this in-flight
+  // pass, stop immediately — before any further step or event. Returns a CANCELLED state (and
+  // emits WORKFLOW_CANCELLED exactly once for the run) or null to continue.
+  const bailIfCancelled = (): WorkflowState | null => {
+    if (!isRunCancelled(state.workflowRunId)) return null;
+    const next: WorkflowState = { ...state, status: "CANCELLED", completedAt: at, updatedAt: at, currentAgentId: null, stopReason: "בוטל על ידי המשתמש.", nextActionHe: null };
+    if (!CANCEL_EMITTED.has(state.workflowRunId)) {
+      CANCEL_EMITTED.add(state.workflowRunId);
+      ev(next, "WORKFLOW_CANCELLED", "התהליך בוטל על ידי המשתמש", { at });
+    }
+    return next;
+  };
 
+  {
+    const b = bailIfCancelled();
+    if (b) return b;
+  }
   // 1) Orchestrator starts + dispatches Wiki (real handoff transition).
   step();
   state = { ...state, currentAgentId: "ag-orchestrator", contributingAgents: ["ag-orchestrator"] };
@@ -166,6 +200,10 @@ export async function runKnowledgeWorkflowToGate(state0: WorkflowState, ctx: Wor
   const query = deriveQuery(state.intent);
   ev(state, "VAULT_SEARCH_STARTED", `חיפוש חי ב-Obsidian: "${query}"`, { actorAgentId: "ag-wiki" });
   const search = await agentSearchVault("ag-wiki", { query }, ctx.correlationId ? { correlationId: ctx.correlationId, now: ctx.now } : { now: ctx.now });
+  { // cancel landed during the search — stop before the note read / result (nothing after cancellation)
+    const b = bailIfCancelled();
+    if (b) return b;
+  }
   if (search.code === "denied") return fail(state, at, "הרשאת קריאה נדחתה.", "CAPABILITY_DENIED", "הרשאה נדחתה");
   if (search.code === "unavailable" || search.code === "timeout") return fail(state, at, "Obsidian אינו זמין — התהליך נעצר ללא ידע חי.", "VAULT_UNAVAILABLE", "Obsidian אינו זמין");
   if (search.code === "unauthorized") return fail(state, at, "נדרש חיבור מחדש ל-Obsidian.", "VAULT_UNAVAILABLE", "נדרש חיבור מחדש");
@@ -183,6 +221,10 @@ export async function runKnowledgeWorkflowToGate(state0: WorkflowState, ctx: Wor
   ev(state, "VAULT_NOTE_READ", `סוכן ידע קרא את ${note.basename}`, { actorAgentId: "ag-wiki", notePath: note.path ?? undefined, vaultName: note.source.vaultName, correlationId: note.correlationId });
   ev(state, "AGENT_COMPLETED", "סוכן ידע סיים — סיכם את המסמך", { actorAgentId: "ag-wiki" });
 
+  { // cancel landed after the read — stop before synthesis (no RESULT_CREATED after cancellation)
+    const b = bailIfCancelled();
+    if (b) return b;
+  }
   // 4) Handoff back → Orchestrator synthesizes a deterministic recommendation.
   step();
   ev(state, "HANDOFF_REQUESTED", "סוכן ידע מחזיר למנהל התזמור", { source: "ag-wiki", target: "ag-orchestrator" });
@@ -201,21 +243,40 @@ export async function runKnowledgeWorkflowToGate(state0: WorkflowState, ctx: Wor
   return state;
 }
 
-/** Human accepts the recommendation (acknowledge only — NO write, NO approval of any mutation). */
+/** Human accepts the recommendation (acknowledge only — NO write, NO approval of any mutation).
+ *  Emits USER_CONTINUED + WORKFLOW_COMPLETED exactly once per run (idempotent — safe against a
+ *  React StrictMode double-invoked state updater, so the audit trace never duplicates events). */
 export function acceptRecommendation(state: WorkflowState, ctx: WorkflowCtx = {}): WorkflowState {
   if (state.status !== "WAITING_FOR_USER") return state;
   const at = nowMs(ctx);
   const next: WorkflowState = { ...state, status: "COMPLETED", completedAt: at, updatedAt: at, nextActionHe: null };
-  ev(next, "USER_CONTINUED", "המשתמש קיבל את ההמלצה (ידע בלבד — ללא כתיבה/אישור מוטציה)", { at });
-  ev(next, "WORKFLOW_COMPLETED", "התהליך הושלם", { at });
+  if (!COMPLETE_EMITTED.has(state.workflowRunId)) {
+    if (COMPLETE_EMITTED.size > 64) COMPLETE_EMITTED.clear();
+    COMPLETE_EMITTED.add(state.workflowRunId);
+    ev(next, "USER_CONTINUED", "המשתמש קיבל את ההמלצה (ידע בלבד — ללא כתיבה/אישור מוטציה)", { at });
+    ev(next, "WORKFLOW_COMPLETED", "התהליך הושלם", { at });
+  }
   return next;
 }
 
-/** Cancel an active workflow. Stops future steps; does NOT roll back already-completed reads. */
+/** Cancel a workflow. Registers the cancellation so an IN-FLIGHT pass stops at its next
+ *  checkpoint (before any further step/read/result). Stops future steps; does NOT roll back an
+ *  already-completed read. Emits WORKFLOW_CANCELLED exactly once per run (idempotent). */
 export function cancelWorkflow(state: WorkflowState, ctx: WorkflowCtx = {}): WorkflowState {
+  markCancelled(state.workflowRunId);
   if (isWorkflowTerminal(state.status) || state.status === "IDLE") return state;
   const at = nowMs(ctx);
   const next: WorkflowState = { ...state, status: "CANCELLED", completedAt: at, updatedAt: at, currentAgentId: null, stopReason: "בוטל על ידי המשתמש.", nextActionHe: null };
-  ev(next, "WORKFLOW_CANCELLED", "התהליך בוטל על ידי המשתמש", { at });
+  if (!CANCEL_EMITTED.has(state.workflowRunId)) {
+    CANCEL_EMITTED.add(state.workflowRunId);
+    ev(next, "WORKFLOW_CANCELLED", "התהליך בוטל על ידי המשתמש", { at });
+  }
   return next;
+}
+
+/** Test-only: clear the runtime cancellation registry between tests. */
+export function __resetKnowledgeWorkflowForTests(): void {
+  CANCELLED_RUNS.clear();
+  CANCEL_EMITTED.clear();
+  COMPLETE_EMITTED.clear();
 }

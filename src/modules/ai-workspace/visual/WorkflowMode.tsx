@@ -17,6 +17,7 @@ import {
   type WorkflowStatus,
 } from "@/agents/workflow/knowledgeWorkflow";
 import { getWorkflowEvents, type WorkflowEvent } from "@/agents/workflow/workflowEvents";
+import { deriveWorkflowHighlights } from "./workflowHighlights";
 import { AgentNetworkPanel } from "./AgentNetworkPanel";
 import { KnowledgeGraphPanel } from "@/modules/memory/obsidian/KnowledgeGraphPanel";
 import "./visual.css";
@@ -66,7 +67,9 @@ export function WorkflowMode(): ReactElement {
     const s0 = startKnowledgeWorkflow(intent);
     setWf(s0);
     const s1 = await runKnowledgeWorkflowToGate(s0); // one bounded pass to the human gate
-    setWf(s1);
+    // Never overwrite a cancellation the user issued during the in-flight pass: if the run is
+    // already terminal (e.g. CANCELLED), keep it; the engine also stops at its own checkpoint.
+    setWf((prev) => (prev && isWorkflowTerminal(prev.status) ? prev : s1));
     setBusy(false);
     runningRef.current = false;
   }, [intent]);
@@ -78,13 +81,10 @@ export function WorkflowMode(): ReactElement {
     setWf((s) => (s ? cancelWorkflow(s) : s));
   }, []);
 
-  // Cross-highlight the graphs from the workflow: a selected timeline event wins; otherwise
-  // the live current agent / the read source. Reuses the Phase-4 cross-highlight props.
-  const highlightAgentId = selectedEvent?.actorAgentId ?? selectedEvent?.source ?? wf?.currentAgentId ?? null;
-  const highlightPaths = useMemo(() => {
-    if (selectedEvent?.notePath) return [selectedEvent.notePath];
-    return (wf?.sources ?? []).map((s) => s.path);
-  }, [selectedEvent, wf]);
+  // Cross-highlight the graphs from REAL event metadata only (see deriveWorkflowHighlights):
+  // a handoff → BOTH endpoints + the exact edge; a note/agent event → its one real actor/note;
+  // an event with no agent/note → NO highlight (never fabricated from the workflow's sources).
+  const { highlightAgentIds, highlightEdge, highlightPaths } = useMemo(() => deriveWorkflowHighlights(selectedEvent, wf), [selectedEvent, wf]);
 
   const chip = wf ? STATUS_CHIP[wf.status] : STATUS_CHIP.IDLE;
 
@@ -173,7 +173,7 @@ export function WorkflowMode(): ReactElement {
 
       {/* The two graphs react to the real workflow (current agent / read note highlighted). */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))", gap: "var(--os-space-5)", alignItems: "start" }}>
-        <AgentNetworkPanel highlightAgentId={highlightAgentId} />
+        <AgentNetworkPanel highlightAgentIds={highlightAgentIds} highlightEdge={highlightEdge} />
         <KnowledgeGraphPanel highlightPaths={highlightPaths} />
       </div>
     </div>

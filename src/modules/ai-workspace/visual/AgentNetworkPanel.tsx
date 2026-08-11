@@ -89,17 +89,24 @@ interface AgentNode {
   id: string;
 }
 
-export function AgentNetworkPanel({ usages = [], onSelectAgent, highlightAgentId }: { usages?: AgentNoteUsage[]; onSelectAgent?: (id: string | null) => void; highlightAgentId?: string | null }): ReactElement {
+export function AgentNetworkPanel({ usages = [], onSelectAgent, highlightAgentId, highlightAgentIds, highlightEdge }: { usages?: AgentNoteUsage[]; onSelectAgent?: (id: string | null) => void; highlightAgentId?: string | null; highlightAgentIds?: readonly string[]; highlightEdge?: { source: string; target: string } | null }): ReactElement {
   const reduced = usePrefersReducedMotion();
   const [selected, setSelected] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, AgentStatus>>({});
   const [fullscreen, setFullscreen] = useState(false);
   const apiRef = useRef<ForceGraphApi | null>(null);
-  // Phase-4 cross-selection: when a note is selected in split mode, the workspace passes the
-  // agent that REALLY read it; we emphasize that agent (dim the rest + focus).
+  // Cross-selection: the workspace (split mode = a note's real reader; live workflow = the real
+  // event's actor(s)) passes the agent(s) to emphasize. A handoff event emphasizes BOTH real
+  // endpoints; a note/agent event emphasizes the one real actor. Nothing is highlighted for an
+  // event that carries no agent — no fabricated emphasis.
+  const highlightSet = useMemo(() => {
+    const ids = highlightAgentIds && highlightAgentIds.length ? [...highlightAgentIds] : highlightAgentId ? [highlightAgentId] : [];
+    return ids.length ? new Set(ids) : null;
+  }, [highlightAgentIds, highlightAgentId]);
+  const highlightPrimary = (highlightAgentIds && highlightAgentIds[0]) ?? highlightAgentId ?? null;
   useEffect(() => {
-    if (highlightAgentId) apiRef.current?.focus(highlightAgentId);
-  }, [highlightAgentId]);
+    if (highlightPrimary) apiRef.current?.focus(highlightPrimary);
+  }, [highlightPrimary]);
 
   const nodes = useMemo<AgentNode[]>(() => AGENT_IDS.map((id) => ({ id })), []);
   const [handoffRows, setHandoffRows] = useState<HandoffRecord[]>([]);
@@ -212,7 +219,7 @@ export function AgentNetworkPanel({ usages = [], onSelectAgent, highlightAgentId
           selectedId={selected}
           onSelect={selectAndFocus}
           degreeOf={(id) => degreeMap.get(id) ?? 0}
-          isDimmed={highlightAgentId ? (id) => id !== highlightAgentId && id !== "ag-orchestrator" : undefined}
+          isDimmed={highlightSet ? (id) => !highlightSet.has(id) && id !== "ag-orchestrator" : undefined}
           nodeRadius={(n) => agentRadius(n.id)}
           labelFor={(n) => getAgentDefinition(n.id)?.nameHe ?? n.id}
           clusterOf={(id) => AGENT_REGION[id] ?? "coordination"}
@@ -231,8 +238,10 @@ export function AgentNetworkPanel({ usages = [], onSelectAgent, highlightAgentId
             if (e.kind === "active") {
               return { stroke: "var(--os-accent-cyan, #35c0c9)", opacity: 0.95, width: 3, signal: true, testId: "agent-handoff-active" };
             }
-            const emphasised = ctx.active || ctx.hovered;
-            return { dashed: true, stroke: emphasised ? "var(--os-accent-cyan, #35c0c9)" : "var(--os-border)", opacity: ctx.dim ? 0.1 : emphasised ? 0.75 : 0.4, width: emphasised ? 2 : 1 };
+            // Emphasize the exact real handoff edge when a handoff event is cross-selected.
+            const edgeHi = !!highlightEdge && ((e.source === highlightEdge.source && e.target === highlightEdge.target) || (e.source === highlightEdge.target && e.target === highlightEdge.source));
+            const emphasised = edgeHi || ctx.active || ctx.hovered;
+            return { dashed: !edgeHi, stroke: emphasised ? "var(--os-accent-cyan, #35c0c9)" : "var(--os-border)", opacity: edgeHi ? 0.95 : ctx.dim ? 0.1 : emphasised ? 0.75 : 0.4, width: edgeHi ? 3 : emphasised ? 2 : 1 };
           }}
           renderNode={(n, ctx) => {
             const def = getAgentDefinition(n.id)!;

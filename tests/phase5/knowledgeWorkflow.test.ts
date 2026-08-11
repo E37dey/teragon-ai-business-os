@@ -15,6 +15,7 @@ import {
   runKnowledgeWorkflowToGate,
   startKnowledgeWorkflow,
   WORKFLOW_MAX_STEPS,
+  __resetKnowledgeWorkflowForTests,
 } from "@/agents/workflow/knowledgeWorkflow";
 import { __resetWorkflowEventsForTests, getWorkflowEvents } from "@/agents/workflow/workflowEvents";
 import { __resetRetrievalTraceForTests } from "@/agents/obsidian/retrievalTrace";
@@ -30,12 +31,14 @@ beforeEach(() => {
   vi.clearAllMocks();
   __resetWorkflowEventsForTests();
   __resetRetrievalTraceForTests();
+  __resetKnowledgeWorkflowForTests();
   vi.mocked(getObsidianToken).mockReturnValue(SECRET);
   vi.mocked(getConnectionInfo).mockResolvedValue(conn);
 });
 afterEach(() => {
   __resetWorkflowEventsForTests();
   __resetRetrievalTraceForTests();
+  __resetKnowledgeWorkflowForTests();
 });
 
 const AI_OPS = "# AI Operations\n\nBridge note connecting [[AI]], [[Automation]], [[Operations]].";
@@ -107,6 +110,20 @@ describe("Phase 5 — human gates (Continue ≠ Approve ≠ write)", () => {
     expect(types).not.toContain("APPROVED");
   });
 
+  it("accept is idempotent — a double-invoked accept (StrictMode) emits USER_CONTINUED/WORKFLOW_COMPLETED once", async () => {
+    vi.mocked(searchNotes).mockResolvedValue(mkSearch("AI Operations", "AI Operations.md"));
+    vi.mocked(readNote).mockResolvedValue(mkNote("AI Operations.md", "AI Operations", AI_OPS));
+    let s = startKnowledgeWorkflow("AI Operations", { workflowRunId: "wf-3b" });
+    s = await runKnowledgeWorkflowToGate(s);
+    const a1 = acceptRecommendation(s);
+    const a2 = acceptRecommendation(s); // React StrictMode double-invokes the setState updater with the same input
+    expect(a1.status).toBe("COMPLETED");
+    expect(a2.status).toBe("COMPLETED");
+    const types = getWorkflowEvents("wf-3b").map((e) => e.type);
+    expect(types.filter((t) => t === "USER_CONTINUED")).toHaveLength(1);
+    expect(types.filter((t) => t === "WORKFLOW_COMPLETED")).toHaveLength(1);
+  });
+
   it("cancel stops future steps and does not roll back the completed read", async () => {
     vi.mocked(searchNotes).mockResolvedValue(mkSearch("AI Operations", "AI Operations.md"));
     vi.mocked(readNote).mockResolvedValue(mkNote("AI Operations.md", "AI Operations", AI_OPS));
@@ -118,6 +135,28 @@ describe("Phase 5 — human gates (Continue ≠ Approve ≠ write)", () => {
     const afterCancel = await runKnowledgeWorkflowToGate(s); // no future step
     expect(afterCancel.status).toBe("CANCELLED");
     expect(getWorkflowEvents("wf-4").map((e) => e.type)).toContain("WORKFLOW_CANCELLED");
+  });
+
+  it("cancel DURING the in-flight pass stops before the read/result (no RESULT_CREATED after cancellation)", async () => {
+    // The cancel fires while Wiki's real search is in flight — the engine must observe it at its
+    // next checkpoint and stop before reading the note or creating a recommendation.
+    const s0 = startKnowledgeWorkflow("AI Operations", { workflowRunId: "wf-4b" });
+    vi.mocked(searchNotes).mockImplementation(async () => {
+      cancelWorkflow(s0); // user clicks "בטל" during the in-flight pass
+      return mkSearch("AI Operations", "AI Operations.md");
+    });
+    vi.mocked(readNote).mockResolvedValue(mkNote("AI Operations.md", "AI Operations", AI_OPS));
+    const done = await runKnowledgeWorkflowToGate(s0);
+    expect(done.status).toBe("CANCELLED");
+    const types = getWorkflowEvents("wf-4b").map((e) => e.type);
+    expect(types).not.toContain("VAULT_NOTE_READ"); // stopped before the read
+    expect(types).not.toContain("RESULT_CREATED"); // no result after cancellation
+    expect(types).not.toContain("USER_DECISION_REQUIRED");
+    expect(types).toContain("WORKFLOW_CANCELLED");
+    expect(types.filter((t) => t === "WORKFLOW_CANCELLED")).toHaveLength(1); // emitted exactly once
+    expect(readNote).not.toHaveBeenCalled(); // the note read never even started
+    expect(done.result).toBeNull();
+    expect(deriveAgentNoteUsages()).toEqual([]); // no Agent→Note relation from a cancelled pass
   });
 });
 
