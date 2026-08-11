@@ -45,6 +45,8 @@ describe("OperationsBrief", () => {
     expect(screen.getByTestId("recent-activity").textContent).toContain("אין פעילות מאומתת");
     // runtime-only persistence truth is stated
     expect(screen.getByTestId("operations-brief").textContent).toContain("תצוגה חיה של ההפעלה הנוכחית");
+    // a11y: an empty inbox must NOT render a childless role="list" (aria-required-children)
+    expect(screen.getByTestId("action-inbox").querySelector('[role="list"]')).toBeNull();
   });
 
   it("a waiting-for-user run appears as ONE actionable inbox item with its CTA + real run id", () => {

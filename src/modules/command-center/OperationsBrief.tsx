@@ -91,32 +91,35 @@ export function OperationsBrief(): ReactElement {
         <CountChip label="דורש חיבור מחדש" value={counts.needsReconnect} testid="count-reconnect" />
       </div>
 
-      {/* Action Inbox — only items where a human decision/step is genuinely valid. */}
-      <div data-testid="action-inbox" role="list" aria-label="תיבת פעולות" style={{ display: "grid", gap: "var(--os-space-2)" }}>
+      {/* Action Inbox — only items where a human decision/step is genuinely valid. The heading and
+          empty state live OUTSIDE role="list" (a list must contain only listitem children). */}
+      <div data-testid="action-inbox" style={{ display: "grid", gap: "var(--os-space-2)" }}>
         <b style={{ fontSize: "var(--os-text-sm, 13px)" }}>תיבת פעולות ({inbox.length})</b>
         {inbox.length === 0 ? (
           <EmptyState icon="check" title="אין כרגע פריטים הדורשים החלטה" reason="כאשר תהליך ימתין להחלטה, הצעה תמתין לאישור או תהליך ייכשל — הם יופיעו כאן." />
         ) : (
-          inbox.map((s) => (
-            <div key={s.id} role="listitem" data-testid="inbox-item" data-type={s.type} style={cardStyle(s.priority)}>
-              <div style={{ ...row, justifyContent: "space-between" }}>
-                <span style={{ fontWeight: 700, fontSize: "var(--os-text-sm, 13px)" }}>{s.titleHe}</span>
-                <StatusChip status={PRIORITY_CHIP[s.priority]} label={s.priority} />
+          <div role="list" aria-label="תיבת פעולות" style={{ display: "grid", gap: "var(--os-space-2)" }}>
+            {inbox.map((s) => (
+              <div key={s.id} role="listitem" data-testid="inbox-item" data-type={s.type} style={cardStyle(s.priority)}>
+                <div style={{ ...row, justifyContent: "space-between" }}>
+                  <span style={{ fontWeight: 700, fontSize: "var(--os-text-sm, 13px)" }}>{s.titleHe}</span>
+                  <StatusChip status={PRIORITY_CHIP[s.priority]} label={s.priority} />
+                </div>
+                <div style={{ ...muted, fontSize: "var(--os-text-2xs, 12px)" }}>{s.detailHe}</div>
+                <div style={{ ...muted, ...code2xs }}>
+                  {s.workflowRunId ? <>run={s.workflowRunId} </> : null}
+                  {s.proposalId ? <>· proposal={s.proposalId} </> : null}
+                  {s.agentId ? <>· agent={s.agentId} </> : null}
+                  {s.notePath ? <>· note={s.notePath}</> : null}
+                </div>
+                <div>
+                  <OsButton variant="cyan" size="sm" onClick={() => open(s)} data-testid="inbox-cta">
+                    {s.recommendedNextStepHe}
+                  </OsButton>
+                </div>
               </div>
-              <div style={{ ...muted, fontSize: "var(--os-text-2xs, 12px)" }}>{s.detailHe}</div>
-              <div style={{ ...muted, ...code2xs }}>
-                {s.workflowRunId ? <>run={s.workflowRunId} </> : null}
-                {s.proposalId ? <>· proposal={s.proposalId} </> : null}
-                {s.agentId ? <>· agent={s.agentId} </> : null}
-                {s.notePath ? <>· note={s.notePath}</> : null}
-              </div>
-              <div>
-                <OsButton variant="cyan" size="sm" onClick={() => open(s)} data-testid="inbox-cta">
-                  {s.recommendedNextStepHe}
-                </OsButton>
-              </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
 
