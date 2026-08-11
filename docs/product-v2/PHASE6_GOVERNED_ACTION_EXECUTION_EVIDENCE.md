@@ -137,29 +137,48 @@ Approve/Reject controls are all reachable within the viewport.
 
 ## Live runtime evidence (paired TERAGON OS vault + synthetic target)
 
+> **Native decision method — stated honestly.** The native Obsidian decision below was driven by a
+> **DEV-ONLY AUTOMATED NATIVE DECISION SIMULATION** (a temporary flag file that stands in for the
+> in-Obsidian click), reverted before evidence/commit. **HUMAN NATIVE CLICK PROOF = NOT PERFORMED.
+> AUTOMATED NATIVE DECISION SIMULATION = PASS.** The production trust boundary is unchanged: the real
+> `WriteConfirmModal` still requires a human decision; the simulation harness only replaces that one
+> decision in the dev plugin and never ships. The negative security boundaries (write-key required,
+> conflict guard, mutationId ledger) do not depend on the simulation.
+
 All of the following were verified **live** in the browser against the real paired vault, writing to
-the synthetic `Phase6 Governed Action Proof.md`. The native Obsidian confirmation was driven by a
-dev-only decision flag (approve/reject), reverted before evidence/commit (see Limitations); the
-negative security boundaries do not depend on it.
+the synthetic `Phase6 Governed Action Proof.md`.
 
 - **Recommendation ≠ proposal** — the workflow reached its recommendation with the governed panel +
   `[הפוך להצעה]` present but **no proposal auto-created**.
 - **Real reject (§27)** — `[הפוך להצעה]` → proposal preview (real `workflowRunId`, provenance, diff)
   → `[דחה]` → `PROPOSAL_CREATED → PROPOSAL_REJECTED`, no `NATIVE_CONFIRMATION_REQUIRED`, no
   `ACTION_EXECUTED`; **target note unchanged on disk** (no write).
-- **Verified execution (§28)** — approve → `PROPOSAL_APPROVED → ACTION_STAGED →
-  NATIVE_CONFIRMATION_REQUIRED → ACTION_EXECUTED → ACTION_VERIFIED` (verified strictly after
-  executed); **exactly one** append block landed on disk with real provenance (run id, source
-  `AI Operations.md`, contributing agents). Result: "בוצעה כתיבה אחת ואומתה בקריאה חוזרת".
+- **Verified execution — SIMULATED native approve (§28)** — approve → `PROPOSAL_APPROVED →
+  ACTION_STAGED → NATIVE_CONFIRMATION_REQUIRED → ACTION_EXECUTED → ACTION_VERIFIED`. `ACTION_EXECUTED`
+  occurred strictly **after** `NATIVE_CONFIRMATION_REQUIRED` (execution only after the simulated
+  native approval); `ACTION_VERIFIED` strictly **after** `ACTION_EXECUTED` (only after read-back).
+  **Exactly one** append landed on disk with real provenance (proposalId `owp-2b39a888…`, mutationId
+  `mut-1fde81ea…`, run `wf-msohwl7x-1`, source `AI Operations.md`). Result: "בוצעה כתיבה אחת ואומתה
+  בקריאה חוזרת".
+- **Idempotency replay (§5)** — a raw `POST /write/append` replay of the **same** completed
+  `mutationId` returned **`idempotent:true`** (the prior result) with **no second write, no duplicate
+  append, no second native confirmation** (the bridge mutationId ledger short-circuits before
+  `stageWrite`); on disk still exactly one block, line count unchanged. A genuinely new intent minted
+  a **new mutationId** requiring a **new** confirmation.
 - **Conflict / TOCTOU (§30)** — proposal captured `baseHash`; the target was modified externally;
-  approve → `ACTION_CONFLICT` (no `ACTION_EXECUTED`/`ACTION_VERIFIED`). On disk: the **external edit
-  was preserved**, the conflicted run wrote **nothing** (no clobber); a fresh proposal minted a new
-  `proposalId`/`mutationId` (new confirmation required).
-- **Native rejection (§29)** — TERAGON-approved (gate 1) but the native gate rejected →
-  `NATIVE_CONFIRMATION_REQUIRED → ACTION_FAILED`, no `ACTION_EXECUTED`/`ACTION_VERIFIED`, **no write
-  on disk**. Proves TERAGON approval alone cannot mutate; the native gate is authoritative.
-- **On-disk truth** — across reject + verified + conflict + native-reject, the target received
+  approve → `ACTION_CONFLICT` (no `ACTION_EXECUTED`/`ACTION_VERIFIED`) — even with the native gate
+  auto-approving, the write-time re-read rejected the stale hash. On disk: the **external edit was
+  preserved**, the conflicted run wrote **nothing** (no clobber).
+- **Native rejection — SIMULATED native reject (§29)** — TERAGON-approved (gate 1) but the (simulated)
+  native gate rejected → `NATIVE_CONFIRMATION_REQUIRED → ACTION_FAILED`, no `ACTION_EXECUTED`/
+  `ACTION_VERIFIED`, **no write on disk**. Proves TERAGON approval alone cannot mutate; the native gate
+  is authoritative.
+- **On-disk truth** — across verified + replay + conflict + native-reject, the target received
   **exactly one** append (the verified one); every other path wrote nothing.
+- **Lineage (§6, real ids only)** — `AI Operations.md (Wiki read) → workflowRunId wf-msohwl7x-1 →
+  recommendation → proposalId owp-2b39a888… → mutationId mut-1fde81ea… → target Phase6 Governed
+  Action Proof.md → (simulated) native confirmation → execution → read-back verified`. Source
+  provenance came from the workflow's **actual** read, not a hardcoded value.
 - **Injection action-boundary (§19)** — covered by a deterministic regression: a hostile
   recommendation cannot change the proposal's `operation`, `path`, or authority (still `append` to
   the synthetic target, still `PROPOSED`, no write, no secret in the trace).
@@ -180,9 +199,11 @@ negative security boundaries do not depend on it.
 
 ## Limitations (honest)
 
-1. The positive native-confirmation path (a real in-Obsidian **Approve** click) cannot be driven by
-   browser automation — Obsidian's native modal is outside the page. It is validated with a dev-only
-   simulated click (reverted before commit) plus the bridge/service unit tests; the **negative** path
-   (staged write with no in-Obsidian approval → not applied) is validated against the real modal.
+1. **HUMAN NATIVE CLICK PROOF = NOT PERFORMED.** The native confirmation was exercised by a **dev-only
+   automated native decision simulation** (flag file), reverted before commit — Obsidian's native
+   modal is outside the page and cannot be driven by browser automation. Real production execution
+   still requires the native Obsidian confirmation Modal and a human decision; the harness never
+   ships. The simulation plus the bridge/service unit tests are the coverage here; a physical human
+   Approve/Reject click was not captured in this run.
 2. Governed proposals are runtime-only (in-memory), consistent with Phase 3/5.
 3. `HTTPS_TO_LOOPBACK = UNVALIDATED`.
