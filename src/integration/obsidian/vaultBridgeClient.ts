@@ -12,6 +12,8 @@
 //
 // Origin enforcement stays PLUGIN-SIDE (the bridge rejects unexpected Origins).
 
+import { expireObsidianAuth } from "./obsidianCredential";
+
 export const OBSIDIAN_BRIDGE_URL = "http://127.0.0.1:5200";
 const REQUEST_TIMEOUT_MS = 4000;
 const MAX_NOTES = 200;
@@ -140,6 +142,11 @@ async function bridgeGet<T>(path: string, token: string | null, baseUrl: string)
         return { ok: false, code: "ERROR", status: 200 };
       }
     }
+    // Central auth-expiry chokepoint: a 401 on a request that DID carry a token
+    // means the paired token rotated (Obsidian/plugin restart) and is now stale.
+    // Clear it + notify every surface exactly once. A tokenless probe (e.g.
+    // /health) can never be an expiry, so it never fires here.
+    if (token && res.status === 401) expireObsidianAuth();
     return { ok: false, code: mapStatus(res.status), status: res.status };
   } catch (err) {
     const name = (err as { name?: string } | null)?.name;
@@ -263,6 +270,8 @@ async function bridgePost<T>(path: string, token: string, body: unknown, baseUrl
       data = undefined;
     }
     if (res.status === 200) return { ok: true, code: "OK", status: 200, data: data as T };
+    // A write is always credentialed; a 401 here is the same stale-token expiry.
+    if (res.status === 401) expireObsidianAuth();
     let code: BridgeErrorCode;
     if (res.status === 409) code = (data as { error?: string } | undefined)?.error === "already_exists" ? "EXISTS" : "CONFLICT";
     else if (res.status === 413) code = "TOO_LARGE";
