@@ -129,10 +129,16 @@ connectivity (in-app client-side navigation preserves the runtime event log):
 
 ## Regression results
 
-Full `vitest` **2784 passing** (Phase-7 suite 14; +14 over Phase 6's 2770); typecheck +
+Full `vitest` **2784 passing** (Phase-7 suite 15; +15 over Phase 6's 2770); typecheck +
 typecheck:tests clean; `oxlint` 4 pre-existing warnings; `scan:secrets` CLEAN. Phase-3 A/B/C/D
 (`obsidian-write`/`bridge`/`security`), Phase-4 (`obsidian-phase4`), Phase-5 (`phase5`), Phase-6
 (`phase6`), Command Center + Visual Workspace suites all green. **7 agents / 14 actions unchanged.**
+
+**GitHub CI (Draft PR #47, head `7c6adeb`): all green** — Static PASS, Accessibility PASS,
+Detect-persistence PASS, Network-resilience PASS, Live ephemeral Supabase skipping (expected). A
+first CI run surfaced one real `aria-required-children` (critical) on the **empty** home inbox (a
+`role="list"` with no `listitem` children); fixed by rendering `role="list"` only around actual item
+cards (heading + empty state moved outside), reproduced locally and covered by a regression test.
 
 ## Limitations (honest)
 
