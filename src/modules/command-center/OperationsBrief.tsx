@@ -78,9 +78,15 @@ export function OperationsBrief(): ReactElement {
     <Panel variant="raised" style={{ padding: "var(--os-space-5)" }} data-testid="operations-brief">
       <div style={{ ...row, justifyContent: "space-between" }}>
         <SectionTitle title="מרכז תפעול — מה דורש טיפול עכשיו?" subtitle="אותות תפעול חיים מתהליכי ה-AI · תצוגת הפעלה נוכחית" icon="sparkle" />
-        <OsButton variant="ghost" size="sm" onClick={recheck} data-testid="ops-refresh" aria-label="רענון">
-          {checking ? "בודק…" : "רענון"}
-        </OsButton>
+        <div style={{ display: "flex", gap: "var(--os-space-2)", alignItems: "center", flexWrap: "wrap" }}>
+          {/* Phase-8 launch CTA — opens the workflow pack (does NOT auto-start it). */}
+          <OsButton variant="cyan" size="sm" onClick={() => navigate("/ai-workspace?pack=governed-knowledge-capture")} data-testid="ops-launch-pack">
+            תעד ידע מבוקר
+          </OsButton>
+          <OsButton variant="ghost" size="sm" onClick={recheck} data-testid="ops-refresh" aria-label="רענון">
+            {checking ? "בודק…" : "רענון"}
+          </OsButton>
+        </div>
       </div>
 
       {/* Counts — derived from the SAME signals below; click to filter to exactly those records. */}

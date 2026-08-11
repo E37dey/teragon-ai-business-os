@@ -36,7 +36,7 @@ const STATUS_CHIP: Record<GovernedActionStatus, { label: string; status: "פעי
   FAILED: { label: "נכשל", status: "חסום" },
 };
 
-export function GovernedActionPanel({ wf }: { wf: WorkflowState }): ReactElement | null {
+export function GovernedActionPanel({ wf, targetPath = PHASE6_TARGET }: { wf: WorkflowState; targetPath?: string }): ReactElement | null {
   const [ga, setGa] = useState<GovernedActionState | null>(null);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
@@ -46,18 +46,19 @@ export function GovernedActionPanel({ wf }: { wf: WorkflowState }): ReactElement
     busyRef.current = true;
     setBusy(true);
     // Read the CURRENT target content (Phase-1 read) so the append carries a real expectedHash
-    // conflict guard. Missing target → empty base (execute will fail closed with NOT_FOUND).
+    // conflict guard. Missing target → empty base (execute will fail closed with NOT_FOUND). The
+    // target comes from TRUSTED pack config, never from Vault content.
     let baseContent = "";
     const token = getObsidianToken();
     if (token) {
-      const rb = await readNote(PHASE6_TARGET, token);
+      const rb = await readNote(targetPath, token);
       if (rb.ok && rb.data) baseContent = rb.data.content;
     }
-    const state = await createProposalFromRecommendation(wf, { targetPath: PHASE6_TARGET, baseContent });
+    const state = await createProposalFromRecommendation(wf, { targetPath, baseContent });
     setGa(state);
     setBusy(false);
     busyRef.current = false;
-  }, [wf]);
+  }, [wf, targetPath]);
 
   const approve = useCallback(async () => {
     if (!ga || busyRef.current) return;
