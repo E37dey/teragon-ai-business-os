@@ -9,13 +9,14 @@ import { OsButton, SectionTitle } from "@/design-system";
 import { KnowledgeGraphPanel } from "@/modules/memory/obsidian/KnowledgeGraphPanel";
 import { AgentNetworkPanel } from "./AgentNetworkPanel";
 import { CrossViewRelations } from "./CrossViewRelations";
+import { WorkflowMode } from "./WorkflowMode";
 import { deriveAgentNoteUsages } from "./crossView";
 import { subscribeRetrievals } from "@/agents/obsidian/retrievalTrace";
 
 const stack = (gap = "var(--os-space-4)"): CSSProperties => ({ display: "grid", gap });
 const seg: CSSProperties = { display: "inline-flex", gap: 4, padding: 4, borderRadius: 999, background: "var(--os-surface-2)", boxShadow: "inset 0 0 0 1px var(--os-border)" };
 
-type Mode = "agents" | "graph" | "split";
+type Mode = "agents" | "graph" | "split" | "workflow";
 
 export function VisualIntelligenceWorkspace(): ReactElement {
   const [mode, setMode] = useState<Mode>("agents");
@@ -53,11 +54,15 @@ export function VisualIntelligenceWorkspace(): ReactElement {
           <OsButton variant={mode === "split" ? "primary" : "ghost"} size="sm" onClick={() => setMode("split")} data-testid="viz-mode-split" aria-pressed={mode === "split"}>
             מסך מפוצל
           </OsButton>
+          <OsButton variant={mode === "workflow" ? "primary" : "ghost"} size="sm" onClick={() => setMode("workflow")} data-testid="viz-mode-workflow" aria-pressed={mode === "workflow"}>
+            תהליך חי
+          </OsButton>
         </div>
       </div>
 
       {mode === "agents" && <AgentNetworkPanel usages={usages} />}
       {mode === "graph" && <KnowledgeGraphPanel />}
+      {mode === "workflow" && <WorkflowMode />}
       {mode === "split" && (
         <div style={stack("var(--os-space-4)")}>
           {/* The real, live Agent→Note relationship spanning both graphs (real traces only). */}
