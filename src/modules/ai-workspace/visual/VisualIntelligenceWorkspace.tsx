@@ -5,6 +5,7 @@
 // product data/state. Each mode is a full-bleed spatial canvas (no card-in-card).
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactElement } from "react";
+import { useSearchParams } from "react-router-dom";
 import { OsButton, SectionTitle } from "@/design-system";
 import { KnowledgeGraphPanel } from "@/modules/memory/obsidian/KnowledgeGraphPanel";
 import { AgentNetworkPanel } from "./AgentNetworkPanel";
@@ -19,7 +20,10 @@ const seg: CSSProperties = { display: "inline-flex", gap: 4, padding: 4, borderR
 type Mode = "agents" | "graph" | "split" | "workflow";
 
 export function VisualIntelligenceWorkspace(): ReactElement {
-  const [mode, setMode] = useState<Mode>("agents");
+  // A Command Center Action-Inbox deep link (/ai-workspace?run=<id>) opens straight into the live
+  // workflow mode so the linked run's recorded timeline is shown.
+  const [searchParams] = useSearchParams();
+  const [mode, setMode] = useState<Mode>(searchParams.get("run") ? "workflow" : "agents");
   // Live Agent↔Note usages (real retrieval traces) drive cross-selection in split mode.
   const [usages, setUsages] = useState(() => deriveAgentNoteUsages());
   useEffect(() => {
