@@ -17,7 +17,7 @@ import {
   type NoteListResult,
   type SearchResult,
 } from "./vaultBridgeClient";
-import { clearObsidianToken, getObsidianToken, hasObsidianToken, setObsidianToken } from "./obsidianCredential";
+import { clearObsidianToken, getObsidianToken, hasObsidianToken, onObsidianAuthExpiry, setObsidianToken } from "./obsidianCredential";
 
 export type ConnectionPhase = "disconnected" | "checking" | "connected" | "error";
 
@@ -31,7 +31,8 @@ export function obsidianErrorMessage(code: BridgeErrorCode | null): string {
     case "TIMEOUT":
       return "הבקשה לא הושלמה בזמן. נסו שוב.";
     case "UNAUTHORIZED":
-      return "נדרש חיבור מחדש.";
+      // Genuine 401: the local pairing token rotated (Obsidian/plugin restart).
+      return "החיבור ל-Obsidian פג. יש להתחבר מחדש.";
     case "ORIGIN_REJECTED":
       return "שגיאת חיבור מאובטח.";
     case "NOT_FOUND":
@@ -112,6 +113,20 @@ export function useObsidianVault(): UseObsidianVault {
     const t = getObsidianToken();
     if (t) void verify(t, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // React to the CENTRAL auth-expiry broadcast. When any surface (or the bridge
+  // chokepoint) detects a genuine 401, the stale token is already cleared for us;
+  // this connection must also drop to the reconnect-required state so the UI is
+  // never showing a stale "connected" while the token is dead.
+  useEffect(() => {
+    return onObsidianAuthExpiry(() => {
+      if (!mounted.current) return;
+      setInfo(null);
+      setBusy(false);
+      setErrorCode("UNAUTHORIZED");
+      setPhase("error");
+    });
   }, []);
 
   const connect = useCallback((token: string) => verify(token.trim(), true), [verify]);
