@@ -150,8 +150,9 @@ export function WorkflowMode(): ReactElement {
         )}
       </div>
 
-      {/* Phase-6 — governed action: recommendation → explicit proposal → human review → verified action. */}
-      {wf?.result && <GovernedActionPanel wf={wf} />}
+      {/* Phase-6 — governed action: recommendation → explicit proposal → human review → verified action.
+          Keyed by the run id so a new workflow starts a fresh governed-action panel (no stale proposal). */}
+      {wf?.result && <GovernedActionPanel key={wf.workflowRunId} wf={wf} />}
 
       {/* Real, ordered Timeline — accessible log; select an event to cross-highlight the graphs. */}
       <div data-testid="workflow-timeline" role="log" aria-label="ציר זמן חי של התהליך" style={{ ...stack("2px"), padding: "var(--os-space-3)", borderRadius: "var(--os-radius-md, 12px)", background: "var(--os-surface-1)", boxShadow: "inset 0 0 0 1px var(--os-border)", maxHeight: "34vh", overflow: "auto" }}>

@@ -127,15 +127,56 @@ Workspace + write-security) stays green.
 
 ## Accessibility / mobile
 
-<!-- filled from the live gate -->
+**Axe (WCAG 2.0/2.1 A/AA)** on the workspace with the governed proposal preview open (provenance +
+diff + Approve/Reject): **0 critical, 0 serious, 0 moderate/minor.** Approve/Reject are keyboard-
+focusable `<button>`s (Approve focused successfully); proposal status carries a text label
+(ממתין לסקירה / אושר / בוצע ואומת / נדחה / התנגשות / נכשל), not color alone; native Obsidian
+confirmation remains native. **Mobile** at **375px and 390px** with the proposal open: **0**
+horizontal overflow; the proposal panel, the scrollable diff, the provenance line, and the
+Approve/Reject controls are all reachable within the viewport.
 
-## Live runtime evidence (paired TERAGON OS vault)
+## Live runtime evidence (paired TERAGON OS vault + synthetic target)
 
-<!-- filled from the live gate -->
+All of the following were verified **live** in the browser against the real paired vault, writing to
+the synthetic `Phase6 Governed Action Proof.md`. The native Obsidian confirmation was driven by a
+dev-only decision flag (approve/reject), reverted before evidence/commit (see Limitations); the
+negative security boundaries do not depend on it.
+
+- **Recommendation ≠ proposal** — the workflow reached its recommendation with the governed panel +
+  `[הפוך להצעה]` present but **no proposal auto-created**.
+- **Real reject (§27)** — `[הפוך להצעה]` → proposal preview (real `workflowRunId`, provenance, diff)
+  → `[דחה]` → `PROPOSAL_CREATED → PROPOSAL_REJECTED`, no `NATIVE_CONFIRMATION_REQUIRED`, no
+  `ACTION_EXECUTED`; **target note unchanged on disk** (no write).
+- **Verified execution (§28)** — approve → `PROPOSAL_APPROVED → ACTION_STAGED →
+  NATIVE_CONFIRMATION_REQUIRED → ACTION_EXECUTED → ACTION_VERIFIED` (verified strictly after
+  executed); **exactly one** append block landed on disk with real provenance (run id, source
+  `AI Operations.md`, contributing agents). Result: "בוצעה כתיבה אחת ואומתה בקריאה חוזרת".
+- **Conflict / TOCTOU (§30)** — proposal captured `baseHash`; the target was modified externally;
+  approve → `ACTION_CONFLICT` (no `ACTION_EXECUTED`/`ACTION_VERIFIED`). On disk: the **external edit
+  was preserved**, the conflicted run wrote **nothing** (no clobber); a fresh proposal minted a new
+  `proposalId`/`mutationId` (new confirmation required).
+- **Native rejection (§29)** — TERAGON-approved (gate 1) but the native gate rejected →
+  `NATIVE_CONFIRMATION_REQUIRED → ACTION_FAILED`, no `ACTION_EXECUTED`/`ACTION_VERIFIED`, **no write
+  on disk**. Proves TERAGON approval alone cannot mutate; the native gate is authoritative.
+- **On-disk truth** — across reject + verified + conflict + native-reject, the target received
+  **exactly one** append (the verified one); every other path wrote nothing.
+- **Injection action-boundary (§19)** — covered by a deterministic regression: a hostile
+  recommendation cannot change the proposal's `operation`, `path`, or authority (still `append` to
+  the synthetic target, still `PROPOSED`, no write, no secret in the trace).
 
 ## Security regressions
 
-<!-- filled from the live gate -->
+- **Phase 3 (A/B/C/D) — green** (`tests/obsidian-write`, `tests/obsidian-bridge`, `tests/security`):
+  pairing token alone cannot mutate; writeKey/capability alone cannot mutate; native confirmation
+  authorizes exactly one bound intent; a new mutation requires a new native confirmation. Phase 6
+  adds **no** bypass — TERAGON proposal approval alone never writes (proven live via native
+  rejection), and execution still requires the separate write key (proven: no write key → FAILED
+  `WRITE_UNAUTHORIZED`).
+- **Phase 4 — green** (`tests/obsidian-phase4`): deny-by-default agent Obsidian access; only
+  allowlisted agents read; **no agent has write authority** (nothing under `src/agents/` calls the
+  governed-execution functions — they are invoked only from the UI by an explicit human).
+- **Phase 5 — green** (`tests/phase5`): workflow bounds / interruptible cancel / idempotent accept
+  intact.
 
 ## Limitations (honest)
 
