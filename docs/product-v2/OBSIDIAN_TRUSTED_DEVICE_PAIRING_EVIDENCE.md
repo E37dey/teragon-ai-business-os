@@ -117,6 +117,39 @@ only from trusted app/session + stored keys, never from note content).
 No dev relay, no temporary tokens/flags/logs, no synthetic trust records committed. `scan:secrets`
 CLEAN. Pairing code / session bearer / private key / writeKey / HMAC are never logged.
 
+## LIVE TRUSTED-DEVICE RESTART PROOF = PASS
+
+Proven end-to-end against the **real Obsidian Desktop** (vault **TERAGON OS**) with the PR #50
+plugin build installed:
+
+`PAIR ONCE → RESTART PLUGIN → NO NEW PAIRING CODE → TRUSTED CHALLENGE-RESPONSE → CUSTOMER SUCCESS.MD READ = PASS`
+
+- **Plugin install:** `…/TERAGON OS/.obsidian/plugins/teragon-vault-bridge/main.js`, SHA-256
+  `e6267cbf59118292d000f2e83ef31246863bfe39f71e9787f05781b54dbf7509` (= committed artifact).
+  Post-reload the new `/auth/*` endpoints answered (`/auth/challenge` → `unknown_device`,
+  Origin + bootstrap gates enforced).
+- **First pair:** the plugin persisted (`data.json`) exactly one trusted device — `deviceId
+  dev-1aTBSGH3…`, **EC P-256 public key (x/y only, no private `d`)**, `origin http://localhost:4173`,
+  `vaultName TERAGON OS`, `revoked:false`. Panel: **מחובר · Vault TERAGON OS**.
+- **Baseline read:** `Customer Success.md` → real body `# Customer Success …`.
+- **Restart:** plugin toggled OFF→ON — `bridgeInstanceId` changed `e525cfde-… → 7b894490-…`
+  (new runtime; old session invalid). The **persisted public key survived** (device still trusted).
+- **Automatic re-auth (no code):** `data.json.lastSeenAt` advanced `1786528803536 → 1786539849435`
+  (matching ~3 h real elapsed) — a **post-restart `/auth/verify` succeeded** via challenge-response.
+  Device count stayed **1** with unchanged `createdAt` → **NOT re-registered, no new pairing code**.
+- **Post-restart read:** `Customer Success.md` → real body again, with **no reconnect modal and no
+  pairing prompt** (`reconnectRequired:false`, `pairingModalShown:false`). The graph also loaded
+  **63 documents** (authenticated read) post-restart.
+- **Browser-reload auto-reconnect** additionally proven (a page reload re-authenticated by
+  challenge-response, first `lastSeenAt` bump, no code).
+
+**Honest scope note:** the in-app Chrome automation repeatedly recreated/reloaded the tab outside
+our control, so the *browser-side* post-restart read was exercised via the **startup
+auto-reconnect** path (app load → challenge-response). The strict *in-place* `401 → challenge →
+verify → retry-once` chokepoint path (no page reload) is covered by the automated
+`chokepointReauth` tests. The decisive product claim — restart requires no new pairing code and
+reads keep working — is proven live either way.
+
 ## Limitations
 - `HTTPS_TO_LOOPBACK = UNVALIDATED` (loopback HTTP, not TLS).
 - Non-exportable key ≠ XSS-proof (an in-origin XSS could request a signature).
