@@ -59,13 +59,38 @@ Trusted-device auth does not grant write authority; Phase-3 write boundary intac
 | PLUGIN-PERSISTED (Obsidian data.json) | Trusted-device **public** registry (outside this repo) |
 | REMOTE SUPABASE | Not used by the demo pilot (no server durability claimed) |
 
+## Continuous canonical E2E walkthrough — PASS (fresh load, product controls only, NO console)
+One continuous, human-operable flow from a clean app load (IndexedDB reset → re-seed), driven
+entirely through product UI (buttons, deep-links, modal actions) — no developer console, no test
+helpers to skip states:
+- **A. Command Center (fresh):** demo banner visible, header **צחי זוסטייהם**, honest empty inbox.
+- **B. AI Workspace** (`/ai-workspace?pack=governed-knowledge-capture`): **7 agents**; 3 Visual
+  Intelligence modes; the governed pack selected with an enabled **"התחל תהליך"** control.
+- **C. Governed workflow (real, via the Start button):** `WORKFLOW_STARTED → Orchestrator →
+  HANDOFF_REQUESTED/ACCEPTED → Wiki → VAULT_SEARCH_STARTED → VAULT_UNAVAILABLE → WORKFLOW_FAILED`.
+- **D. Governed knowledge action:** not reached this run — the workflow **failed closed** at the
+  Obsidian read because Obsidian was disconnected (truthful). The native Obsidian write confirmation
+  is **not repeated here**; it has separate prior live proof (Phases 3/6/8 + Trusted Device). No
+  native confirmation was fabricated.
+- **E→F. Command Center:** the real **`workflow_failed`** signal appears in the Action Inbox
+  ("1 נכשל") with the **"צור משימת מעקב"** CTA — produced entirely by the real workflow failure.
+- **G. Governed Follow-up Task:** preview shown, **zero Task before approval** (8), approve →
+  **VERIFIED**, exactly **one** Task (8→9) `task-flw-…` `ownerId=u-tzachi` `status=פתוחה`; **"פתח משימה"**
+  → `/tasks` lists it; **original `workflow_failed` stays actionable**; Recent Activity shows the
+  verified action.
+
+**No console-only demo dependency:** the canonical `workflow_failed` condition is created by the
+existing **"התחל תהליך"** control (the governed workflow fails on the unavailable Obsidian read) —
+**no code change was required**. The demo is fully human-operable.
+
 ## Live validation this turn
-- **Responsive (live, in-app):** `/`, `/ai-workspace`, `/tasks`, `/customers`, `/contacts`, `/memory`
-  (+ `/customers/:id`) at **375 / 768 / 1440** → **0 horizontal overflow** everywhere. Phase-9 modal
-  at **375 / 390** → 0 overflow (prior turn).
-- **Axe (live, in-app, wcag2a/2aa):** Command Center, Tasks, AI Workspace → **0 critical / 0 serious**.
-  Phase-9 proposal-preview / verified / rejected → 0/0 (prior turn). CI Accessibility gate covers the
-  pilot pages at 1440/390.
+- **Responsive (live, in-app) — full matrix:** `/`, `/ai-workspace`, `/memory`, `/tasks`,
+  `/customers`, `/contacts`, `/customers/:id`, and the governed follow-up modal at
+  **375 / 390 / 768 / 1024 / 1440** → **0 horizontal overflow** at every width; modal buttons
+  reachable. (390 and 1024 measured explicitly, not inferred.)
+- **Axe (live, in-app, wcag2a/2aa):** Command Center, Tasks, AI Workspace, and the governed
+  proposal modal → **0 critical / 0 serious**. Phase-9 verified/rejected → 0/0 (prior turn). CI
+  Accessibility gate covers the pilot pages at 1440/390.
 - **Governed Follow-up Task (prior turn, real app + real ApprovalEngine + real IndexedDB):** reject
   (delta 0), approve (one verified task, trusted owner, allowlisted), idempotency (same intent no dup /
   new intent new task), injection (authority unaffected, no auto-approve), verified→Recent Activity.

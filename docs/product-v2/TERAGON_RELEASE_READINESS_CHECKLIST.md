@@ -53,10 +53,15 @@ Base `cc5811355b1d57f09f7960eadacebb298635bb44` · every item is **PASS**, **KNO
 - Keyboard-operable modals, focus management, labeled controls, status not color-only — **PASS**
 
 ## RESPONSIVE
-- Phase-9 modal at 375 & 390: 0 horizontal overflow (live) — **PASS**
+- Full matrix **375 / 390 / 768 / 1024 / 1440** on `/`, `/ai-workspace`, `/memory`, `/tasks`,
+  `/customers`, `/contacts`, `/customers/:id` + governed modal → **0 horizontal overflow** (live) — **PASS**
 - CI offline UI-resilience gate (chromium 1440/390) — **PASS**
-- Full 5-width × all-routes matrix exhaustively re-run this turn — **KNOWN LIMITATION** (spot-checked
-  key routes live; CI covers 1440/390; see evidence)
+
+## CONTINUOUS DEMO WALKTHROUGH
+- Fresh-load, product-controls-only E2E (Command Center → AI Workspace → governed workflow →
+  `workflow_failed` → Governed Follow-up Task → verified → `/tasks`) — **PASS**
+- `workflow_failed` produced via product UI ("התחל תהליך"), **no console dependency** — **PASS**
+- Native Obsidian write confirmation: relied on prior separate live proof (not repeated this run) — **PASS (prior)**
 
 ## TESTING
 - typecheck / typecheck:tests — **PASS**
