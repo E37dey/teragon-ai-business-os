@@ -34,3 +34,11 @@ continues with the CRM/Command-Center/Task steps.
   actionable signal demonstrates the governed-task flow.
 - Nothing in this script requires a developer console. The `workflow_failed` scenario is produced
   by a **real** workflow outcome (a failed/unavailable run), not by injecting events.
+- **Two truthful outcomes at the recommendation boundary** (step 5): the human either (a) escalates
+  to a governed write via **"הפוך להצעה"** → proposal → approve → native Obsidian confirmation →
+  read-back (steps 6–7), **or** (b) takes the safe decision **"אשר קבלה"** — accept the
+  knowledge recommendation — which closes the run (`USER_CONTINUED → WORKFLOW_COMPLETED`) with
+  **no Vault mutation** (no `NATIVE_CONFIRMATION_REQUIRED`, no write). Both are governed; neither is
+  autonomous. The **positive release proof** (connected Vault → real read of `AI Operations.md` →
+  synthesis → recommendation → human decision) was validated live via path (b) — **no Vault write
+  performed** — with the native-write path (a) relying on its prior separate authoritative proof.

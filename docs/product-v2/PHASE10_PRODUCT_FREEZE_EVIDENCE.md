@@ -59,7 +59,40 @@ Trusted-device auth does not grant write authority; Phase-3 write boundary intac
 | PLUGIN-PERSISTED (Obsidian data.json) | Trusted-device **public** registry (outside this repo) |
 | REMOTE SUPABASE | Not used by the demo pilot (no server durability claimed) |
 
-## Continuous canonical E2E walkthrough — PASS (fresh load, product controls only, NO console)
+## POSITIVE canonical path — PASS (real connected Obsidian read; real Chrome, trusted device)
+Driven in the **real Chrome** (the browser previously trusted in PR #50), through product UI only —
+no console, no event injection, no test helpers:
+- **Trusted-device auto-reconnect (no new pairing code):** loading `/memory` → challenge-response →
+  **מחובר · Vault TERAGON OS**, session bearer minted, no pairing modal. (Bridge up, plugin v0.3.0-phase3;
+  vault trust registry still holds device `…aebf7659`, not revoked.)
+- **Governed workflow via "התחל תהליך"** (runs `wf-msqgr8ni-1` / `wf-msqgx75t-1`):
+  `WORKFLOW_STARTED → Orchestrator → HANDOFF_REQUESTED/ACCEPTED → Wiki → VAULT_SEARCH_STARTED →
+  VAULT_SEARCH_COMPLETED → VAULT_NOTE_READ → AGENT_COMPLETED → handoff back → Orchestrator →
+  RESULT_CREATED → USER_DECISION_REQUIRED`.
+- **Real note read:** **`AI Operations.md`** from Vault **TERAGON OS**; **exactly one** note read + one
+  search (bounded); no note body leaked into graph metadata; no token/writeKey exposed. (Excerpt only:
+  the recommendation reads "מנהל התזמור הפיק המלצה מבוססת-ידע"; full note not reproduced.)
+- **Synthesis / recommendation:** derived from the real read; **remote AI off** ("ללא מודל מרוחק");
+  no autonomous second workflow; bounded steps/events intact.
+- **Human decision:** the workflow waits at `USER_DECISION_REQUIRED`; the safe control **"אשר קבלה"**
+  (accept) → `USER_CONTINUED → WORKFLOW_COMPLETED`. **NO VAULT MUTATION PERFORMED** (0 write events,
+  no `NATIVE_CONFIRMATION_REQUIRED`, no native modal). The Phase-3 native write confirmation is **not
+  repeated here** — it has separate prior authoritative live proof (Phases 3/6/8).
+- **Command Center outcome:** the successful run shows **no `workflow_failed`** and **no invented
+  success event** — a cleanly-completed read-only workflow yields no signal (no Recent Activity entry
+  until a governed mutation occurs — truthful architecture).
+- **Trusted-device truth:** during the positive run no pairing token / bearer / private key / writeKey
+  was exposed; trusted-device auth authenticated **bridge access only** (connection + read), granting
+  **no write authority**. No plugin/browser restart was performed this run, so no new restart proof is
+  claimed (the prior live restart proof remains authoritative).
+
+## The release story (both paths)
+- **POSITIVE:** connected Vault → governed multi-agent intelligence → **real Obsidian read** →
+  deterministic synthesis → recommendation → human decision — no autonomous authority, no mutation.
+- **NEGATIVE / RECOVERY:** Vault unavailable → `workflow_failed` → explicit Governed Follow-up Task →
+  human approve → CREATE ONE TASK → read-back **VERIFIED** → `/tasks`.
+
+## Continuous canonical E2E walkthrough (negative/recovery) — PASS (fresh load, product controls only, NO console)
 One continuous, human-operable flow from a clean app load (IndexedDB reset → re-seed), driven
 entirely through product UI (buttons, deep-links, modal actions) — no developer console, no test
 helpers to skip states:
