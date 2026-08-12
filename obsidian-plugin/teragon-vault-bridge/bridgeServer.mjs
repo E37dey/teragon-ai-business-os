@@ -54,6 +54,41 @@ export function generateToken() {
   return crypto.randomBytes(32).toString("base64url");
 }
 
+// --- Trusted Device Pairing (asymmetric device identity) -------------------
+// The persistent trust is an asymmetric device identity, NOT a persistent bearer.
+// The plugin stores only the device PUBLIC key; the browser holds a non-exportable
+// private key. After a plugin restart the browser proves possession via a signed
+// challenge and receives a NEW short-lived session bearer — no manual re-pairing.
+export const TDP_VERSION = "tdp-1";
+const SESSION_TTL_MS = 30 * 60 * 1000; // short-lived bridge session bearer
+const CHALLENGE_TTL_MS = 60 * 1000; // one-time challenge lifetime
+const MAX_TRUSTED_DEVICES = 10; // bounded registry (registration guard)
+const MAX_LIVE_CHALLENGES = 100; // bounded in-memory challenge map
+
+/** Canonical, unambiguous challenge payload. MUST match the TERAGON client byte-for-byte. */
+export function challengePayload({ deviceId, challengeId, nonce, bridgeInstanceId, origin, expiresAt }) {
+  return [TDP_VERSION, deviceId, challengeId, nonce, bridgeInstanceId, origin, String(expiresAt)].join("\n");
+}
+
+/** Short public-key fingerprint (hex) for non-secret display/audit — never the private key. */
+export function deviceFingerprint(publicKeyJwk) {
+  const canon = JSON.stringify([publicKeyJwk.kty, publicKeyJwk.crv, publicKeyJwk.x, publicKeyJwk.y]);
+  return sha256(canon);
+}
+
+/** Verify an ECDSA P-256 / SHA-256 signature (WebCrypto raw IEEE-P1363) over `payload`. */
+export function verifyDeviceSignature(publicKeyJwk, payload, signatureB64url) {
+  try {
+    if (!publicKeyJwk || publicKeyJwk.kty !== "EC" || publicKeyJwk.crv !== "P-256") return false;
+    const key = crypto.createPublicKey({ key: publicKeyJwk, format: "jwk" });
+    const sig = Buffer.from(String(signatureB64url), "base64url");
+    if (sig.length !== 64) return false; // P-256 raw r||s
+    return crypto.verify("sha256", Buffer.from(payload, "utf8"), { key, dsaEncoding: "ieee-p1363" }, sig);
+  } catch {
+    return false;
+  }
+}
+
 function timingSafeEq(a, b) {
   const ba = Buffer.from(String(a));
   const bb = Buffer.from(String(b));
@@ -109,6 +144,36 @@ export function createBridge(opts) {
   // Idempotency ledger for this bridge instance (per plugin load / session).
   const appliedMutations = new Map();
 
+  // --- Trusted Device Pairing state (per bridge runtime) --------------------
+  // A fresh random instance id per plugin load: challenge signatures bind to it, so a
+  // signature captured for one runtime cannot be replayed against a future one.
+  const bridgeInstanceId = crypto.randomUUID();
+  // Optional persistent trust registry (public-device info only), supplied by the plugin
+  // (loadData/saveData) or tests. When absent, the trusted-device endpoints are inert and
+  // the bridge behaves exactly as before (backward compatible).
+  const trust = opts.trustStore ?? null;
+  const sessions = new Map(); // sessionBearer -> { deviceId, exp }  (short-lived, in-memory)
+  const challenges = new Map(); // challengeId -> { deviceId, nonce, exp, origin }  (one-time)
+  // The pairing token bootstraps trust ONCE per plugin load: after the first NEW device
+  // registers, the token can no longer enrol a DIFFERENT device (re-pairing the same
+  // device stays idempotent). Enrolling another device requires a fresh pairing token
+  // (a plugin reload rotates it).
+  let registrationOpen = true;
+
+  function pruneSessions(now) {
+    for (const [k, v] of sessions) if (v.exp <= now) sessions.delete(k);
+  }
+  function pruneChallenges(now) {
+    for (const [k, v] of challenges) if (v.exp <= now) challenges.delete(k);
+  }
+  function issueSession(deviceId, now) {
+    pruneSessions(now);
+    const sessionToken = generateToken();
+    const exp = now + SESSION_TTL_MS;
+    sessions.set(sessionToken, { deviceId, exp });
+    return { sessionToken, expiresAt: exp };
+  }
+
   function corsHeaders(origin) {
     const h = { Vary: "Origin" };
     if (origin && origins.has(origin)) {
@@ -130,9 +195,18 @@ export function createBridge(opts) {
     });
     res.end(payload);
   }
-  function isAuthed(req) {
+  function bearerOf(req) {
     const m = /^Bearer (.+)$/.exec(req.headers["authorization"] || "");
-    return !!m && timingSafeEq(m[1], token);
+    return m ? m[1] : null;
+  }
+  // A request is authed by EITHER the bootstrap pairing token (backward compatible)
+  // OR a live, non-expired trusted-device session bearer.
+  function isAuthed(req) {
+    const b = bearerOf(req);
+    if (!b) return false;
+    if (timingSafeEq(b, token)) return true;
+    const s = sessions.get(b);
+    return !!s && s.exp > Date.now();
   }
 
   async function handleWrite(res, pathname, body, cors, cid) {
@@ -198,6 +272,88 @@ export function createBridge(opts) {
     return send(res, 200, { ...applied, cid }, cors);
   }
 
+  // --- Trusted Device Pairing endpoints -------------------------------------
+  // register: bootstrap the trust (requires the one-time pairing token) by storing the
+  // device PUBLIC key. challenge/verify: unauthenticated by bearer — the device proves
+  // possession of its non-exportable private key, and only then receives a new session.
+  async function handleAuth(res, pathname, req, body, cors, cid, origin) {
+    if (!trust) return send(res, 404, { error: "not_found", cid }, cors);
+    // Trusted-device auth is bound to an explicitly allowed Origin (defense in depth;
+    // the global gate already rejects a present-but-disallowed Origin).
+    if (!origin || !origins.has(origin)) return send(res, 403, { error: "origin_not_allowed", cid }, cors);
+    if (!body || typeof body !== "object") return send(res, 400, { error: "bad_request", cid }, cors);
+    const now = Date.now();
+
+    if (pathname === "/auth/register") {
+      // The one-time pairing token is the bootstrap proof (a session bearer cannot register).
+      const b = bearerOf(req);
+      if (!b || !timingSafeEq(b, token)) return send(res, 401, { error: "unauthorized", cid }, cors);
+      const { deviceId, publicKey, label } = body;
+      if (typeof deviceId !== "string" || deviceId.length < 8 || deviceId.length > 200) return send(res, 400, { error: "bad_request", cid }, cors);
+      if (!publicKey || publicKey.kty !== "EC" || publicKey.crv !== "P-256" || typeof publicKey.x !== "string" || typeof publicKey.y !== "string") {
+        return send(res, 400, { error: "bad_request", cid }, cors);
+      }
+      const existing = trust.get(deviceId);
+      // A used pairing code cannot enrol a NEW (different) device this plugin load.
+      if (!existing && !registrationOpen) return send(res, 403, { error: "pairing_consumed", cid }, cors);
+      if (!existing && trust.list().filter((d) => !d.revoked).length >= MAX_TRUSTED_DEVICES) {
+        return send(res, 403, { error: "too_many_devices", cid }, cors);
+      }
+      const fingerprint = deviceFingerprint(publicKey);
+      const record = {
+        deviceId,
+        publicKey,
+        fingerprint,
+        label: typeof label === "string" ? label.slice(0, 80) : "TERAGON device",
+        origin,
+        createdAt: existing?.createdAt ?? now,
+        lastSeenAt: now,
+        revoked: false,
+      };
+      trust.put(record);
+      if (!existing) registrationOpen = false; // pairing token consumed for new-device enrolment
+      const { sessionToken, expiresAt } = issueSession(deviceId, now);
+      return send(res, 200, { ok: true, deviceId, fingerprint, sessionToken, expiresAt, bridgeInstanceId, cid }, cors);
+    }
+
+    if (pathname === "/auth/challenge") {
+      const { deviceId } = body;
+      const dev = typeof deviceId === "string" ? trust.get(deviceId) : null;
+      if (!dev || dev.revoked) return send(res, 401, { error: "unknown_device", cid }, cors);
+      if (dev.origin && dev.origin !== origin) return send(res, 403, { error: "origin_mismatch", cid }, cors);
+      pruneChallenges(now);
+      if (challenges.size >= MAX_LIVE_CHALLENGES) return send(res, 429, { error: "too_many_challenges", cid }, cors);
+      const challengeId = crypto.randomUUID();
+      const nonce = crypto.randomBytes(32).toString("base64url");
+      const expiresAt = now + CHALLENGE_TTL_MS;
+      challenges.set(challengeId, { deviceId, nonce, exp: expiresAt, origin });
+      return send(res, 200, { challengeId, nonce, expiresAt, bridgeInstanceId, cid }, cors);
+    }
+
+    if (pathname === "/auth/verify") {
+      const { deviceId, challengeId, signature } = body;
+      if (typeof deviceId !== "string" || typeof challengeId !== "string" || typeof signature !== "string") {
+        return send(res, 400, { error: "bad_request", cid }, cors);
+      }
+      const ch = challenges.get(challengeId);
+      // Consume the challenge on ANY verify attempt so it can never be replayed.
+      if (ch) challenges.delete(challengeId);
+      if (!ch || ch.exp <= now) return send(res, 401, { error: "challenge_invalid", cid }, cors);
+      if (ch.deviceId !== deviceId || ch.origin !== origin) return send(res, 401, { error: "challenge_invalid", cid }, cors);
+      const dev = trust.get(deviceId);
+      if (!dev || dev.revoked) return send(res, 401, { error: "unknown_device", cid }, cors);
+      const payload = challengePayload({ deviceId, challengeId, nonce: ch.nonce, bridgeInstanceId, origin, expiresAt: ch.exp });
+      if (!verifyDeviceSignature(dev.publicKey, payload, signature)) return send(res, 401, { error: "bad_signature", cid }, cors);
+      if (typeof trust.touch === "function") trust.touch(deviceId, now);
+      const { sessionToken, expiresAt } = issueSession(deviceId, now);
+      return send(res, 200, { ok: true, sessionToken, expiresAt, bridgeInstanceId, cid }, cors);
+    }
+
+    return send(res, 404, { error: "not_found", cid }, cors);
+  }
+
+  const AUTH_PATHS = new Set(["/auth/register", "/auth/challenge", "/auth/verify"]);
+
   const server = http.createServer(async (req, res) => {
     const cid = crypto.randomUUID();
     const origin = req.headers.origin;
@@ -218,7 +374,23 @@ export function createBridge(opts) {
         return send(res, 200, { ok: true, service: "teragon-vault-bridge", version: BRIDGE_VERSION, cid }, cors);
       }
 
-      // Everything else requires the pairing token.
+      // Trusted Device Pairing endpoints — POST only, bounded body. These authenticate
+      // by device signature (challenge/verify) or the bootstrap token (register), NOT by
+      // a session bearer, so they sit BEFORE the session gate.
+      if (AUTH_PATHS.has(pathname)) {
+        if (req.method !== "POST") return send(res, 405, { error: "method_not_allowed", cid }, { ...cors, Allow: "POST, OPTIONS" });
+        const raw = await readBody(req, MAX_WRITE_BYTES);
+        if (raw === null) return send(res, 413, { error: "payload_too_large", cid }, cors);
+        let parsed;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          return send(res, 400, { error: "bad_request", cid }, cors);
+        }
+        return handleAuth(res, pathname, req, parsed, cors, cid, origin);
+      }
+
+      // Everything else requires the pairing token OR a live trusted-device session.
       if (!isAuthed(req)) return send(res, 401, { error: "unauthorized", cid }, cors);
 
       // WRITE capability endpoints (Phase 3) — POST only, bounded body.

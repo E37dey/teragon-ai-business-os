@@ -17,7 +17,9 @@ import {
   type NoteListResult,
   type SearchResult,
 } from "./vaultBridgeClient";
-import { clearObsidianToken, getObsidianToken, hasObsidianToken, setObsidianToken } from "./obsidianCredential";
+import { clearObsidianToken, getObsidianToken, hasObsidianToken, onObsidianAuthExpiry, setObsidianToken } from "./obsidianCredential";
+import { forgetDevice as forgetDeviceKey, hasDeviceIdentity } from "./deviceIdentity";
+import { reauthenticate, registerDevice } from "./trustedAuth";
 
 export type ConnectionPhase = "disconnected" | "checking" | "connected" | "error";
 
@@ -31,7 +33,8 @@ export function obsidianErrorMessage(code: BridgeErrorCode | null): string {
     case "TIMEOUT":
       return "הבקשה לא הושלמה בזמן. נסו שוב.";
     case "UNAUTHORIZED":
-      return "נדרש חיבור מחדש.";
+      // Genuine 401: the local pairing token rotated (Obsidian/plugin restart).
+      return "החיבור ל-Obsidian פג. יש להתחבר מחדש.";
     case "ORIGIN_REJECTED":
       return "שגיאת חיבור מאובטח.";
     case "NOT_FOUND":
@@ -54,6 +57,8 @@ interface UseObsidianVault {
   /** "בדוק חיבור": verify with token if paired, else probe reachability. */
   check(): Promise<{ reachable: boolean; paired: boolean }>;
   disconnect(): void;
+  /** "שכח את המכשיר הזה": delete the local device key + session and return to first-pair. */
+  forgetDevice(): Promise<void>;
   search(query: string): Promise<BridgeResult<SearchResult>>;
   read(path: string): Promise<BridgeResult<NoteContent>>;
   list(): Promise<BridgeResult<NoteListResult>>;
@@ -107,14 +112,71 @@ export function useObsidianVault(): UseObsidianVault {
     [applyConnected, applyFault],
   );
 
-  // On mount, restore a session-paired connection with a SINGLE check (no polling).
+  // On mount: startup auto-reconnect. If a session bearer survives (same tab), verify it —
+  // the chokepoint silently re-auths it if the plugin restarted. If there is no bearer but
+  // THIS browser is a trusted device (private key in IndexedDB), re-authenticate by
+  // challenge-response with NO pairing code. Only a truly untrusted browser lands on the
+  // manual first-pair state. Single check, no polling.
   useEffect(() => {
-    const t = getObsidianToken();
-    if (t) void verify(t, false);
+    let cancelled = false;
+    void (async () => {
+      const t = getObsidianToken();
+      if (t) {
+        await verify(t, false);
+        return;
+      }
+      const trusted = await hasDeviceIdentity();
+      if (cancelled || !mounted.current) return;
+      if (!trusted) {
+        setPhase("disconnected");
+        return;
+      }
+      setPhase("checking"); // "מתחבר ל-Obsidian…"
+      const fresh = await reauthenticate();
+      if (cancelled || !mounted.current) return;
+      if (fresh) await verify(fresh, false);
+      else setPhase("disconnected"); // trusted but bridge down/revoked → user can retry/pair
+    })();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const connect = useCallback((token: string) => verify(token.trim(), true), [verify]);
+  // React to the CENTRAL auth-expiry broadcast. When any surface (or the bridge
+  // chokepoint) detects a genuine 401, the stale token is already cleared for us;
+  // this connection must also drop to the reconnect-required state so the UI is
+  // never showing a stale "connected" while the token is dead.
+  useEffect(() => {
+    return onObsidianAuthExpiry(() => {
+      if (!mounted.current) return;
+      setInfo(null);
+      setBusy(false);
+      setErrorCode("UNAUTHORIZED");
+      setPhase("error");
+    });
+  }, []);
+
+  // FIRST PAIR: the pasted one-time pairing token bootstraps device trust. We register
+  // THIS browser's public key, receive a short-lived session bearer, and then load the
+  // connection. The pairing token is used once and never persisted; the persistent
+  // credential is the non-exportable device key.
+  const connect = useCallback(
+    async (bootstrapToken: string): Promise<BridgeResult<ConnectionInfo>> => {
+      setBusy(true);
+      const reg = await registerDevice(bootstrapToken.trim());
+      if (!mounted.current) return { ok: false, code: "ERROR", status: null };
+      if (reg.ok) {
+        const session = getObsidianToken();
+        if (session) return verify(session, false);
+      }
+      setBusy(false);
+      const code: BridgeErrorCode = reg.code === "unavailable" ? "UNAVAILABLE" : reg.code === "denied" ? "UNAUTHORIZED" : "ERROR";
+      applyFault(code);
+      return { ok: false, code, status: null };
+    },
+    [verify, applyFault],
+  );
 
   const refresh = useCallback((): Promise<BridgeResult<ConnectionInfo>> => {
     const t = getObsidianToken();
@@ -144,6 +206,19 @@ export function useObsidianVault(): UseObsidianVault {
 
   const disconnect = useCallback(() => {
     clearObsidianToken();
+    setInfo(null);
+    setPhase("disconnected");
+    setLastCheckAt(null);
+    setErrorCode(null);
+  }, []);
+
+  // "שכח את המכשיר הזה": erase the non-exportable device key + deviceId from IndexedDB and
+  // the session bearer, returning to the first-pair state. Trust cannot silently return —
+  // a new manual pairing is required. Other trusted devices are unaffected.
+  const forgetDevice = useCallback(async () => {
+    await forgetDeviceKey();
+    clearObsidianToken();
+    if (!mounted.current) return;
     setInfo(null);
     setPhase("disconnected");
     setLastCheckAt(null);
@@ -200,5 +275,5 @@ export function useObsidianVault(): UseObsidianVault {
     [info],
   );
 
-  return { phase, info, lastCheckAt, errorCode, busy, connect, refresh, check, disconnect, search, read, list, openVault, openNote };
+  return { phase, info, lastCheckAt, errorCode, busy, connect, refresh, check, disconnect, forgetDevice, search, read, list, openVault, openNote };
 }

@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactElement } from "react";
 import { EmptyState, Modal, OsButton, SearchInput, StatusChip, useToast } from "@/design-system";
-import { getObsidianToken } from "@/integration/obsidian/obsidianCredential";
+import { getObsidianToken, onObsidianAuthExpiry, setObsidianToken } from "@/integration/obsidian/obsidianCredential";
 import { obsidianErrorMessage } from "@/integration/obsidian/useObsidianVault";
 import {
   getConnectionInfo,
@@ -19,6 +19,7 @@ import {
   type GraphNode,
   type VaultGraph,
 } from "@/integration/obsidian/vaultBridgeClient";
+import { ObsidianPairingModal } from "./ObsidianPairingModal";
 import { ForceGraph, type ForceGraphApi } from "@/modules/ai-workspace/visual/ForceGraph";
 import { usePrefersReducedMotion } from "@/modules/ai-workspace/visual/usePrefersReducedMotion";
 import "@/modules/ai-workspace/visual/visual.css";
@@ -101,6 +102,12 @@ export function KnowledgeGraphPanel({ onSelectNote, highlightPaths }: { onSelect
   const [connectedOnly, setConnectedOnly] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [note, setNote] = useState<{ basename: string; path: string; content: string; truncated: boolean } | null>(null);
+  // Reconnect flow (stale pairing token after an Obsidian/plugin restart → 401).
+  const [authExpired, setAuthExpired] = useState(false);
+  const [pendingReadPath, setPendingReadPath] = useState<string | null>(null);
+  const [pairingOpen, setPairingOpen] = useState(false);
+  const [pairingBusy, setPairingBusy] = useState(false);
+  const [pairingError, setPairingError] = useState<string | null>(null);
   const apiRef = useRef<ForceGraphApi | null>(null);
 
   const load = useCallback(async () => {
@@ -112,13 +119,16 @@ export function KnowledgeGraphPanel({ onSelectNote, highlightPaths }: { onSelect
     setPhase("loading");
     const conn = await getConnectionInfo(token);
     if (!conn.ok || !conn.data) {
+      if (conn.code === "UNAUTHORIZED") setAuthExpired(true);
       setErrorCode(conn.code === "OK" ? "ERROR" : conn.code);
       setPhase("error");
       return;
     }
+    setAuthExpired(false);
     setVaultName(conn.data.vaultName);
     const g = await getVaultGraph(token);
     if (!g.ok || !g.data) {
+      if (g.code === "UNAUTHORIZED") setAuthExpired(true);
       setErrorCode(g.code === "OK" ? "ERROR" : g.code);
       setPhase("error");
       return;
@@ -131,6 +141,10 @@ export function KnowledgeGraphPanel({ onSelectNote, highlightPaths }: { onSelect
   useEffect(() => {
     void load();
   }, [load]);
+
+  // React to the CENTRAL auth-expiry broadcast (e.g. a 401 from the Vault panel's
+  // own search): reflect the reconnect-required state here too, without polling.
+  useEffect(() => onObsidianAuthExpiry(() => setAuthExpired(true)), []);
 
   const refresh = useCallback(async () => {
     await load();
@@ -240,15 +254,64 @@ export function KnowledgeGraphPanel({ onSelectNote, highlightPaths }: { onSelect
     return { out: graph.edges.filter((e) => e.source === selected), in: graph.edges.filter((e) => e.target === selected) };
   }, [graph, selected]);
 
+  // Open the reconnect flow, remembering the read to resume after a fresh pairing.
+  const startReconnect = useCallback((path: string | null) => {
+    setPendingReadPath(path);
+    setAuthExpired(true);
+    setPairingError(null);
+    setPairingOpen(true);
+  }, []);
+
   const onRead = useCallback(
     async (path: string) => {
       const token = getObsidianToken();
-      if (!token) return;
+      // No token (never paired, or already expired+cleared) → straight to reconnect.
+      if (!token) {
+        startReconnect(path);
+        return;
+      }
       const r = await readNote(path, token);
-      if (r.ok && r.data) setNote({ basename: r.data.basename, path: r.data.path, content: r.data.content, truncated: r.data.truncated });
-      else toast(obsidianErrorMessage(r.code === "OK" ? "ERROR" : r.code), "danger");
+      if (r.ok && r.data) {
+        setNote({ basename: r.data.basename, path: r.data.path, content: r.data.content, truncated: r.data.truncated });
+        return;
+      }
+      // Stale token: the client chokepoint already cleared it + broadcast expiry.
+      // Remember THIS read and guide the user to reconnect; it resumes once paired.
+      if (r.code === "UNAUTHORIZED") {
+        startReconnect(path);
+        return;
+      }
+      // Unavailable / timeout / not-found are NOT auth expiry — an honest toast.
+      toast(obsidianErrorMessage(r.code === "OK" ? "ERROR" : r.code), "danger");
     },
-    [toast],
+    [toast, startReconnect],
+  );
+
+  // Verify a freshly-pasted token against the live /connection probe. Only a real
+  // 200 counts as connected; then persist (session-scoped) and resume the pending
+  // read EXACTLY ONCE. Invalid/expired token stays disconnected — no auto re-pair.
+  const handleReconnect = useCallback(
+    async (token: string) => {
+      setPairingBusy(true);
+      setPairingError(null);
+      const r = await getConnectionInfo(token);
+      if (r.ok && r.data?.connected) {
+        setObsidianToken(token);
+        setAuthExpired(false);
+        setPairingOpen(false);
+        setPairingBusy(false);
+        setVaultName(r.data.vaultName);
+        toast("מחובר מחדש ל-Obsidian", "success");
+        const pending = pendingReadPath;
+        setPendingReadPath(null);
+        void load(); // refresh the possibly-stale graph with the fresh token
+        if (pending) void onRead(pending); // resume the original read, once
+        return;
+      }
+      setPairingBusy(false);
+      setPairingError("קוד החיבור אינו תקין או שפג תוקפו");
+    },
+    [pendingReadPath, toast, load, onRead],
   );
 
   const resetFilters = useCallback(() => {
@@ -263,7 +326,9 @@ export function KnowledgeGraphPanel({ onSelectNote, highlightPaths }: { onSelect
         <div style={{ fontWeight: 700, fontSize: "var(--os-text-md, 15px)" }}>מפת ידע</div>
         <div style={{ ...muted, fontSize: "var(--os-text-2xs, 11px)" }}>Obsidian · מפת קישורים חיה</div>
       </div>
-      {phase === "loaded" ? (
+      {authExpired ? (
+        <StatusChip status="אזהרה" label="נדרש חיבור מחדש" />
+      ) : phase === "loaded" ? (
         <StatusChip status="פעיל" label={`${graph?.count ?? 0} מסמכים`} />
       ) : phase === "error" || phase === "disconnected" ? (
         <StatusChip status="מושבת" label="לא זמין" />
@@ -299,9 +364,15 @@ export function KnowledgeGraphPanel({ onSelectNote, highlightPaths }: { onSelect
             {obsidianErrorMessage(errorCode)}
           </div>
           <div style={row}>
-            <OsButton variant="ghost" onClick={refresh} data-testid="obsidian-graph-refresh">
-              נסה שוב
-            </OsButton>
+            {authExpired || errorCode === "UNAUTHORIZED" ? (
+              <OsButton variant="primary" onClick={() => startReconnect(null)} data-testid="obsidian-graph-reconnect-btn">
+                התחבר מחדש ל-Obsidian
+              </OsButton>
+            ) : (
+              <OsButton variant="ghost" onClick={refresh} data-testid="obsidian-graph-refresh">
+                נסה שוב
+              </OsButton>
+            )}
           </div>
         </div>
       )}
@@ -451,14 +522,34 @@ export function KnowledgeGraphPanel({ onSelectNote, highlightPaths }: { onSelect
                       <span style={muted}>קשרים נכנסים</span>
                       <span>{selectedEdges.in.length}</span>
                     </div>
-                    <div style={row}>
-                      <OsButton variant="primary" size="sm" onClick={() => onRead(selectedNode.path)} data-testid="obsidian-graph-read">
-                        קרא מסמך
-                      </OsButton>
-                      <OsButton variant="cyan" size="sm" onClick={() => openInObsidian(vaultName, selectedNode.path)} data-testid="obsidian-graph-open">
-                        פתח ב-Obsidian
-                      </OsButton>
-                    </div>
+                    {authExpired ? (
+                      <div data-testid="obsidian-graph-reconnect" style={stack("var(--os-space-2)")}>
+                        <div style={{ ...row, gap: 6 }}>
+                          <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, background: "var(--os-warning, #b8860b)", flex: "0 0 auto" }} />
+                          <span style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-warning, #b8860b)" }}>נדרש חיבור מחדש</span>
+                        </div>
+                        <div role="alert" style={{ fontSize: "var(--os-text-2xs, 11px)", ...muted }}>החיבור המקומי ל-Obsidian פג לאחר הפעלה מחדש של התוסף.</div>
+                        <div style={row}>
+                          {/* Read through the bridge requires re-pairing… */}
+                          <OsButton variant="primary" size="sm" onClick={() => startReconnect(selectedNode.path)} data-testid="obsidian-graph-reconnect-btn">
+                            התחבר מחדש
+                          </OsButton>
+                          {/* …but "open in Obsidian" uses the obsidian:// URI (no bridge token) — stays available. */}
+                          <OsButton variant="cyan" size="sm" onClick={() => openInObsidian(vaultName, selectedNode.path)} data-testid="obsidian-graph-open">
+                            פתח ב-Obsidian
+                          </OsButton>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={row}>
+                        <OsButton variant="primary" size="sm" onClick={() => onRead(selectedNode.path)} data-testid="obsidian-graph-read">
+                          קרא מסמך
+                        </OsButton>
+                        <OsButton variant="cyan" size="sm" onClick={() => openInObsidian(vaultName, selectedNode.path)} data-testid="obsidian-graph-open">
+                          פתח ב-Obsidian
+                        </OsButton>
+                      </div>
+                    )}
                   </aside>
                 )}
               </div>
@@ -484,6 +575,17 @@ export function KnowledgeGraphPanel({ onSelectNote, highlightPaths }: { onSelect
           )}
         </>
       )}
+
+      <ObsidianPairingModal
+        open={pairingOpen}
+        busy={pairingBusy}
+        onClose={() => setPairingOpen(false)}
+        onSubmit={handleReconnect}
+        title="חיבור מחדש ל-Obsidian"
+        submitLabel="התחבר מחדש"
+        intro="החיבור המקומי ל-Obsidian פג לאחר הפעלה מחדש של התוסף. הדביקו קוד התאמה חדש מהתוסף TERAGON Vault Bridge."
+        error={pairingError}
+      />
 
       {note && (
         <Modal open onClose={() => setNote(null)} title={note.basename} footer={<OsButton variant="ghost" onClick={() => setNote(null)}>סגירה</OsButton>}>

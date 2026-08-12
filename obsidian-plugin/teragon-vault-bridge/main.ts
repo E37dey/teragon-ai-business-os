@@ -66,6 +66,68 @@ class WriteConfirmModal extends Modal {
     this.contentEl.empty();
   }
 }
+// A trusted TERAGON device: PUBLIC identity only (never a private key or bearer). Persisted
+// in THIS vault's plugin data (data.json) → naturally scoped to this vault.
+interface TrustedDevice {
+  deviceId: string;
+  publicKey: { kty: string; crv: string; x: string; y: string };
+  fingerprint: string;
+  label: string;
+  origin: string;
+  vaultName: string;
+  createdAt: number;
+  lastSeenAt: number;
+  revoked: boolean;
+}
+
+/** Manage trusted TERAGON browsers — shows NON-secret metadata only; supports revocation. */
+class TrustedDevicesModal extends Modal {
+  private readonly devices: Map<string, TrustedDevice>;
+  private readonly onRevoke: (deviceId: string) => void;
+  private readonly onRevokeAll: () => void;
+  constructor(app: App, devices: Map<string, TrustedDevice>, onRevoke: (id: string) => void, onRevokeAll: () => void) {
+    super(app);
+    this.devices = devices;
+    this.onRevoke = onRevoke;
+    this.onRevokeAll = onRevokeAll;
+  }
+  onOpen(): void {
+    this.render();
+  }
+  private render(): void {
+    this.titleEl.setText("TERAGON — מכשירים מהימנים");
+    const c = this.contentEl;
+    c.empty();
+    const active = [...this.devices.values()].filter((d) => !d.revoked);
+    if (active.length === 0) {
+      c.createEl("p", { text: "אין מכשירים מהימנים. חברו דפדפן דרך קוד ההתאמה החד-פעמי." });
+      return;
+    }
+    c.createEl("p", { text: "דפדפנים שאושרו להתחבר מחדש אוטומטית לאחר הפעלה מחדש (מידע ציבורי בלבד):" });
+    for (const d of active) {
+      const row = c.createEl("div");
+      row.createEl("div", { text: `${d.label} · ${d.fingerprint.slice(-12)}` });
+      row.createEl("div", { text: `נוצר: ${new Date(d.createdAt).toLocaleString()} · נראה לאחרונה: ${new Date(d.lastSeenAt).toLocaleString()}` });
+      row.createEl("div", { text: `מקור: ${d.origin} · כספת: ${d.vaultName}` });
+      const revoke = row.createEl("button", { text: "בטל אמון" });
+      revoke.addEventListener("click", () => {
+        this.onRevoke(d.deviceId);
+        this.render();
+        new Notice("המכשיר נשלל. יידרש חיבור מחדש עם קוד התאמה.");
+      });
+    }
+    const all = c.createEl("button", { text: "בטל אמון לכל המכשירים" });
+    all.addEventListener("click", () => {
+      this.onRevokeAll();
+      this.render();
+      new Notice("כל המכשירים נשללו.");
+    });
+  }
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
 // The TERAGON dev origin(s) allowed to call the bridge (explicit allowlist; no wildcard).
 const ALLOWED_ORIGINS = ["http://localhost:4173", "http://127.0.0.1:4173"];
 const SEARCH_SCAN_CAP = 1000; // max notes scanned per search (bounded work)
@@ -84,8 +146,31 @@ export default class TeragonVaultBridge extends Plugin {
   private bridge: { close: () => Promise<void> } | null = null;
   private token = "";
   private writeKey = "";
+  // Persistent trusted-device registry (PUBLIC keys only) — loaded from this vault's
+  // data.json, so trust is inherently scoped to this vault.
+  private trustedDevices = new Map<string, TrustedDevice>();
+
+  private async loadTrust(): Promise<void> {
+    try {
+      const data = (await this.loadData()) as { trustedDevices?: TrustedDevice[] } | null;
+      const arr = Array.isArray(data?.trustedDevices) ? data!.trustedDevices : [];
+      for (const d of arr) {
+        if (d && typeof d.deviceId === "string" && d.publicKey && typeof d.publicKey.x === "string") this.trustedDevices.set(d.deviceId, d);
+      }
+    } catch {
+      /* fresh registry on any read fault */
+    }
+  }
+  private async persistTrust(): Promise<void> {
+    try {
+      await this.saveData({ trustedDevices: [...this.trustedDevices.values()] });
+    } catch {
+      /* best-effort persistence; in-memory registry still authoritative this session */
+    }
+  }
 
   async onload(): Promise<void> {
+    await this.loadTrust();
     // Dev-only: a fresh strong random pairing token per load; revealed once via a command.
     this.token = generateToken();
     // SEPARATE write-authorization secret (NOT the pairing token). Revealed via its own
@@ -208,8 +293,48 @@ export default class TeragonVaultBridge extends Plugin {
         return { ok: true, path: file.path, hash: sha256(next) };
       },
     };
-    this.bridge = createBridge({ token: this.token, writeKey: this.writeKey, allowedOrigins: ALLOWED_ORIGINS, vault });
+    // Trusted-device registry: the bridge reads/records PUBLIC device info only; the plugin
+    // persists it to this vault's data.json (naturally vault-scoped). Each stored record is
+    // tagged with the current vaultName for audit/display.
+    const trustStore = {
+      list: () => [...this.trustedDevices.values()],
+      get: (deviceId: string) => this.trustedDevices.get(deviceId) ?? null,
+      put: (rec: TrustedDevice) => {
+        this.trustedDevices.set(rec.deviceId, { ...rec, vaultName: this.app.vault.getName() });
+        void this.persistTrust();
+      },
+      touch: (deviceId: string, at: number) => {
+        const d = this.trustedDevices.get(deviceId);
+        if (d) {
+          d.lastSeenAt = at;
+          void this.persistTrust();
+        }
+      },
+    };
+    this.bridge = createBridge({ token: this.token, writeKey: this.writeKey, allowedOrigins: ALLOWED_ORIGINS, vault, trustStore });
     await (this.bridge as unknown as { start: (p: number) => Promise<unknown> }).start(DEFAULT_PORT);
+
+    this.addCommand({
+      id: "manage-trusted-devices",
+      name: "Manage TERAGON trusted devices",
+      callback: () => {
+        new TrustedDevicesModal(
+          this.app,
+          this.trustedDevices,
+          (id) => {
+            const d = this.trustedDevices.get(id);
+            if (d) {
+              d.revoked = true;
+              void this.persistTrust();
+            }
+          },
+          () => {
+            for (const d of this.trustedDevices.values()) d.revoked = true;
+            void this.persistTrust();
+          },
+        ).open();
+      },
+    });
 
     this.addCommand({
       id: "show-pairing-token",

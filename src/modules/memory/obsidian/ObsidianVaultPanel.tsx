@@ -8,6 +8,7 @@ import { invalidateCollections } from "@/app/data/hooks";
 import { obsidianErrorMessage, useObsidianVault } from "@/integration/obsidian/useObsidianVault";
 import { OBSIDIAN_BRIDGE_URL, type BridgeCode, type NoteContent, type SearchHit } from "@/integration/obsidian/vaultBridgeClient";
 import { classifyObsidianNote, createObsidianImportProposal, type ClassifyResult } from "@/integration/obsidian/obsidianImport";
+import { ObsidianPairingModal } from "./ObsidianPairingModal";
 import { WriteProposeModal } from "./WriteProposeModal";
 
 const stack = (gap = "var(--os-space-3)"): CSSProperties => ({ display: "grid", gap });
@@ -15,18 +16,6 @@ const row: CSSProperties = { display: "flex", flexWrap: "wrap", gap: "var(--os-s
 const metaRow: CSSProperties = { display: "flex", justifyContent: "space-between", gap: "var(--os-space-2)", fontSize: "var(--os-text-2xs, 11px)" };
 const muted: CSSProperties = { color: "var(--os-text-2)" };
 const codeStyle: CSSProperties = { fontFamily: "var(--os-font-mono, monospace)", direction: "ltr", unicodeBidi: "isolate" };
-
-const inputStyle: CSSProperties = {
-  font: "inherit",
-  fontSize: "var(--os-text-sm, 13px)",
-  background: "var(--os-bg-2, transparent)",
-  color: "var(--os-text)",
-  border: "1px solid var(--os-border)",
-  borderRadius: "var(--os-radius-sm, 6px)",
-  paddingBlock: 8,
-  paddingInline: 10,
-  width: "100%",
-};
 
 function fmtTime(mtime: number | null): string {
   if (!mtime) return "—";
@@ -66,73 +55,6 @@ function ActionButton({
     <OsButton variant={variant} onClick={onClick} data-testid={testId}>
       {children}
     </OsButton>
-  );
-}
-
-/** Pairing modal — the normal in-product interaction (paste the token, no terminal). */
-function PairingModal({
-  open,
-  busy,
-  onClose,
-  onSubmit,
-}: {
-  open: boolean;
-  busy: boolean;
-  onClose: () => void;
-  onSubmit: (token: string) => void;
-}): ReactElement {
-  const [token, setToken] = useState("");
-  const submit = (): void => {
-    if (token.trim()) onSubmit(token.trim());
-  };
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="חיבור ל-Obsidian"
-      footer={
-        <div style={row}>
-          <OsButton variant="ghost" onClick={onClose}>
-            ביטול
-          </OsButton>
-          {token.trim() ? (
-            <OsButton variant="primary" onClick={submit}>
-              {busy ? "מתחבר…" : "התחבר"}
-            </OsButton>
-          ) : (
-            <OsButton variant="primary" disabled disabledReason="הדביקו את קוד ההתאמה מ-Obsidian">
-              התחבר
-            </OsButton>
-          )}
-        </div>
-      }
-    >
-      <div style={stack()}>
-        <p style={{ margin: 0, fontSize: "var(--os-text-sm, 13px)" }}>
-          ב-Obsidian, הפעילו את הפקודה <b>“Copy TERAGON pairing token (once)”</b> והדביקו את הקוד כאן. הקוד נשמר
-          מקומית בלבד (session), לעולם לא נשלח לרשת ולא נשמר בקוד המקור.
-        </p>
-        <label style={stack("var(--os-space-1)")}>
-          <span style={{ fontSize: "var(--os-text-2xs, 11px)", ...muted }}>קוד התאמה</span>
-          <input
-            data-testid="obsidian-token-input"
-            type="password"
-            autoComplete="off"
-            style={inputStyle}
-            value={token}
-            aria-label="קוד התאמה של Obsidian"
-            placeholder="הדביקו כאן…"
-            onChange={(e) => setToken(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submit();
-            }}
-          />
-        </label>
-        <div style={{ fontSize: "var(--os-text-2xs, 11px)", ...muted }}>
-          חיבור מקומי בלבד אל <span style={codeStyle}>{OBSIDIAN_BRIDGE_URL}</span> · קריאה בלבד.
-        </div>
-      </div>
-    </Modal>
   );
 }
 
@@ -474,6 +396,11 @@ export function ObsidianVaultPanel(): ReactElement {
     toast("נותקתם מ-Obsidian", "info");
   }, [vault, toast]);
 
+  const handleForget = useCallback(async () => {
+    await vault.forgetDevice();
+    toast("המכשיר הוסר מהמכשירים המהימנים. יידרש חיבור מחדש עם קוד התאמה.", "info");
+  }, [vault, toast]);
+
   const onSearch = useCallback(
     async (q: string): Promise<{ hits: SearchHit[]; error: string | null }> => {
       const r = await vault.search(q);
@@ -501,6 +428,8 @@ export function ObsidianVaultPanel(): ReactElement {
         action={
           connected ? (
             <StatusChip status="פעיל" label="מחובר" />
+          ) : vault.phase === "checking" ? (
+            <StatusChip status="ממתין" label="מתחבר…" />
           ) : vault.phase === "error" ? (
             <StatusChip status="חסום" label="שגיאת חיבור" />
           ) : (
@@ -538,6 +467,10 @@ export function ObsidianVaultPanel(): ReactElement {
             <span style={muted}>בדיקת חיבור אחרונה</span>
             <span>{fmtTime(vault.lastCheckAt)}</span>
           </div>
+          <div style={{ fontSize: "var(--os-text-2xs, 11px)", ...muted }}>
+            החיבור נשמר באופן מקומי במכשיר זה. לאחר הפעלה מחדש של Obsidian, TERAGON יתחבר מחדש באופן מאובטח — ללא צורך
+            בקוד נוסף.
+          </div>
           <div style={row}>
             <OsButton variant="primary" onClick={() => setSearchOpen(true)} data-testid="obsidian-search-btn">
               חפש ב-Vault
@@ -556,11 +489,14 @@ export function ObsidianVaultPanel(): ReactElement {
             <OsButton variant="danger" onClick={handleDisconnect} data-testid="obsidian-disconnect-btn">
               נתק
             </OsButton>
+            <OsButton variant="ghost" onClick={handleForget} data-testid="obsidian-forget-btn">
+              שכח את המכשיר הזה
+            </OsButton>
           </div>
         </div>
       ) : (
         <div style={stack()} data-testid="obsidian-disconnected">
-          <div style={{ fontSize: "var(--os-text-sm, 13px)" }}>לא מחובר</div>
+          <div style={{ fontSize: "var(--os-text-sm, 13px)" }}>{vault.phase === "checking" ? "מתחבר ל-Obsidian…" : "לא מחובר"}</div>
           {vault.phase === "error" && vault.errorCode && (
             <div role="alert" data-testid="obsidian-error" style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-danger, #c0392b)" }}>
               {obsidianErrorMessage(vault.errorCode)}
@@ -581,7 +517,15 @@ export function ObsidianVaultPanel(): ReactElement {
         </div>
       )}
 
-      <PairingModal open={pairingOpen} busy={vault.busy} onClose={() => setPairingOpen(false)} onSubmit={handleConnect} />
+      <ObsidianPairingModal
+        open={pairingOpen}
+        busy={vault.busy}
+        onClose={() => setPairingOpen(false)}
+        onSubmit={handleConnect}
+        title="חבר את המכשיר הזה ל-Obsidian"
+        submitLabel="חבר מכשיר"
+        intro="ב-Obsidian הפעילו את הפקודה “Copy TERAGON pairing token (once)” והדביקו את הקוד. החיבור נשמר מקומית במכשיר זה (מפתח מכשיר לא ניתן לייצוא) — לאחר הפעלה מחדש TERAGON יתחבר מחדש באופן מאובטח, ללא צורך בקוד נוסף."
+      />
       {connected && (
         <SearchModal
           open={searchOpen}

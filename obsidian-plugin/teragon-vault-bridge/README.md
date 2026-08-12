@@ -24,6 +24,24 @@ No POST/PUT/PATCH/DELETE. No `?path=`/`?file=`. Binds `127.0.0.1` only.
 
 **Never** put the token in a URL/query string, never commit it, never log it. It rotates on every plugin load.
 
+## Trusted Device Pairing (auto re-auth after restart)
+The pairing code is now a **one-time bootstrap** for device trust, not a recurring login. The
+browser holds a **non-exportable** ECDSA P-256 key; the plugin persists only the **public** key
+(`loadData/saveData`, per-vault). After a restart the browser proves possession via a signed
+challenge (`/auth/challenge` → `/auth/verify`) and gets a fresh short-lived session — **no new
+pairing code**. Manage/revoke via the command **"Manage TERAGON trusted devices"**. See
+`docs/product-v2/OBSIDIAN_TRUSTED_DEVICE_PAIRING_EVIDENCE.md`.
+
+## Build (produces `main.js` for install)
+`main.js` is the esbuild bundle of `main.ts` (+ `bridgeServer.mjs`) that Obsidian loads:
+```
+npx esbuild main.ts --bundle --format=cjs --platform=node --target=es2020 \
+  --external:obsidian --external:electron --outfile=main.js
+```
+Install by copying `main.js` + `manifest.json` into
+`<vault>/.obsidian/plugins/teragon-vault-bridge/`, then toggle the plugin off/on (or restart
+Obsidian) to load it.
+
 ## Security
 127.0.0.1-only bind · Bearer token (constant-time compare) · explicit Origin allowlist (no `*`) · GET-only ·
 no arbitrary path params · bounded response/body sizes · sanitized errors (no stack, no token) · correlation

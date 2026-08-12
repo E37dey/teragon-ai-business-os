@@ -105,3 +105,67 @@ export function clearObsidianWriteKey(): void {
 export function hasObsidianWriteKey(): boolean {
   return getObsidianWriteKey() !== null;
 }
+
+// ---------------------------------------------------------------------------
+// Centralized auth-expiry mechanism.
+//
+// The Vault Bridge rotates its pairing token on every Obsidian/plugin restart.
+// After a restart the browser still holds the OLD token in sessionStorage, so
+// the next authenticated request fails closed with a genuine 401. That is an
+// AUTH-EXPIRY, distinct from "never paired" and from "bridge unavailable".
+//
+// This is the single, narrow place that reacts to it: any surface (or the
+// bridge client chokepoint) that observes a real 401 calls expireObsidianAuth(),
+// which clears the stale credential ONCE and notifies every connection surface
+// so they all transition to "reconnect required" together — one behavior,
+// everywhere. It intentionally does NOT auto re-pair: recovery requires an
+// explicit human pairing with a fresh token.
+type AuthExpiryListener = () => void;
+const authExpiryListeners = new Set<AuthExpiryListener>();
+
+/** Subscribe to stale-token expiry. Returns an unsubscribe function. */
+export function onObsidianAuthExpiry(listener: AuthExpiryListener): () => void {
+  authExpiryListeners.add(listener);
+  return () => {
+    authExpiryListeners.delete(listener);
+  };
+}
+
+/**
+ * A genuine 401 was observed on a credentialed request: the paired token is
+ * stale. Clear it (token + write key) and tell every surface to require a fresh
+ * reconnect. No-op — and NO broadcast — when nothing was paired, so "not paired"
+ * is never mistaken for "expired" and the notification never fires twice.
+ */
+export function expireObsidianAuth(): void {
+  if (!hasObsidianToken()) return;
+  clearObsidianToken();
+  for (const fn of authExpiryListeners) {
+    try {
+      fn();
+    } catch {
+      /* isolate a faulty listener — expiry must still reach the others */
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Trusted-device re-auth handler registry.
+//
+// The bridge client's 401 chokepoint asks this registry to recover the session
+// via trusted-device challenge-response BEFORE falling back to the manual
+// reconnect UI. trustedAuth.ts registers its (single-flight) handler on import;
+// when unregistered (e.g. bridge-only tests) recovery is a no-op and behavior
+// falls back to expiry exactly as before.
+type ReauthHandler = () => Promise<string | null>;
+let reauthHandler: ReauthHandler | null = null;
+
+/** Register (or clear with null) the trusted-device re-auth handler. */
+export function setTrustedReauthHandler(handler: ReauthHandler | null): void {
+  reauthHandler = handler;
+}
+
+/** Run trusted re-auth if a handler is registered; resolves to a fresh bearer or null. */
+export function runTrustedReauth(): Promise<string | null> {
+  return reauthHandler ? reauthHandler() : Promise.resolve(null);
+}
