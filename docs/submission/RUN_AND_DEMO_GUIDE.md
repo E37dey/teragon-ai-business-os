@@ -62,6 +62,32 @@ every route, and no external side effects. Just `npm run dev` and open the print
 The live Customers/Contacts (Supabase) require a configured Supabase project + sign-in;
 for the demo, stay in local mode.
 
+## Obsidian Vault Bridge (optional — knowledge + governed-write demo)
+
+The core app + Command Center + the `workflow_failed` → Governed Follow-up Task recovery
+story run **without** Obsidian. The **positive** governed-knowledge path (a real Vault note
+read → recommendation, and the Phase-3 governed write) additionally needs the desktop
+**TERAGON Vault Bridge** plugin. For a handoff, wire it up as follows:
+
+- **Plugin files:** `obsidian-plugin/teragon-vault-bridge/` — install `main.js` + `manifest.json`
+  (build `main.js` per the plugin README's *Build* section if it is absent).
+- **Install:** copy those two files into `<vault>/.obsidian/plugins/teragon-vault-bridge/`,
+  then enable the plugin in Obsidian (Community plugins). It starts a loopback bridge on
+  `127.0.0.1:5200` (desktop-only; no external network).
+- **First pairing:** run the Obsidian command **"Copy TERAGON pairing token (once)"** and paste
+  the token into TERAGON's diagnostic connect field (sent as `Authorization: Bearer …`, never in
+  a URL, never committed).
+- **After pairing — Trusted Device:** the pairing code is a **one-time bootstrap**. The browser
+  holds a non-exportable ECDSA P-256 key; the plugin persists only the **public** key. After an
+  Obsidian/plugin restart the browser re-authenticates automatically via a signed challenge —
+  **no new pairing code**. Manage/revoke via **"Manage TERAGON trusted devices"**.
+- **Trust boundary:** trusted-device auth re-establishes the **bridge session only** — it is
+  **not** write authority. Governed writes still require the separate writeKey + HMAC capability
+  + native Obsidian confirmation + read-back. The bridge is loopback HTTP
+  (`HTTPS_TO_LOOPBACK = UNVALIDATED`).
+- **Authoritative detail:** [`obsidian-plugin/teragon-vault-bridge/README.md`](../../obsidian-plugin/teragon-vault-bridge/README.md)
+  and [`docs/product-v2/OBSIDIAN_TRUSTED_DEVICE_PAIRING_EVIDENCE.md`](../product-v2/OBSIDIAN_TRUSTED_DEVICE_PAIRING_EVIDENCE.md).
+
 ## Expected local URLs
 
 - Dev: `http://localhost:5173`
