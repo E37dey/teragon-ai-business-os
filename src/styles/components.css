@@ -2715,3 +2715,180 @@ select:focus-visible {
   outline-offset: 2px;
   border-radius: var(--os-radius-sm, 6px);
 }
+
+/* ═══════════════ Analytics — executive BI polish (VC-F visual) ═══════════════
+   Presentation only: no metric/data change. All colors flow through existing
+   theme-aware --os / --accent / semantic tokens. */
+.an-trend {
+  position: relative;
+  inline-size: 100%;
+  direction: ltr; /* charts render LTR, like all charts here */
+}
+.an-trend svg {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+}
+.an-trend--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 140px;
+  color: var(--os-muted);
+  font-size: var(--os-text-sm);
+}
+.an-trend__grid {
+  stroke: var(--os-border-thin, var(--os-border));
+  stroke-width: 1;
+  opacity: 0.45;
+}
+.an-trend__ylabel,
+.an-trend__xlabel {
+  fill: var(--os-muted);
+  font-size: 10px;
+  font-family: var(--os-font-mono, ui-monospace, monospace);
+}
+.an-trend__guide {
+  stroke: var(--accent-primary-border, var(--os-border));
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  opacity: 0.55;
+}
+.an-trend__pt {
+  cursor: pointer;
+  opacity: 0; /* hidden until hover/focus — no giant marker field */
+  transition: opacity 120ms ease;
+}
+.an-trend:hover .an-trend__pt {
+  opacity: 0.5;
+}
+.an-trend__pt.is-active,
+.an-trend__pt:hover,
+.an-trend__pt:focus,
+.an-trend__pt:focus-visible {
+  opacity: 1;
+  outline: none;
+}
+.an-trend__tip {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 12px));
+  background: var(--os-raised);
+  border: 1px solid var(--os-border);
+  border-radius: var(--os-radius-md, 8px);
+  padding: var(--os-space-2) var(--os-space-3);
+  box-shadow: var(--os-shadow-2, 0 6px 18px rgba(15, 23, 32, 0.22));
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 4;
+  min-inline-size: 92px;
+}
+.an-trend__tip-period {
+  font-size: var(--os-text-2xs);
+  color: var(--os-muted);
+}
+.an-trend__tip-metric {
+  font-size: var(--os-text-2xs);
+  color: var(--os-text-2);
+  margin-block: 2px;
+}
+.an-trend__tip-value {
+  font-size: var(--os-text-md);
+  font-weight: var(--os-weight-bold, 700);
+  color: var(--os-text);
+}
+
+/* executive chart header */
+.an-chart-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--os-space-3);
+}
+.an-chart-header__label {
+  font-size: var(--os-text-sm);
+  color: var(--os-text-2);
+  font-weight: var(--os-weight-medium);
+}
+.an-chart-header__value {
+  font-size: var(--os-text-2xl, 1.75rem);
+  font-weight: var(--os-weight-bold, 700);
+  color: var(--os-text);
+  line-height: 1.05;
+  margin-block-start: 2px;
+}
+.an-chart-header__delta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--os-space-2);
+  font-size: var(--os-text-2xs);
+  font-weight: var(--os-weight-semibold);
+  padding: var(--os-space-1) var(--os-space-3);
+  border-radius: var(--os-radius-full);
+}
+.an-chart-header__delta--up {
+  color: var(--success-text);
+  background: var(--os-success-soft);
+}
+.an-chart-header__delta--down {
+  color: var(--danger-text);
+  background: var(--os-danger-soft);
+}
+.an-chart-header__delta--flat {
+  color: var(--os-muted);
+  background: rgba(101, 117, 139, 0.12);
+}
+.an-chart-header__arrow {
+  font-weight: 700;
+}
+/* secondary suffix — de-emphasized via weight, NOT opacity (opacity would drop
+   the green/red delta text below WCAG AA contrast). */
+.an-chart-header__delta-sfx {
+  font-weight: var(--os-weight-normal, 400);
+}
+
+/* filter bar — grouped clusters, quiet secondary controls */
+.an-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--os-space-3) var(--os-space-4);
+}
+.an-filter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--os-space-2);
+}
+.an-filter-group + .an-filter-group {
+  border-inline-start: 1px solid var(--os-border-thin, var(--os-border));
+  padding-inline-start: var(--os-space-4);
+}
+.an-filter-group__label {
+  font-size: var(--os-text-2xs);
+  color: var(--os-muted);
+  font-weight: var(--os-weight-medium);
+}
+.an-filters__spacer {
+  flex: 1 1 auto;
+}
+.an-filters__secondary {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--os-space-2);
+}
+
+/* small per-metric chart — markers hidden until hover/focus */
+.an-mchart__pt {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.an-mchart:hover .an-mchart__pt {
+  opacity: 0.55;
+}
+.an-mchart__pt:hover,
+.an-mchart__pt:focus,
+.an-mchart__pt:focus-visible {
+  opacity: 1;
+  outline: none;
+}

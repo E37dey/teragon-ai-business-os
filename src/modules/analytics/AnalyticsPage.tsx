@@ -87,6 +87,7 @@ import { SUBMISSION_METRICS } from "@/domain/submission/metricLevels";
 import { getRepository, nextId } from "@/repositories";
 import { CEO_USER_ID, DEMO_DATA_LABEL } from "@/repositories/seed";
 import { MetricChart } from "./MetricChart";
+import { TrendChart } from "./TrendChart";
 import { ANALYTICS_PRINT_CSS, ReportRunPrintView } from "./reportPrint";
 import { downloadTextFile, fmtPointValue, latestMeasured, shortDateHe } from "./lib";
 
@@ -527,6 +528,7 @@ export default function AnalyticsPage(): ReactElement {
             defs={primaryDefs}
             series={primarySeries}
             chartDef={chartDef}
+            chartComparison={chartDef === null ? null : comparisons.get(chartDef.key) ?? null}
             tableMode={tableMode}
             onDrill={openDrill}
           />
@@ -765,73 +767,92 @@ function FilterBar({
   onSave: () => void;
 }): ReactElement {
   return (
-    <Panel style={{ padding: "var(--os-space-3)", display: "flex", flexWrap: "wrap", gap: "var(--os-space-2)", alignItems: "center" }}>
-      <select
-        style={selectStyle}
-        value={filter.rangePreset}
-        onChange={(e) => onChange({ ...filter, rangePreset: e.target.value as AnalyticsRangePreset })}
-        aria-label="טווח תאריכים"
-      >
-        {(Object.keys(RANGE_PRESET_HE) as AnalyticsRangePreset[]).map((p) => (
-          <option key={p} value={p}>
-            {RANGE_PRESET_HE[p]}
-          </option>
-        ))}
-      </select>
-      <select
-        style={selectStyle}
-        value={filter.ownerId ?? ""}
-        onChange={(e) => onChange({ ...filter, ownerId: e.target.value === "" ? null : e.target.value })}
-        aria-label="בעלים"
-      >
-        <option value="">כל הבעלים</option>
-        {users.map((u) => (
-          <option key={u.id} value={u.id}>
-            {u.name}
-          </option>
-        ))}
-      </select>
-      <select
-        style={selectStyle}
-        value={filter.entityType ?? ""}
-        onChange={(e) => onChange({ ...filter, entityType: e.target.value === "" ? null : e.target.value })}
-        aria-label="סוג ישות"
-      >
-        <option value="">כל סוגי הישויות</option>
-        {entityTypes.map((t) => (
-          <option key={t} value={t}>
-            {t}
-          </option>
-        ))}
-      </select>
-      <select
-        style={selectStyle}
-        value={filter.status ?? ""}
-        onChange={(e) => onChange({ ...filter, status: e.target.value === "" ? null : e.target.value })}
-        aria-label="סטטוס רשומות"
-      >
-        <option value="">כל הסטטוסים</option>
-        {statusOptions.map((s) => (
-          <option key={s} value={s}>
-            {s}
-          </option>
-        ))}
-      </select>
-      <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.82rem", color: "var(--os-text-2)" }}>
-        <input
-          type="checkbox"
-          checked={filter.comparePrevious}
-          onChange={(e) => onChange({ ...filter, comparePrevious: e.target.checked })}
-        />
-        השוואה לתקופה קודמת
-      </label>
-      <SavedViewsPicker views={views} onPick={(v) => onChange(v.filter)} />
-      <OsButton variant="ghost" size="sm" onClick={onSave}>
-        שמירת תצוגה
-      </OsButton>
-      <OsButton variant="ghost" size="sm" onClick={onReset}>
-        איפוס
-      </OsButton>
+    <Panel style={{ padding: "var(--os-space-3) var(--os-space-4)" }}>
+      <div className="an-filters">
+        <div className="an-filter-group">
+          <span className="an-filter-group__label">טווח</span>
+          <select
+            style={selectStyle}
+            value={filter.rangePreset}
+            onChange={(e) => onChange({ ...filter, rangePreset: e.target.value as AnalyticsRangePreset })}
+            aria-label="טווח תאריכים"
+          >
+            {(Object.keys(RANGE_PRESET_HE) as AnalyticsRangePreset[]).map((p) => (
+              <option key={p} value={p}>
+                {RANGE_PRESET_HE[p]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="an-filter-group">
+          <span className="an-filter-group__label">בעלים</span>
+          <select
+            style={selectStyle}
+            value={filter.ownerId ?? ""}
+            onChange={(e) => onChange({ ...filter, ownerId: e.target.value === "" ? null : e.target.value })}
+            aria-label="בעלים"
+          >
+            <option value="">כל הבעלים</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="an-filter-group">
+          <span className="an-filter-group__label">סוג</span>
+          <select
+            style={selectStyle}
+            value={filter.entityType ?? ""}
+            onChange={(e) => onChange({ ...filter, entityType: e.target.value === "" ? null : e.target.value })}
+            aria-label="סוג ישות"
+          >
+            <option value="">כל סוגי הישויות</option>
+            {entityTypes.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="an-filter-group">
+          <span className="an-filter-group__label">סטטוס</span>
+          <select
+            style={selectStyle}
+            value={filter.status ?? ""}
+            onChange={(e) => onChange({ ...filter, status: e.target.value === "" ? null : e.target.value })}
+            aria-label="סטטוס רשומות"
+          >
+            <option value="">כל הסטטוסים</option>
+            {statusOptions.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="an-filters__spacer" />
+
+        <div className="an-filters__secondary">
+          <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.82rem", color: "var(--os-text-2)" }}>
+            <input
+              type="checkbox"
+              checked={filter.comparePrevious}
+              onChange={(e) => onChange({ ...filter, comparePrevious: e.target.checked })}
+            />
+            השוואה לתקופה קודמת
+          </label>
+          <SavedViewsPicker views={views} onPick={(v) => onChange(v.filter)} />
+          <OsButton variant="ghost" size="sm" onClick={onSave}>
+            שמירת תצוגה
+          </OsButton>
+          <OsButton variant="ghost" size="sm" onClick={onReset}>
+            איפוס
+          </OsButton>
+        </div>
+      </div>
     </Panel>
   );
 }
@@ -912,8 +933,10 @@ function MetricCard({
         style={{
           all: "unset",
           cursor: "pointer",
-          fontSize: "1.35rem",
-          fontWeight: 700,
+          // VC-F §5: an unavailable metric must not shout — quieter, smaller
+          // "טרם נמדד" so measured metrics clearly stand out.
+          fontSize: latest === null ? "0.98rem" : "1.35rem",
+          fontWeight: latest === null ? 600 : 700,
           color: latest === null ? "var(--os-muted)" : "var(--os-text)",
         }}
         aria-label={`${def.titleHe} — פתיחת רשומות המקור`}
@@ -925,7 +948,7 @@ function MetricCard({
         )}
       </button>
       {latest === null && (
-        <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--os-muted)" }}>{def.sourceHe}</p>
+        <p style={{ margin: 0, fontSize: "0.72rem", color: "var(--os-muted)", opacity: 0.9 }}>{def.sourceHe}</p>
       )}
       {comparison !== null && (
         <div>{comparisonChip(comparison, def.betterWhen)}</div>
@@ -1033,20 +1056,40 @@ function GroupNav({
 // VC-F: the executive summary — exactly 4 primary metrics + ONE steel-blue
 // trend chart (with the accessible table alternative). Zero renders muted
 // (0 is not success); null renders the honest "טרם נמדד".
+// real measured values only (≥2) for a KPI sparkline — never fabricated
+function sparkValues(series: MetricSeries | undefined): number[] | undefined {
+  if (series === undefined) return undefined;
+  const vals = series.points.filter((p) => p.value !== null).map((p) => p.value as number);
+  return vals.length >= 2 ? vals : undefined;
+}
+
+// semantic direction from the EXISTING honest comparison (no fabricated %)
+function headerDelta(c: MetricComparison | null): { cls: "up" | "down" | "flat"; arrow: string; label: string } | null {
+  if (c === null) return null;
+  if (c.state === "improved") return { cls: "up", arrow: "↑", label: c.labelHe };
+  if (c.state === "declined") return { cls: "down", arrow: "↓", label: c.labelHe };
+  if (c.state === "unchanged") return { cls: "flat", arrow: "→", label: c.labelHe };
+  return null; // insufficient / no previous → omit the comparison (honest)
+}
+
 function PrimarySummary({
   defs,
   series,
   chartDef,
+  chartComparison,
   tableMode,
   onDrill,
 }: {
   defs: readonly AnalyticsMetricDef[];
   series: Map<string, MetricSeries>;
   chartDef: AnalyticsMetricDef | null;
+  chartComparison: MetricComparison | null;
   tableMode: boolean;
   onDrill: (def: AnalyticsMetricDef, period: AnalyticsPeriod, contextHe: string) => void;
 }): ReactElement {
   const chartSeries = chartDef === null ? null : (series.get(chartDef.key) ?? null);
+  const chartLatest = chartSeries === null ? null : latestMeasured(chartSeries.points);
+  const delta = headerDelta(chartComparison);
   return (
     <div style={{ display: "grid", gap: "var(--os-space-5)" }}>
       <div style={kpiRowStyle}>
@@ -1061,13 +1104,29 @@ function PrimarySummary({
               accent="blue"
               icon={PRIMARY_KPI_ICON[def.key]}
               muted={latest === null || isZero}
+              glow={def.key === PRIMARY_CHART_KEY && latest !== null && !isZero}
+              spark={sparkValues(series.get(def.key))}
             />
           );
         })}
       </div>
       {chartDef !== null && chartSeries !== null && (
-        <Panel variant="raised" style={{ padding: "var(--os-space-4)", display: "grid", gap: "var(--os-space-3)" }}>
-          <SectionTitle icon="gauge" title={`מגמה — ${chartDef.titleHe}`} />
+        <Panel variant="raised" style={{ padding: "var(--os-space-5)", display: "grid", gap: "var(--os-space-4)" }}>
+          <div className="an-chart-header">
+            <div>
+              <div className="an-chart-header__label">מגמה — {chartDef.titleHe}</div>
+              <div className="an-chart-header__value os-num">
+                {chartLatest === null ? NOT_MEASURED_HE : fmtPointValue(chartLatest.value, chartDef.unit)}
+              </div>
+            </div>
+            {delta !== null && (
+              <div className={`an-chart-header__delta an-chart-header__delta--${delta.cls}`}>
+                <span className="an-chart-header__arrow" aria-hidden="true">{delta.arrow}</span>
+                <span>{delta.label}</span>
+                <span className="an-chart-header__delta-sfx">· לעומת התקופה הקודמת</span>
+              </div>
+            )}
+          </div>
           {tableMode ? (
             <DataTable
               columns={[
@@ -1107,10 +1166,11 @@ function PrimarySummary({
               emptyText="אין נקודות מדודות בטווח"
             />
           ) : (
-            <MetricChart
+            <TrendChart
               points={chartSeries.points}
               accent={SERIES_ACCENT}
               unit={chartDef.unit}
+              titleHe={chartDef.titleHe}
               onPointClick={(i) => {
                 const p = chartSeries.points[i];
                 if (p !== undefined)

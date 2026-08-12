@@ -40,6 +40,7 @@ export function MetricChart({ points, accent, unit, onPointClick }: MetricChartP
 
   return (
     <svg
+      className="an-mchart"
       viewBox={`0 0 ${W} ${H}`}
       style={{ inlineSize: "100%", blockSize: "auto", display: "block" }}
       // role="group" (not "img"): the chart CONTAINS focusable point controls
@@ -59,7 +60,8 @@ export function MetricChart({ points, accent, unit, onPointClick }: MetricChartP
             points={pts}
             fill="none"
             stroke={stroke}
-            strokeWidth={1.6}
+            strokeWidth={2}
+            vectorEffect="non-scaling-stroke"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
@@ -69,12 +71,14 @@ export function MetricChart({ points, accent, unit, onPointClick }: MetricChartP
         p.value === null ? null : (
           <circle
             key={p.periodStart}
+            className="an-mchart__pt"
             cx={x(i)}
             cy={y(p.value)}
-            r={4}
+            r={3}
             fill="var(--os-raised)"
             stroke={stroke}
-            strokeWidth={1.6}
+            strokeWidth={2}
+            vectorEffect="non-scaling-stroke"
             style={{ cursor: "pointer" }}
             tabIndex={0}
             role="button"
