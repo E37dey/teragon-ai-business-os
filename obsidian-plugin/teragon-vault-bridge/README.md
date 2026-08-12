@@ -1,21 +1,35 @@
-# TERAGON Vault Bridge — Phase 0 (development-only, READ-ONLY)
+# TERAGON Vault Bridge (Phase 3) — development-only loopback bridge
 
-An isolated Obsidian community-style plugin that starts a **loopback (127.0.0.1) READ-ONLY** HTTP bridge
-exposing bounded Vault metadata to TERAGON. **No writes, no sync, no external network.** This is the Phase 0
-transport/security spike from `docs/product-v2/OBSIDIAN_LIVE_CONNECTION_ARCHITECTURE.md`.
+An isolated Obsidian community-style plugin (`manifest.json` v0.3.0, `isDesktopOnly`) that starts a
+**loopback (127.0.0.1) only** HTTP bridge for TERAGON. It exposes **bounded read/search/open** access
+to Vault metadata and notes, **Trusted Device Pairing** (auto re-auth after restart), and **three
+human-confirmed governed write endpoints** (create / update / append) — each hash-guarded, idempotent,
+and read-back-verified. **No delete/rename/move, no sync, no external network.** Trusted-device auth
+authenticates the **bridge session only — it is not write authority**; the bridge is loopback HTTP
+(`HTTPS_TO_LOOPBACK = UNVALIDATED`). Architecture:
+`docs/product-v2/OBSIDIAN_LIVE_CONNECTION_ARCHITECTURE.md`.
 
 ## Files
 - `bridgeServer.mjs` — the loopback HTTP bridge (single source; also used by the local spike runner + tests).
 - `mockVault.mjs` — deterministic mock provider (spike/tests only; the plugin uses `app.vault`).
-- `main.ts` — the Obsidian plugin wrapper (uses `app.vault`, read-only).
+- `main.ts` — the Obsidian plugin wrapper (uses `app.vault`).
 - `manifest.json` — Obsidian plugin manifest (`isDesktopOnly`).
 
-## Endpoints (GET only)
+## Endpoints
+**Read (GET, authenticated except `/health`):**
 - `GET /health` — generic health, **no auth, no vault content**.
-- `GET /connection` — **authenticated**; `{ connected, vaultName, version, readonly: true }`.
-- `GET /notes` — **authenticated**; bounded list of `{ path, basename, mtime }` (markdown metadata only).
+- `GET /connection` — `{ connected, vaultName, version, … }`.
+- `GET /notes` — bounded list of `{ path, basename, mtime }` (markdown metadata only).
+- `GET /graph` — bounded knowledge-graph metadata (no note bodies).
+- `GET /note/<path>` · `GET /search/<query>` — bounded single-note read / search.
 
-No POST/PUT/PATCH/DELETE. No `?path=`/`?file=`. Binds `127.0.0.1` only.
+**Trusted Device auth (POST):** `/auth/register` · `/auth/challenge` · `/auth/verify` — signed
+challenge-response; the plugin persists only **public** keys.
+
+**Governed write (POST, human-confirmed):** `/write/create` · `/write/update` · `/write/append` —
+enabled only when the write capability is configured; each requires a `mutationId`, a
+`contentHash` (and `expectedHash` for update/append), passes a native Obsidian confirmation, and is
+read-back-verified. **No delete/rename/move.** Binds `127.0.0.1` only.
 
 ## Pairing (dev)
 1. Enable the plugin in Obsidian; it starts the bridge on `127.0.0.1:5200`.
@@ -43,6 +57,8 @@ Install by copying `main.js` + `manifest.json` into
 Obsidian) to load it.
 
 ## Security
-127.0.0.1-only bind · Bearer token (constant-time compare) · explicit Origin allowlist (no `*`) · GET-only ·
-no arbitrary path params · bounded response/body sizes · sanitized errors (no stack, no token) · correlation
-ids · fail-closed. See the spike evidence doc for the automated + live browser test results.
+127.0.0.1-only bind · Bearer session token (constant-time compare) · explicit Origin allowlist (no `*`) ·
+reads are GET with bounded path params only · governed writes are POST behind a separate write
+capability + native Obsidian confirmation + read-back (no delete/rename/move) · bounded response/body
+sizes · sanitized errors (no stack, no token) · correlation ids · fail-closed. See the evidence docs
+for the automated + live browser test results.
