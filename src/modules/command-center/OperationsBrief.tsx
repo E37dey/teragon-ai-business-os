@@ -53,7 +53,7 @@ function useObsidianConnected(): { connected: boolean | null; recheck: () => voi
 
 export function OperationsBrief(): ReactElement {
   const navigate = useNavigate();
-  const [, bump] = useReducer((x: number) => x + 1, 0);
+  const [version, bump] = useReducer((x: number) => x + 1, 0);
   const { connected, recheck, checking } = useObsidianConnected();
   const [filter, setFilter] = useState<Filter>("all");
 
@@ -62,7 +62,8 @@ export function OperationsBrief(): ReactElement {
 
   const signals = useMemo(
     () => deriveBusinessSignals({ events: getAllWorkflowEvents(), obsidian: connected == null ? null : { connected }, now: Date.now() }),
-    [connected], // eslint-disable-line react-hooks/exhaustive-deps -- also re-runs via bump() re-render
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `version` intentionally forces a re-derive when a real workflow event is recorded (via subscribeWorkflowEvents)
+    [connected, version],
   );
   const counts = useMemo(() => countSignals(signals), [signals]);
   const inbox = useMemo(() => {

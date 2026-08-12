@@ -84,6 +84,18 @@ describe("governedTaskProposal", () => {
     expect(payload.record.ownerId).toBe(ACTOR);
   });
 
+  it("AUDIT TRUTH — the note + audit label the mutation as task creation, never 'external automation'", async () => {
+    const d = await deps();
+    const rec = deriveFollowUpRecommendation(makeSignal(), ACTOR, { clock: d.clock });
+    const ref = await createFollowUpTaskProposal(d, rec, ACTOR);
+    const approval = await d.stores.approvals.get(ref.approvalId);
+    expect(approval?.note).toContain("יצירת משימה");
+    expect(approval?.note).not.toContain("אוטומציה חיצונית");
+    const auditDetails = (await d.stores.audit.list()).map((a) => a.details).join(" | ");
+    expect(auditDetails).toContain("יצירת משימה");
+    expect(auditDetails).not.toContain("אוטומציה חיצונית");
+  });
+
   it("execute BEFORE approval is blocked by the engine", async () => {
     const d = await deps();
     const rec = deriveFollowUpRecommendation(makeSignal(), ACTOR, { clock: d.clock });

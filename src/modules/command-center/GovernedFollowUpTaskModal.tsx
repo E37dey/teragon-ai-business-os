@@ -9,6 +9,7 @@ import type { CSSProperties, ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
 import { Modal, OsButton, StatusChip, useToast } from "@/design-system";
 import { getAgentEngine } from "@/components/ai/engine";
+import { recordWorkflowEvent } from "@/agents/workflow/workflowEvents";
 import { CEO_USER_ID } from "@/repositories/seed/seedData";
 import type { BusinessSignal } from "@/integration/command-center/businessSignals";
 import {
@@ -64,6 +65,12 @@ export function GovernedFollowUpTaskModal({ signal, onClose, onChanged }: { sign
     const map: Record<FollowUpOutcome, Phase> = { "created-verified": "verified", "already-exists": "already-exists", rejected: "rejected", failed: "failed" };
     setPhase(map[result.outcome]);
     if (result.outcome === "created-verified" || result.outcome === "already-exists") {
+      // Surface the verified governed action in Command Center Recent Activity (info signal),
+      // reusing the Phase-6/7 governed-action pipeline — a real verified action, not a duplicate
+      // actionable alarm.
+      if (result.outcome === "created-verified") {
+        recordWorkflowEvent({ id: `gft-verified-${ref.runId}`, workflowRunId: ref.runId, type: "ACTION_VERIFIED", at: Date.now(), proposalId: ref.approvalId, detailHe: `נוצרה ואומתה משימת מעקב מבוקרת (${result.taskId})`, success: true });
+      }
       onChanged?.();
       toast(result.outcome === "created-verified" ? "נוצרה משימת מעקב ואומתה" : "משימת מעקב כבר קיימת", "success");
     } else {

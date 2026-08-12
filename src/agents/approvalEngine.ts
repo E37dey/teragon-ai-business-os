@@ -86,6 +86,19 @@ export interface DecideInput {
 
 const ROLLBACK_MARKER = "rollback:";
 
+/**
+ * Human-readable label for the persisted note + audit history. A first-class
+ * `task-creation` execution is labeled by its TRUE mutation ("יצירת משימה"),
+ * never by the authorization-bucket `action` enum — so the canonical audit
+ * trail never mislabels a governed task creation as an unrelated action (e.g.
+ * "external automation" / "customer message"). The structured `action` value is
+ * retained separately on the event as the authorization category.
+ */
+function actionLabelHe(action: ApprovalRequiredAction, payload: ExecutionPayload | null): string {
+  if (payload?.kind === "task-creation") return "יצירת משימה";
+  return APPROVAL_ACTION_LABELS_HE[action];
+}
+
 export class ApprovalEngine {
   private readonly stores: AgentStores;
   private readonly clock: Clock;
@@ -125,7 +138,7 @@ export class ApprovalEngine {
       status: "ממתין",
       decidedById: null,
       decidedAt: null,
-      note: `${APPROVAL_ACTION_LABELS_HE[input.action]} — ${input.previewHe}`,
+      note: `${actionLabelHe(input.action, input.executionPayload)} — ${input.previewHe}`,
     };
     const created = await this.stores.approvals.create(approval);
     await appendEvent(this.stores, input.runId, this.clock, input.requestedById, {
@@ -139,7 +152,7 @@ export class ApprovalEngine {
       actor: input.requestedById,
       action: "approval.request",
       entityRef: `approval:${created.id}`,
-      detailsHe: `נוצרה בקשת אישור: ${APPROVAL_ACTION_LABELS_HE[input.action]}`,
+      detailsHe: `נוצרה בקשת אישור: ${actionLabelHe(input.action, input.executionPayload)}`,
     });
     // run linkage
     const run = await this.stores.runs.get(input.runId);
