@@ -21,6 +21,7 @@ import {
   type BusinessSignal,
   type SignalPriority,
 } from "@/integration/command-center/businessSignals";
+import { GovernedFollowUpTaskModal } from "./GovernedFollowUpTaskModal";
 
 const PRIORITY_CHIP: Record<SignalPriority, OsStatus> = { דחוף: "חסום", אזהרה: "אזהרה", מידע: "מושבת" };
 const row: CSSProperties = { display: "flex", gap: "var(--os-space-2)", alignItems: "center", flexWrap: "wrap" };
@@ -52,7 +53,7 @@ function useObsidianConnected(): { connected: boolean | null; recheck: () => voi
 
 export function OperationsBrief(): ReactElement {
   const navigate = useNavigate();
-  const [, bump] = useReducer((x: number) => x + 1, 0);
+  const [version, bump] = useReducer((x: number) => x + 1, 0);
   const { connected, recheck, checking } = useObsidianConnected();
   const [filter, setFilter] = useState<Filter>("all");
 
@@ -61,7 +62,8 @@ export function OperationsBrief(): ReactElement {
 
   const signals = useMemo(
     () => deriveBusinessSignals({ events: getAllWorkflowEvents(), obsidian: connected == null ? null : { connected }, now: Date.now() }),
-    [connected], // eslint-disable-line react-hooks/exhaustive-deps -- also re-runs via bump() re-render
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `version` intentionally forces a re-derive when a real workflow event is recorded (via subscribeWorkflowEvents)
+    [connected, version],
   );
   const counts = useMemo(() => countSignals(signals), [signals]);
   const inbox = useMemo(() => {
@@ -73,6 +75,8 @@ export function OperationsBrief(): ReactElement {
   const recent = useMemo(() => infoSignals(signals), [signals]);
 
   const open = useCallback((s: BusinessSignal) => navigate(s.deepLink), [navigate]);
+  // Phase-9 Governed Follow-up Task — an explicit per-signal capability (no auto-proposal).
+  const [followUpSignal, setFollowUpSignal] = useState<BusinessSignal | null>(null);
 
   return (
     <Panel variant="raised" style={{ padding: "var(--os-space-5)" }} data-testid="operations-brief">
@@ -118,9 +122,13 @@ export function OperationsBrief(): ReactElement {
                   {s.agentId ? <>· agent={s.agentId} </> : null}
                   {s.notePath ? <>· note={s.notePath}</> : null}
                 </div>
-                <div>
+                <div style={row}>
                   <OsButton variant="cyan" size="sm" onClick={() => open(s)} data-testid="inbox-cta">
                     {s.recommendedNextStepHe}
+                  </OsButton>
+                  {/* Governed Follow-up Task: explicit human capability — does NOT auto-create a proposal. */}
+                  <OsButton variant="ghost" size="sm" onClick={() => setFollowUpSignal(s)} data-testid="inbox-followup-cta">
+                    צור משימת מעקב
                   </OsButton>
                 </div>
               </div>
@@ -128,6 +136,8 @@ export function OperationsBrief(): ReactElement {
           </div>
         )}
       </div>
+
+      {followUpSignal && <GovernedFollowUpTaskModal signal={followUpSignal} onClose={() => setFollowUpSignal(null)} onChanged={() => bump()} />}
 
       {/* Recent verified activity — informational, NOT the inbox. */}
       <div data-testid="recent-activity" style={{ marginTop: "var(--os-space-4)", display: "grid", gap: "var(--os-space-2)" }}>
