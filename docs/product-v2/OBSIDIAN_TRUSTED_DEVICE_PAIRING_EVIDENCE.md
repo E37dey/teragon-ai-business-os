@@ -6,6 +6,7 @@ challenge-response re-authentication — **without** a permanent bearer token.
 > **The persistent trusted-device credential is an asymmetric device identity, not a persistent bearer token.**
 > **The browser private key is non-exportable and never leaves the TERAGON origin.**
 > **The Obsidian plugin persists only trusted public-device information.**
+> **Restarting the Obsidian plugin does not require manual re-pairing for an already trusted device.**
 > **Short-lived bridge session credentials are reissued only after successful trusted-device challenge-response.**
 > **Trusted-device authentication does not grant Obsidian write authority.**
 > **Device revocation prevents future trusted-device re-authentication.**
