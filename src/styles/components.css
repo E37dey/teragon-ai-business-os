@@ -209,6 +209,11 @@
   justify-content: space-between;
   gap: var(--os-space-5);
   margin-block-end: var(--os-space-5);
+  /* When the title + its action group can't share one line, the action group drops
+     to the next line instead of forcing horizontal overflow (S11.2-A). Desktop keeps
+     one line (they fit). */
+  flex-wrap: wrap;
+  row-gap: var(--os-space-3);
 }
 
 .os-section-title__main {
@@ -228,9 +233,14 @@
   font-size: var(--os-text-lg);
   font-weight: var(--os-weight-semibold);
   color: var(--os-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Titles must WRAP rather than force a nowrap floor. The previous
+     `nowrap + ellipsis` never truncated (the flex child lacked min-inline-size:0),
+     so a long title propagated its full intrinsic width up to the canvas and drove
+     the systemic sub-883px horizontal overflow (S11.2-A). Wrapping shows the full
+     title on desktop (short → one line) and on mobile (2 lines) — no hidden content. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-inline-size: 0;
 }
 
 .os-section-title__subtitle {
@@ -243,6 +253,10 @@
 .os-section-title__action {
   flex: none;
   display: inline-flex;
+  /* Actions wrap within the available width instead of forcing the title row wide
+     (a nowrap action group was a shared driver of the sub-883px overflow — S11.2-A). */
+  flex-wrap: wrap;
+  max-inline-size: 100%;
   align-items: center;
   gap: var(--os-space-3);
 }
@@ -491,7 +505,13 @@
   padding: var(--os-space-3) var(--os-space-5);
   font-size: var(--os-text-2xs);
   line-height: var(--os-leading-normal);
-  white-space: nowrap;
+  /* A `nowrap` tooltip with a long Hebrew reason rendered ~540px wide and, though
+     hidden (opacity:0), stayed laid out as an absolute box — extending the document
+     scroll width on pages with disabled buttons (e.g. /stage-gates, S11.2-A). Wrap it
+     and cap its width so it can never drive horizontal overflow (also better UX). */
+  white-space: normal;
+  inline-size: max-content;
+  max-inline-size: min(220px, 78vw);
   box-shadow: var(--os-shadow-raised);
   opacity: 0;
   pointer-events: none;
@@ -1561,7 +1581,9 @@
 }
 .os-more-metrics__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  /* min(100%, 180px) lets a single column shrink below 180px on very narrow screens
+     so the grid can never force the canvas wider than its container (S11.2-A). */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
   gap: 0 var(--os-space-7);
   padding: 0 var(--os-space-5) var(--os-space-4);
 }
@@ -1865,9 +1887,60 @@
 }
 
 .os-header__search {
-  flex: 1;
+  /* flex-basis 0 + min-inline-size 0 lets the search shrink BELOW its content
+     min-width instead of forcing the header wider than the viewport. Without the
+     min-inline-size:0 the input's intrinsic width overflowed ~20px at 390px in
+     RTL (S10.3-C1 finding). */
+  flex: 1 1 0;
+  min-inline-size: 0;
   display: flex;
   justify-content: center;
+}
+
+/* Header row + user block must also be allowed to shrink, or a flex child's
+   default min-width:auto reintroduces the overflow. */
+.os-header {
+  min-inline-size: 0;
+}
+.os-header__user {
+  min-inline-size: 0;
+  flex-shrink: 1;
+}
+
+/* The mobile search control shows ONLY below the breakpoint (see media query). */
+.os-header__search-btn {
+  display: none;
+}
+
+/* Narrow viewports (≤640px): the full-width inline search cannot shrink below its
+   own min-content (~46px of icon+padding), so it is replaced by an explicit
+   search icon button that opens the same overlay — search stays accessible, the
+   header no longer overflows, and nothing is clipped. The theme selector also
+   compacts to glyphs to reclaim width. */
+@media (max-width: 640px) {
+  .os-header {
+    gap: var(--os-space-3);
+    padding-inline: var(--os-space-4);
+  }
+  .os-header__actions {
+    gap: var(--os-space-2, 6px);
+  }
+  .os-header__search {
+    display: none;
+  }
+  .os-header__search-btn {
+    display: inline-flex;
+  }
+  /* compact theme selector: glyph-only, words hidden (frees ~60px). */
+  .os-theme-select__glyph {
+    display: inline;
+  }
+  .os-theme-select__label {
+    display: none;
+  }
+  .os-theme-select__opt {
+    padding-inline: 7px;
+  }
 }
 
 .os-header__meta {
@@ -1955,6 +2028,55 @@
   display: flex;
   flex-direction: column;
   gap: var(--os-space-6);
+}
+
+/* Every direct child of the canvas is a flex item that defaults to
+   `min-width: auto`, so a section holding a wide grid/row would refuse to shrink. */
+.os-workspace__canvas > * {
+  min-inline-size: 0;
+}
+
+/* THE systemic sub-883px overflow (S11.2-A). Page roots and section wrappers are
+   inline `display:grid` used only for vertical stacking — `{display:grid; gap}` with
+   NO `grid-template-columns`. Their single *implicit* column is `auto`, so it
+   content-sizes to max-content; nested `auto-fit` grids then read that inflated
+   width and the whole subtree blows up circularly (canvas → ~884px inside a 390px
+   viewport). Pinning those implicit-column grids to `minmax(0, 1fr)` makes the
+   column track the container instead of the content — nested grids then collapse
+   and the canvas fits every viewport. Scoped to the canvas; grids that declare
+   their own columns (auto-fit card grids, kanban, etc.) are excluded and unchanged;
+   no content is hidden. */
+.os-workspace__canvas :is([style*="display:grid"], [style*="display: grid"]):not([style*="grid-template-columns"]) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* At/below the tablet breakpoint, inline FIXED-track grids (process flows, tier
+   models, stage boards — e.g. `1fr auto 1fr auto 1fr`, `repeat(3, …)`) cannot fit and
+   drive the residual overflow. Collapse them to a single column. `auto-fit`/`auto-fill`
+   CARD grids are excluded — they already reflow and keep their multi-column layout on
+   tablet. No content is hidden; the columns simply stack. */
+@media (max-width: 768px) {
+  .os-workspace__canvas :is([style*="display:grid"], [style*="display: grid"]):not([style*="auto-fit"]):not([style*="auto-fill"]) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  /* Dense tables: pin to the container and wrap cell content at narrow widths so a
+     content-sized table never scrolls the document. `table-layout: fixed` + wrapping
+     cells keeps full table semantics and hides no content (text wraps, it is not
+     clipped). Desktop table sizing is untouched (rule is tablet-and-below only). */
+  .os-workspace__canvas table {
+    table-layout: fixed;
+    inline-size: 100%;
+  }
+  .os-workspace__canvas table :is(td, th) {
+    overflow-wrap: anywhere;
+  }
+
+  /* Action button groups (a flex row of `.os-btn-wrap` buttons — e.g. Go / No-Go /
+     בקש השלמה on a stage-gate card) wrap to the next line instead of overflowing. */
+  .os-workspace__canvas :has(> .os-btn-wrap) {
+    flex-wrap: wrap;
+  }
 }
 
 /* ═══════════════ Wave 2 — Grouped navigation ═══════════════ */
@@ -2420,7 +2542,9 @@
 }
 
 .os-qc-input {
-  background: var(--os-raised);
+  /* background-color (not the `background` shorthand) so the standardized <select>
+     caret background-image below is not reset on select.os-qc-input (S11.2-B). */
+  background-color: var(--os-raised);
   border: var(--os-border-thin);
   border-radius: var(--os-radius-md);
   color: var(--os-text);
@@ -2445,6 +2569,37 @@
 
 .os-qc-input[aria-invalid="true"] {
   border-color: var(--os-danger-border);
+}
+
+/* Standardize EVERY native <select> into one consistent, theme-aware control
+   (S11.2-B). Some pages used unstyled selects (native OS arrow + a light option list
+   that clashes in dark mode). This gives them the same raised surface, border, and a
+   single themed caret on the inline-end (left in RTL) — matching `.os-qc-input`. The
+   mid-grey caret reads on both light and dark surfaces. Accessible name and keyboard
+   behaviour are unchanged; focus shows the standard ring. */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--os-raised);
+  color: var(--os-text);
+  border: var(--os-border-thin);
+  border-radius: var(--os-radius-md);
+  font-family: var(--os-font);
+  font-size: var(--os-text-sm);
+  padding: var(--os-space-4) var(--os-space-5);
+  padding-inline-end: calc(var(--os-space-5) + 18px);
+  /* !important: some pages still set an inline `background` shorthand on the select,
+     which would reset the caret and leave appearance:none with NO affordance. The
+     caret must always win so every select keeps a visible, consistent dropdown cue. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%238a94a6' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: left var(--os-space-4) center !important;
+  background-size: 12px !important;
+}
+select:focus-visible {
+  border-color: var(--os-cyan-border);
+  box-shadow: var(--os-focus-ring);
+  outline: none;
 }
 
 .os-qc-error {

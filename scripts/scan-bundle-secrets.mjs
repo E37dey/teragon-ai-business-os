@@ -61,6 +61,11 @@ const KEY_PATTERNS = [
   { id: "jwt-like", re: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\b/g },
   { id: "api-key-assign", re: /\bapi[_-]?key\s*[:=]\s*['"][^'"]{6,}['"]/gi },
   { id: "bearer-token", re: /\b[Bb]earer\s+[A-Za-z0-9._~+/=-]{16,}/g },
+  // Modern Supabase SECRET (server) key VALUE — sb_secret_ + a long body. NOT the
+  // browser-public sb_publishable_ key, and NOT the bare "sb_secret_" format-prefix
+  // constant (no body) that the key classifier/redactor legitimately bundles —
+  // only an actual leaked secret value matches.
+  { id: "supabase-secret-key", re: /\bsb_secret_[A-Za-z0-9]{12,}/g },
 ];
 
 // --------------------------------------------------------------------------

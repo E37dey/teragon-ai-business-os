@@ -7,18 +7,20 @@ name: Supabase Live Validation
 # NO remote credential (no SUPABASE_ACCESS_TOKEN / PROJECT_REF / DB_PASSWORD).
 # LOCAL_INDEXEDDB remains the app's runtime default.
 
+# S10.0-F: the top-level `pull_request.paths` filter was REMOVED. It gated BOTH
+# jobs, so a pull request touching none of those paths received no checks at all
+# — PR #6 (observability + health, 18 files) merged with zero gates and had to be
+# validated by a manual workflow_dispatch. The static gate must never be
+# path-conditional; only the expensive live-database job is, and that decision now
+# lives at the JOB level (see the `changes` job below).
+# Scoped to the feature base with the NATIVE branch filter — a `branches` filter
+# selects the PR's TARGET branch, so every PR merging into the feature base is
+# gated, regardless of which paths it touches. workflow_dispatch is unrestricted.
 on:
-  workflow_dispatch: {}
   pull_request:
-    paths:
-      - "supabase/**"
-      - "src/persistence/**"
-      - "scripts/platform/**"
-      - "tests/persistence/**"
-      - "tests/supabase/**"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/supabase-live-validation.yml"
+    branches:
+      - feature/teragon-supabase-app-auth
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -29,8 +31,42 @@ env:
   LOCAL_DB_URL: "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
 jobs:
+  # Job-level change detection using NATIVE git diff — no third-party Action is
+  # introduced. It decides ONLY whether the expensive live-database job is
+  # needed; the static gate never depends on it.
+  changes:
+    name: Detect persistence changes
+    runs-on: ubuntu-latest
+    outputs:
+      persistence: ${{ steps.detect.outputs.persistence }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need both PR endpoints for a real diff
+      - id: detect
+        name: Decide whether the live database is required
+        run: |
+          # Anything that is not a pull_request (notably workflow_dispatch) runs
+          # the full validation — an explicit request always gets both jobs.
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "persistence=true" >> "$GITHUB_OUTPUT"
+            echo "reason=non-PR event (${{ github.event_name }}) → full validation"
+            exit 0
+          fi
+          BASE='${{ github.event.pull_request.base.sha }}'
+          HEAD='${{ github.event.pull_request.head.sha }}'
+          CHANGED="$(git diff --name-only "$BASE" "$HEAD")"
+          echo "changed files:"; echo "$CHANGED"
+          if echo "$CHANGED" | grep -Eq '^(supabase/|src/persistence/|scripts/platform/|tests/persistence/|tests/supabase/|package\.json$|package-lock\.json$|\.github/workflows/supabase-live-validation\.yml$)'; then
+            echo "persistence=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "persistence=false" >> "$GITHUB_OUTPUT"
+          fi
+
   static-gate:
     name: Static application gate (no Supabase)
+    # NO `needs` and NO `if` on purpose: this job must run for EVERY pull request,
+    # including one that touches no persistence path.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,18 +85,65 @@ jobs:
         run: npx vitest run
       - name: production build
         run: npm run build
-      - name: secret scanner
+      # Authoritative bundle-secret gate (privileged material included). This
+      # replaces the old inline grep step whose expression matched "supabase"
+      # followed anywhere by "service" — a false positive, because Vite output is
+      # one long minified line, so it matched a benign "supabase" occurrence and an
+      # unrelated later identifier (e.g. "serviceWorker"). The scanner fails only on
+      # real credential VALUES —
+      # sb_secret_ keys, JWTs (incl. service_role), db/admin passwords, api keys,
+      # bearer/access tokens — and never on the browser-public publishable key,
+      # "supabase"/"service"/"serviceWorker", or key-format prefix constants.
+      - name: secret scanner (authoritative privileged-key + secret gate)
         run: node scripts/scan-bundle-secrets.mjs
-      - name: privileged-key bundle scan
-        run: |
-          set -euo pipefail
-          if grep -rqiE "service_role|supabase.*service|SUPABASE_SERVICE_ROLE" dist/assets/*.js; then
-            echo "FAIL: privileged Supabase key/reference found in bundle"; exit 1
-          fi
-          echo "OK: no privileged Supabase key/reference in bundle"
+
+  accessibility-gate:
+    name: Accessibility gate (Demo Pilot, synthetic)
+    # Required for EVERY pull request (no needs / no if), like the static gate.
+    # Synthetic LOCAL build only: no Supabase, no service-role, no live data.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      # Chromium is sufficient for the a11y gate — the cross-browser matrix
+      # (separate config) covers engine parity and is not duplicated here.
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build LOCAL synthetic-data app
+        run: npm run build
+      - name: axe + keyboard/landmark/label a11y gate (chromium × 1440/390)
+        run: npx playwright test -c e2e/a11y.config.ts
+
+  network-resilience-gate:
+    name: Network resilience gate (Demo Pilot, synthetic)
+    # Required for EVERY pull request (no needs / no if), like the other gates.
+    # Synthetic LOCAL build + offline simulation only: no Supabase, no
+    # service-role, no live data, no customer/contact acceptance.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build LOCAL synthetic-data app
+        run: npm run build
+      - name: offline UI-resilience gate (chromium × 1440/390)
+        run: npx playwright test -c e2e/network.config.ts
 
   live-database:
     name: Live ephemeral Supabase database
+    # Runs ONLY when persistence/Supabase paths changed, or on any non-PR event
+    # (workflow_dispatch always gets the full validation).
+    needs: changes
+    if: needs.changes.outputs.persistence == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

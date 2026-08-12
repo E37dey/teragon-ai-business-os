@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TERAGON ↔ Obsidian Bridge — Phase 0 Diagnostic</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 1.5rem; }
+      pre { background: #111; color: #0f0; padding: 1rem; overflow: auto; }
+      h1 { font-size: 1.1rem; }
+    </style>
+  </head>
+  <body>
+    <h1>Phase 0 transport diagnostic (origin: <code id="orig"></code> → bridge: <code>__BRIDGE_URL__</code>)</h1>
+    <pre id="out">running…</pre>
+    <script>
+      const BRIDGE = "__BRIDGE_URL__";
+      const TOKEN = "__BRIDGE_TOKEN__"; // injected at serve time; never in URL, never committed
+      const results = [];
+      document.getElementById("orig").textContent = location.origin;
+
+      async function step(name, url, init) {
+        try {
+          const res = await fetch(url, init);
+          let body = null;
+          try { body = await res.json(); } catch {}
+          results.push({ name, ok: res.ok, status: res.status, cors: res.type, body });
+        } catch (e) {
+          results.push({ name, ok: false, status: "FETCH_ERROR", error: String(e && e.message || e) });
+        }
+        document.getElementById("out").textContent = JSON.stringify(results, null, 2);
+      }
+
+      (async () => {
+        const auth = { headers: { Authorization: "Bearer " + TOKEN } };
+        await step("health (no auth)", BRIDGE + "/health");
+        await step("connection (NO token → expect 401)", BRIDGE + "/connection");
+        await step("connection (Bearer token → expect 200)", BRIDGE + "/connection", auth);
+        await step("notes (Bearer token → expect 200 bounded)", BRIDGE + "/notes", auth);
+        await step("notes?path=../ (expect 400)", BRIDGE + "/notes?path=../", auth);
+        await step("POST /health (expect 405)", BRIDGE + "/health", { method: "POST" });
+        // signal completion for the harness
+        window.__SPIKE_DONE__ = true;
+      })();
+    </script>
+  </body>
+</html>

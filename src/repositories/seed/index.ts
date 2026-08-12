@@ -52,6 +52,30 @@ import {
 
 export * from "./seedData";
 
+// S13.4 (PR D) — deterministic synthetic seed for the real local-memory CRUD.
+// Org-scoped ("org-1"); no real business/customer data. Fixed timestamps (no random).
+import type { MemoryEntry } from "@/domain/memory/entry";
+const MEMORY_ENTRIES_SEED: readonly MemoryEntry[] = [
+  {
+    id: "me-1", createdAt: "2026-07-01T09:00:00.000Z", updatedAt: "2026-07-01T09:00:00.000Z",
+    organizationId: "org-1", title: "מדיניות מצב הדגמה", category: "PROCESS", status: "ACTIVE",
+    source: "user", tags: ["דמו", "מדיניות"],
+    content: "כל הנתונים כאן סינתטיים. אין להזין נתוני לקוח אמיתיים במצב ההדגמה.",
+  },
+  {
+    id: "me-2", createdAt: "2026-07-03T11:30:00.000Z", updatedAt: "2026-07-05T08:15:00.000Z",
+    organizationId: "org-1", title: "החלטה: אישור אנושי לכל כתיבה", category: "DECISION", status: "ACTIVE",
+    source: "user", tags: ["אישורים", "ממשל"],
+    content: "כל שינוי שמבצע סוכן מחייב אישור אנושי מפורש דרך מנוע האישורים.",
+  },
+  {
+    id: "me-3", createdAt: "2026-07-10T14:00:00.000Z", updatedAt: "2026-07-10T14:00:00.000Z",
+    organizationId: "org-1", title: "לקח: השלמת פרטי לקוח מוקדם", category: "LEARNING", status: "ARCHIVED",
+    source: "user", tags: ["לקוחות", "איכות-נתונים"],
+    content: "רשומות לקוח חסרות פוגעות במעקב ובפילוח — כדאי להשלים שדות חובה מוקדם.",
+  },
+] as const;
+
 /** collection → deterministic seed items */
 export const SEED: Record<CollectionKey, readonly BaseEntity[]> = {
   organizations: ORGANIZATIONS,
@@ -99,6 +123,7 @@ export const SEED: Record<CollectionKey, readonly BaseEntity[]> = {
   memoryConflicts: [],
   memoryImportJobs: [],
   memoryExportJobs: [],
+  memoryEntries: MEMORY_ENTRIES_SEED,
   knowledgeArticles: [],
   knowledgeSources: [],
   knowledgeVersions: [],

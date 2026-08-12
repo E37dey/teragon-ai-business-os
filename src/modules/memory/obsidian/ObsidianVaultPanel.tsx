@@ -1,0 +1,547 @@
+// S14.2 Phase 1 — compact READ-ONLY Obsidian Vault connection section for /memory.
+// One panel; no new dashboard. Read-only: connect, check, search, read, open, disconnect.
+// All copy Hebrew/RTL; every control does real work (zero NO_OP); fail-closed states.
+import { useCallback, useEffect, useState } from "react";
+import type { CSSProperties, ReactElement } from "react";
+import { EmptyState, Modal, OsButton, Panel, SearchInput, SectionTitle, StatusChip, useToast } from "@/design-system";
+import { invalidateCollections } from "@/app/data/hooks";
+import { obsidianErrorMessage, useObsidianVault } from "@/integration/obsidian/useObsidianVault";
+import { OBSIDIAN_BRIDGE_URL, type BridgeCode, type NoteContent, type SearchHit } from "@/integration/obsidian/vaultBridgeClient";
+import { classifyObsidianNote, createObsidianImportProposal, type ClassifyResult } from "@/integration/obsidian/obsidianImport";
+import { ObsidianPairingModal } from "./ObsidianPairingModal";
+import { WriteProposeModal } from "./WriteProposeModal";
+
+const stack = (gap = "var(--os-space-3)"): CSSProperties => ({ display: "grid", gap });
+const row: CSSProperties = { display: "flex", flexWrap: "wrap", gap: "var(--os-space-2)", alignItems: "center" };
+const metaRow: CSSProperties = { display: "flex", justifyContent: "space-between", gap: "var(--os-space-2)", fontSize: "var(--os-text-2xs, 11px)" };
+const muted: CSSProperties = { color: "var(--os-text-2)" };
+const codeStyle: CSSProperties = { fontFamily: "var(--os-font-mono, monospace)", direction: "ltr", unicodeBidi: "isolate" };
+
+function fmtTime(mtime: number | null): string {
+  if (!mtime) return "—";
+  try {
+    return new Date(mtime).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" });
+  } catch {
+    return new Date(mtime).toISOString();
+  }
+}
+
+function errCopy(code: BridgeCode): string {
+  return obsidianErrorMessage(code === "OK" ? "ERROR" : code);
+}
+
+/** Action button that disables (with an honest reason) while a request is in flight. */
+function ActionButton({
+  busy,
+  variant,
+  onClick,
+  testId,
+  children,
+}: {
+  busy: boolean;
+  variant: "primary" | "ghost" | "cyan" | "danger";
+  onClick: () => void;
+  testId: string;
+  children: string;
+}): ReactElement {
+  if (busy) {
+    return (
+      <OsButton variant={variant} disabled disabledReason="בקשה בתהליך" data-testid={testId}>
+        {children}
+      </OsButton>
+    );
+  }
+  return (
+    <OsButton variant={variant} onClick={onClick} data-testid={testId}>
+      {children}
+    </OsButton>
+  );
+}
+
+/** Note viewer — bounded read-only Markdown content of one note. */
+function NoteViewer({
+  note,
+  onClose,
+  onOpen,
+  onImport,
+}: {
+  note: NoteContent;
+  onClose: () => void;
+  onOpen: () => void;
+  onImport: () => void;
+}): ReactElement {
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={note.basename}
+      footer={
+        <div style={row}>
+          <OsButton variant="ghost" onClick={onClose}>
+            סגירה
+          </OsButton>
+          <OsButton variant="primary" onClick={onImport} data-testid="obsidian-import-btn">
+            ייבא לידע
+          </OsButton>
+          <OsButton variant="cyan" onClick={onOpen}>
+            פתח ב-Obsidian
+          </OsButton>
+        </div>
+      }
+    >
+      <div style={stack()} data-testid="obsidian-note-viewer">
+        <div style={{ ...metaRow, ...muted }}>
+          <span style={codeStyle}>{note.path}</span>
+          <span>{fmtTime(note.mtime)}</span>
+        </div>
+        {note.truncated && (
+          <div role="status" style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-warning, #b8860b)" }}>
+            התוכן קוצר לתצוגה (מוגבל בגודל).
+          </div>
+        )}
+        <pre
+          data-testid="obsidian-note-content"
+          style={{
+            margin: 0,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            maxHeight: "50vh",
+            overflow: "auto",
+            background: "var(--os-bg-2, transparent)",
+            border: "1px solid var(--os-border)",
+            borderRadius: "var(--os-radius-sm, 6px)",
+            padding: "var(--os-space-3)",
+            fontSize: "var(--os-text-sm, 13px)",
+          }}
+        >
+          {note.content}
+        </pre>
+      </div>
+    </Modal>
+  );
+}
+
+/** Search modal — bounded local search + open a result as a read-only note. */
+function SearchModal({
+  open,
+  onClose,
+  onSearch,
+  onRead,
+  onOpenNote,
+  onImportNote,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSearch: (q: string) => Promise<{ hits: SearchHit[]; error: string | null }>;
+  onRead: (path: string) => Promise<NoteContent | null>;
+  onOpenNote: (path: string) => void;
+  onImportNote: (note: NoteContent) => void;
+}): ReactElement {
+  const [query, setQuery] = useState("");
+  const [phase, setPhase] = useState<"idle" | "loading" | "done">("idle");
+  const [hits, setHits] = useState<SearchHit[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<NoteContent | null>(null);
+
+  const run = useCallback(
+    async (q: string) => {
+      if (!q.trim()) return;
+      setPhase("loading");
+      setError(null);
+      const { hits: h, error: e } = await onSearch(q);
+      setHits(h);
+      setError(e);
+      setPhase("done");
+    },
+    [onSearch],
+  );
+
+  return (
+    <Modal open={open} onClose={onClose} title="חיפוש בכספת Obsidian">
+      <div style={stack()}>
+        <SearchInput value={query} onChange={setQuery} onSubmit={run} placeholder="חיפוש בכותרת, נתיב ותוכן…" ariaLabel="חיפוש בכספת Obsidian" />
+        <div data-testid="obsidian-search-results" style={stack("var(--os-space-2)")}>
+          {phase === "loading" && (
+            <div role="status" style={muted}>
+              מחפש…
+            </div>
+          )}
+          {phase === "done" && error && <EmptyState title="החיפוש נכשל" reason={error} />}
+          {phase === "done" && !error && hits.length === 0 && <EmptyState title="אין תוצאות" reason={`לא נמצאו פריטים עבור “${query}”.`} />}
+          {phase === "done" &&
+            !error &&
+            hits.map((h) => (
+              <button
+                key={h.path}
+                type="button"
+                className="os-panel"
+                onClick={() => {
+                  void onRead(h.path).then((n) => n && setNote(n));
+                }}
+                style={{
+                  textAlign: "start",
+                  cursor: "pointer",
+                  display: "grid",
+                  gap: 4,
+                  padding: "var(--os-space-3)",
+                  border: "1px solid var(--os-border)",
+                  borderRadius: "var(--os-radius-sm, 6px)",
+                  background: "var(--os-bg-2, transparent)",
+                }}
+              >
+                <div style={{ ...metaRow }}>
+                  <span style={{ fontWeight: 600 }}>{h.basename}</span>
+                  <span style={muted}>{fmtTime(h.mtime)}</span>
+                </div>
+                <div style={{ ...codeStyle, ...muted, fontSize: "var(--os-text-2xs, 11px)" }}>{h.path}</div>
+                {h.snippet && <div style={{ fontSize: "var(--os-text-2xs, 11px)", ...muted }}>{h.snippet}</div>}
+              </button>
+            ))}
+        </div>
+      </div>
+      {note && (
+        <NoteViewer
+          note={note}
+          onClose={() => setNote(null)}
+          onOpen={() => onOpenNote(note.path)}
+          onImport={() => onImportNote(note)}
+        />
+      )}
+    </Modal>
+  );
+}
+
+/** Import preview — governed manual import (NOT sync). Creates a proposal only. */
+export function ImportPreviewModal({
+  note,
+  vaultName,
+  onClose,
+}: {
+  note: NoteContent;
+  vaultName: string;
+  onClose: () => void;
+}): ReactElement {
+  const { toast } = useToast();
+  const [cls, setCls] = useState<ClassifyResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void classifyObsidianNote(note.path, note.content)
+      .then((c) => alive && setCls(c))
+      .catch(() => alive && setCls({ status: "new", existingSourceId: null, existingCapturedAt: null }));
+    return () => {
+      alive = false;
+    };
+  }, [note.path, note.content]);
+
+  const create = useCallback(async () => {
+    setBusy(true);
+    try {
+      await createObsidianImportProposal({ path: note.path, content: note.content });
+      await invalidateCollections(["memoryProposals", "memorySources", "memoryImportJobs", "agentEvents", "auditEvents"]);
+      setDone(true);
+      toast("הצעת ייבוא נוצרה — ממתינה לאישור אנושי בתור ההצעות", "success");
+    } catch {
+      toast("יצירת הצעת הייבוא נכשלה", "danger");
+    } finally {
+      setBusy(false);
+    }
+  }, [note.path, note.content, toast]);
+
+  const unchanged = cls?.status === "unchanged";
+  const badge =
+    cls?.status === "new"
+      ? { status: "ממתין" as const, label: "חדש" }
+      : cls?.status === "changed"
+        ? { status: "אזהרה" as const, label: "השתנה מאז הייבוא הקודם" }
+        : cls?.status === "unchanged"
+          ? { status: "מושבת" as const, label: "כבר יובא ללא שינוי" }
+          : null;
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="ייבוא לידע מנוהל"
+      footer={
+        <div style={row}>
+          <OsButton variant="ghost" onClick={onClose}>
+            {done ? "סגירה" : "ביטול"}
+          </OsButton>
+          {done ? (
+            <OsButton variant="success" disabled disabledReason="ההצעה כבר נוצרה — אשרו אותה בתור ההצעות">
+              נוצרה הצעה
+            </OsButton>
+          ) : busy ? (
+            <OsButton variant="primary" disabled disabledReason="יוצר הצעה…">
+              יוצר…
+            </OsButton>
+          ) : unchanged ? (
+            <OsButton variant="primary" disabled disabledReason="כבר יובא ללא שינוי — אין צורך בהצעה חדשה">
+              צור הצעת ייבוא
+            </OsButton>
+          ) : (
+            <OsButton variant="primary" onClick={create} data-testid="obsidian-import-create">
+              צור הצעת ייבוא
+            </OsButton>
+          )}
+        </div>
+      }
+    >
+      <div style={stack()} data-testid="obsidian-import-preview">
+        <div style={metaRow}>
+          <span style={muted}>כותרת</span>
+          <span style={{ fontWeight: 600 }}>{note.basename}</span>
+        </div>
+        <div style={metaRow}>
+          <span style={muted}>נתיב בכספת</span>
+          <span style={codeStyle}>{note.path}</span>
+        </div>
+        <div style={metaRow}>
+          <span style={muted}>מקור</span>
+          <span>Obsidian · {vaultName}</span>
+        </div>
+        <div style={metaRow}>
+          <span style={muted}>יעד</span>
+          <span data-testid="obsidian-import-destination">ידע מנוהל (memoryRecords)</span>
+        </div>
+        {badge && (
+          <div style={metaRow}>
+            <span style={muted}>מצב מול הידע</span>
+            <span data-testid="obsidian-import-status">
+              <StatusChip status={badge.status} label={badge.label} />
+            </span>
+          </div>
+        )}
+        <div role="note" style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-warning, #b8860b)" }}>
+          ייבוא הוא פעולה ידנית וחד-פעמית — <b>אינו סנכרון</b>. לא נוצר קישור חי ולא מתבצע עדכון אוטומטי. הפעולה
+          יוצרת הצעה הממתינה לאישור אנושי לפני כניסה לידע המנוהל.
+        </div>
+        {note.frontmatter && Object.keys(note.frontmatter).length > 0 && (
+          <div style={stack("var(--os-space-1)")}>
+            <span style={{ fontSize: "var(--os-text-2xs, 11px)", ...muted }}>מאפיינים (frontmatter)</span>
+            <div style={{ display: "grid", gap: 2, fontSize: "var(--os-text-2xs, 11px)" }}>
+              {Object.entries(note.frontmatter).map(([k, v]) => (
+                <div key={k} style={metaRow}>
+                  <span style={{ ...codeStyle, ...muted }}>{k}</span>
+                  <span>{typeof v === "string" ? v : JSON.stringify(v)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <span style={{ fontSize: "var(--os-text-2xs, 11px)", ...muted }}>תצוגה מקדימה</span>
+        <pre
+          style={{
+            margin: 0,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            maxHeight: "34vh",
+            overflow: "auto",
+            background: "var(--os-bg-2, transparent)",
+            border: "1px solid var(--os-border)",
+            borderRadius: "var(--os-radius-sm, 6px)",
+            padding: "var(--os-space-3)",
+            fontSize: "var(--os-text-sm, 13px)",
+          }}
+        >
+          {note.content}
+        </pre>
+      </div>
+    </Modal>
+  );
+}
+
+/** ObsidianVaultPanel — the compact /memory section. */
+export function ObsidianVaultPanel(): ReactElement {
+  const vault = useObsidianVault();
+  const { toast } = useToast();
+  const [pairingOpen, setPairingOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [importNote, setImportNote] = useState<NoteContent | null>(null);
+  const [writeOpen, setWriteOpen] = useState(false);
+
+  const connected = vault.phase === "connected" && vault.info !== null;
+  const writeEnabled = connected && vault.info?.writeEnabled === true;
+
+  const handleConnect = useCallback(
+    async (token: string) => {
+      const r = await vault.connect(token);
+      if (r.ok) {
+        setPairingOpen(false);
+        toast("מחובר ל-Obsidian", "success");
+      } else {
+        toast(errCopy(r.code), "danger");
+      }
+    },
+    [vault, toast],
+  );
+
+  const handleCheck = useCallback(async () => {
+    const { reachable, paired } = await vault.check();
+    if (paired) toast("החיבור פעיל", "success");
+    else if (reachable) toast("הגשר זמין — התחברו כדי לגשת לכספת", "info");
+    else toast(obsidianErrorMessage("UNAVAILABLE"), "danger");
+  }, [vault, toast]);
+
+  const handleRefresh = useCallback(async () => {
+    const r = await vault.refresh();
+    toast(r.ok ? "המצב עודכן" : errCopy(r.code), r.ok ? "success" : "danger");
+  }, [vault, toast]);
+
+  const handleDisconnect = useCallback(() => {
+    vault.disconnect();
+    toast("נותקתם מ-Obsidian", "info");
+  }, [vault, toast]);
+
+  const handleForget = useCallback(async () => {
+    await vault.forgetDevice();
+    toast("המכשיר הוסר מהמכשירים המהימנים. יידרש חיבור מחדש עם קוד התאמה.", "info");
+  }, [vault, toast]);
+
+  const onSearch = useCallback(
+    async (q: string): Promise<{ hits: SearchHit[]; error: string | null }> => {
+      const r = await vault.search(q);
+      if (r.ok && r.data) return { hits: r.data.results, error: null };
+      return { hits: [], error: errCopy(r.code) };
+    },
+    [vault],
+  );
+
+  const onRead = useCallback(
+    async (path: string): Promise<NoteContent | null> => {
+      const r = await vault.read(path);
+      if (r.ok && r.data) return r.data;
+      toast(errCopy(r.code), "danger");
+      return null;
+    },
+    [vault, toast],
+  );
+
+  return (
+    <Panel data-testid="obsidian-panel" style={stack()}>
+      <SectionTitle
+        title="Obsidian"
+        subtitle={writeEnabled ? "כספת מקומית · קריאה + כתיבה באישור" : "כספת מקומית · קריאה בלבד"}
+        action={
+          connected ? (
+            <StatusChip status="פעיל" label="מחובר" />
+          ) : vault.phase === "checking" ? (
+            <StatusChip status="ממתין" label="מתחבר…" />
+          ) : vault.phase === "error" ? (
+            <StatusChip status="חסום" label="שגיאת חיבור" />
+          ) : (
+            <StatusChip status="מושבת" label="לא מחובר" />
+          )
+        }
+      />
+
+      {connected && vault.info ? (
+        <div style={stack()} data-testid="obsidian-connected">
+          <div style={{ fontSize: "var(--os-text-sm, 13px)" }}>מחובר ל-Obsidian</div>
+          <div style={metaRow}>
+            <span style={muted}>Vault</span>
+            <span data-testid="obsidian-vault-name" style={{ fontWeight: 600 }}>
+              {vault.info.vaultName}
+            </span>
+          </div>
+          <div style={metaRow}>
+            <span style={muted}>מצב</span>
+            <span>{writeEnabled ? "חיבור מקומי · קריאה + כתיבה באישור" : "חיבור מקומי · קריאה בלבד"}</span>
+          </div>
+          <div style={metaRow}>
+            <span style={muted}>גשר</span>
+            <span style={codeStyle}>{OBSIDIAN_BRIDGE_URL}</span>
+          </div>
+          <div style={metaRow}>
+            <span style={muted}>גרסת גשר</span>
+            <span style={codeStyle}>{vault.info.version}</span>
+          </div>
+          <div style={metaRow}>
+            <span style={muted}>כתיבה</span>
+            <span data-testid="obsidian-readonly">{writeEnabled ? "באישור אנושי בלבד" : "מושבתת (קריאה בלבד)"}</span>
+          </div>
+          <div style={metaRow}>
+            <span style={muted}>בדיקת חיבור אחרונה</span>
+            <span>{fmtTime(vault.lastCheckAt)}</span>
+          </div>
+          <div style={{ fontSize: "var(--os-text-2xs, 11px)", ...muted }}>
+            החיבור נשמר באופן מקומי במכשיר זה. לאחר הפעלה מחדש של Obsidian, TERAGON יתחבר מחדש באופן מאובטח — ללא צורך
+            בקוד נוסף.
+          </div>
+          <div style={row}>
+            <OsButton variant="primary" onClick={() => setSearchOpen(true)} data-testid="obsidian-search-btn">
+              חפש ב-Vault
+            </OsButton>
+            <ActionButton busy={vault.busy} variant="ghost" onClick={handleRefresh} testId="obsidian-refresh-btn">
+              רענן
+            </ActionButton>
+            <OsButton variant="cyan" onClick={vault.openVault} data-testid="obsidian-open-btn">
+              פתח ב-Obsidian
+            </OsButton>
+            {writeEnabled && (
+              <OsButton variant="violet" onClick={() => setWriteOpen(true)} data-testid="obsidian-write-btn">
+                הצע כתיבה ל-Obsidian
+              </OsButton>
+            )}
+            <OsButton variant="danger" onClick={handleDisconnect} data-testid="obsidian-disconnect-btn">
+              נתק
+            </OsButton>
+            <OsButton variant="ghost" onClick={handleForget} data-testid="obsidian-forget-btn">
+              שכח את המכשיר הזה
+            </OsButton>
+          </div>
+        </div>
+      ) : (
+        <div style={stack()} data-testid="obsidian-disconnected">
+          <div style={{ fontSize: "var(--os-text-sm, 13px)" }}>{vault.phase === "checking" ? "מתחבר ל-Obsidian…" : "לא מחובר"}</div>
+          {vault.phase === "error" && vault.errorCode && (
+            <div role="alert" data-testid="obsidian-error" style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-danger, #c0392b)" }}>
+              {obsidianErrorMessage(vault.errorCode)}
+            </div>
+          )}
+          <div style={{ fontSize: "var(--os-text-2xs, 11px)", ...muted }}>
+            חיבור מקומי בלבד אל <span style={codeStyle}>{OBSIDIAN_BRIDGE_URL}</span> · קריאה בלבד. מקור ידע חיצוני —
+            אינו מיובא אוטומטית לזיכרון.
+          </div>
+          <div style={row}>
+            <OsButton variant="primary" onClick={() => setPairingOpen(true)} data-testid="obsidian-connect-btn">
+              חבר Obsidian
+            </OsButton>
+            <ActionButton busy={vault.busy} variant="ghost" onClick={handleCheck} testId="obsidian-check-btn">
+              בדוק חיבור
+            </ActionButton>
+          </div>
+        </div>
+      )}
+
+      <ObsidianPairingModal
+        open={pairingOpen}
+        busy={vault.busy}
+        onClose={() => setPairingOpen(false)}
+        onSubmit={handleConnect}
+        title="חבר את המכשיר הזה ל-Obsidian"
+        submitLabel="חבר מכשיר"
+        intro="ב-Obsidian הפעילו את הפקודה “Copy TERAGON pairing token (once)” והדביקו את הקוד. החיבור נשמר מקומית במכשיר זה (מפתח מכשיר לא ניתן לייצוא) — לאחר הפעלה מחדש TERAGON יתחבר מחדש באופן מאובטח, ללא צורך בקוד נוסף."
+      />
+      {connected && (
+        <SearchModal
+          open={searchOpen}
+          onClose={() => setSearchOpen(false)}
+          onSearch={onSearch}
+          onRead={onRead}
+          onOpenNote={vault.openNote}
+          onImportNote={setImportNote}
+        />
+      )}
+      {connected && vault.info && importNote && (
+        <ImportPreviewModal note={importNote} vaultName={vault.info.vaultName} onClose={() => setImportNote(null)} />
+      )}
+      {writeEnabled && vault.info && writeOpen && (
+        <WriteProposeModal vaultName={vault.info.vaultName} onLoadCurrent={onRead} onClose={() => setWriteOpen(false)} />
+      )}
+    </Panel>
+  );
+}

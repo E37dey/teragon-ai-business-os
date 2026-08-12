@@ -40,6 +40,8 @@ import { quoteTotals } from "@/modules/quotations/quoteMath";
 import { ils, dateHe, dateTimeHe } from "@/modules/quotations/fmt";
 import { customerOpenItems, customerTimeline, tasksForCustomer } from "./selectors";
 import { Customer360MemoryTab } from "./Customer360MemoryTab";
+import { PERSISTENCE_PROVIDER } from "@/persistence/provider";
+import { SupabaseCustomerDetail } from "./SupabaseCustomerDetail";
 
 const railTitle: CSSProperties = {
   fontSize: "var(--os-text-2xs, 11px)",
@@ -89,7 +91,16 @@ function ticketChip(status: ServiceTicket["status"]): ReactElement {
   return <StatusChip status={m.chip} label={m.label} />;
 }
 
+/**
+ * Route entry. The provider is a build constant, so the branch is stable across
+ * renders (no conditional-hook hazard): SUPABASE mounts the reduced, remotely-
+ * connected detail; LOCAL keeps the full Customer-360 below, unchanged.
+ */
 export default function CustomerDetailPage(): ReactElement {
+  return PERSISTENCE_PROVIDER === "SUPABASE" ? <SupabaseCustomerDetail /> : <LocalCustomerDetailPage />;
+}
+
+function LocalCustomerDetailPage(): ReactElement {
   const { id } = useParams();
   const { toast } = useToast();
   const invalidate = useInvalidateCollections();
@@ -283,6 +294,9 @@ export default function CustomerDetailPage(): ReactElement {
           }}
         >
           <div style={{ display: "grid", gap: 4 }}>
+            <div style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-sm, 13px)" }}>
+              כרטיס לקוח
+            </div>
             <div style={{ display: "flex", gap: "var(--os-space-3)", alignItems: "center" }}>
               <h1 style={{ margin: 0, fontSize: "var(--os-text-xl, 20px)" }}>{customer.name}</h1>
               {entityChip(customer.status)}

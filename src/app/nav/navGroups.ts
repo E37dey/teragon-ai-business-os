@@ -1,8 +1,9 @@
-// Grouped RTL navigation model — the 5 canonical groups of the TERAGON shell.
+// Grouped RTL navigation model — Product V2 (S13.1): six calm primary groups.
+// Everyday business first; academic/training/reference/submission stay reachable
+// under "מערכת ומתקדם" (collapsed by default) so they don't dominate daily nav.
 // Every item path MUST exist in APP_ROUTES (verified by tests/navGroups.test.ts).
 //
-// Deliberately NOT in the nav: "/customers" (reachable from the /crm screen and
-// by direct URL — docs/WAVE_2_INTEGRATION_REPORT.md documents this) and
+// Deliberately NOT in the nav: "/customers/:id" (opened from a customer row) and
 // "/submission/presentation" (opened from the submission center itself).
 import type { IconName } from "@/design-system/icons";
 
@@ -21,61 +22,72 @@ export interface NavGroup {
 
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
-    id: "business",
-    label: "ניהול העסק",
+    id: "command",
+    label: "מרכז השליטה",
     items: [
       { path: "/", label: "מרכז השליטה", icon: "home" },
-      { path: "/crm", label: "לקוחות ולידים", icon: "users" },
-      { path: "/sales", label: "מכירות והתאמת מדפסות", icon: "briefcase" },
-      { path: "/organizations", label: "ארגונים ומוסדות", icon: "building" },
-      { path: "/tasks", label: "משימות ופגישות", icon: "clock" },
-      { path: "/documents", label: "מסמכים והצעות מחיר", icon: "doc" },
+      { path: "/analytics", label: "דוחות וניתוחים", icon: "gauge" },
     ],
   },
   {
-    id: "service",
-    label: "שירות והדרכה",
+    id: "customers",
+    label: "לקוחות ואנשי קשר",
     items: [
-      { path: "/courses", label: "קורסים והכשרות", icon: "graduation" },
-      { path: "/service", label: "שירות ותיקונים", icon: "wrench" },
-      { path: "/printers", label: "מדפסות וציוד", icon: "printer" },
-      { path: "/support", label: "תמיכה לאחר ההשקה", icon: "mail" },
+      { path: "/crm", label: "לקוחות ולידים", icon: "users" },
+      { path: "/customers", label: "לקוחות", icon: "users" },
+      { path: "/contacts", label: "אנשי קשר", icon: "users" },
+      { path: "/organizations", label: "ארגונים ומוסדות", icon: "building" },
+      { path: "/sales", label: "מכירות והצעות מחיר", icon: "briefcase" },
+      { path: "/documents", label: "מסמכים", icon: "doc" },
+    ],
+  },
+  {
+    id: "ai",
+    label: "AI וסוכנים",
+    items: [
+      { path: "/ai-workspace", label: "מרחב AI", icon: "sparkle" },
+      { path: "/agents", label: "סוכני AI", icon: "bot" },
+      { path: "/agents/collaboration", label: "חדר התיאום", icon: "network" },
     ],
   },
   {
     id: "knowledge",
-    label: "ידע ואוטומציה",
+    label: "ידע וזיכרון",
     items: [
-      { path: "/agents", label: "סוכני AI", icon: "bot" },
-      { path: "/agents/collaboration", label: "חדר התיאום", icon: "network" },
-      { path: "/automations", label: "אוטומציות", icon: "gear" },
-      { path: "/memory", label: "זיכרון Obsidian", icon: "memory" },
       { path: "/knowledge", label: "מאגר ידע", icon: "book" },
-      { path: "/learning", label: "מרכז למידה ושיפור", icon: "sparkle" },
+      { path: "/memory", label: "זיכרון מקומי", icon: "memory" },
     ],
   },
   {
-    id: "adoption",
-    label: "הטמעה והגשה",
+    id: "operations",
+    label: "תפעול ואוטומציה",
     items: [
+      { path: "/automations", label: "אוטומציות", icon: "gear" },
+      { path: "/tasks", label: "משימות ופגישות", icon: "clock" },
+      { path: "/service", label: "שירות ותיקונים", icon: "wrench" },
+      { path: "/printers", label: "מדפסות וציוד", icon: "printer" },
+      { path: "/system-health", label: "בריאות המערכת", icon: "gauge" },
+    ],
+  },
+  {
+    // System & Advanced — everyday-secondary + all demoted academic/training/
+    // reference/submission routes. Collapsed by default; reachable when needed.
+    id: "system",
+    label: "מערכת ומתקדם",
+    items: [
+      { path: "/settings", label: "הגדרות", icon: "gear" },
+      { path: "/administration", label: "משתמשים והרשאות", icon: "users" },
+      { path: "/governance", label: "ממשל ובקרת AI", icon: "shield" },
+      { path: "/courses", label: "קורסים והכשרות", icon: "graduation" },
+      { path: "/learning", label: "מרכז למידה ושיפור", icon: "sparkle" },
       { path: "/implementation", label: "תכנית ההטמעה", icon: "target" },
       { path: "/personas", label: "פרסונות ומסלולי הדרכה", icon: "users" },
       { path: "/stage-gates", label: "שערי מעבר וראיות", icon: "check" },
       { path: "/training-materials", label: "חומרי הדרכה", icon: "book" },
       { path: "/quick-start", label: "התחלה מהירה", icon: "sparkle" },
       { path: "/faq", label: "FAQ והתנגדויות", icon: "inbox" },
-      { path: "/analytics", label: "דוחות וניתוחים", icon: "gauge" },
+      { path: "/support", label: "תמיכה לאחר ההשקה", icon: "mail" },
       { path: "/submission", label: "מרכז ההגשה", icon: "evidence" },
-    ],
-  },
-  {
-    id: "system",
-    label: "ניהול המערכת",
-    items: [
-      { path: "/governance", label: "ממשל ובקרת AI", icon: "shield" },
-      { path: "/administration", label: "משתמשים והרשאות", icon: "users" },
-      { path: "/system-health", label: "בריאות המערכת", icon: "gauge" },
-      { path: "/settings", label: "הגדרות", icon: "gear" },
     ],
   },
 ] as const;

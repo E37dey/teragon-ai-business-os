@@ -1,0 +1,126 @@
+# TERAGON AI BUSINESS OS — Gate S9.2-A1d2a-1B: MANUAL live customer acceptance.
+# Runs the fail-closed live customer suite once against teragon-staging.
+# workflow_dispatch ONLY — never on push/pull_request. The service-role secret is
+# scoped to the server-side runner step and is ABSENT during the Vite build, so
+# it can never enter the browser bundle.
+name: customer-live-acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Exact commit SHA to validate
+        required: true
+        type: string
+      preflight_only:
+        description: Non-mutating server-side preflight only (no browser, no fixtures)
+        required: false
+        default: false
+        type: boolean
+      suite:
+        description: Which live domain suite to run
+        required: false
+        default: customers
+        type: choice
+        options: [customers, contacts]
+
+permissions:
+  contents: read
+
+env:
+  # Single source of truth for the runner's Node major (see setup-node below).
+  NODE_VERSION: "22"
+
+concurrency:
+  group: customer-live-acceptance
+  cancel-in-progress: false
+
+jobs:
+  live-customer:
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 30
+    steps:
+      - name: Checkout the exact selected commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit }}
+
+      # Provenance gate: prove the tree under test IS the requested commit. Without
+      # this the logs never show the ACTUAL checkout SHA, so a workflow-definition /
+      # branch-HEAD / requested-commit divergence is unfalsifiable after the fact.
+      - name: Verify checked-out SHA matches the requested commit
+        run: |
+          ACTUAL="$(git rev-parse HEAD)"
+          echo "requested_commit=${{ inputs.commit }}"
+          echo "actual_checkout_sha=${ACTUAL}"
+          echo "workflow_definition_sha=${{ github.sha }}"
+          echo "preflight_only=${{ inputs.preflight_only }}"
+          if [ "${ACTUAL}" != "${{ inputs.commit }}" ]; then
+            echo "::error::checkout SHA ${ACTUAL} != requested ${{ inputs.commit }}"
+            exit 1
+          fi
+
+      # MUST satisfy @supabase/supabase-js `engines: node>=22`. `npm ci` does not
+      # enforce engines, so Node 20 installed cleanly and then failed at call
+      # time inside the SDK — indistinguishable from a bad credential in the
+      # report. Matches NODE_VERSION in supabase-live-validation.yml.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      # Vite build — NO service-role secret in this step's env (publishable only,
+      # sourced from netlify.toml deploy-preview by preview-build.mjs).
+      - name: Build Preview-context app (SUPABASE, publishable only)
+        run: npm run build:preview
+
+      # Scan the built bundle BEFORE any fixture creation / live step.
+      - name: Scan bundle for secrets (no service_role in dist)
+        run: npm run scan:secrets
+
+      # Browser tooling is for the FULL suite only. A preflight-only run is
+      # non-mutating and headless by contract: no Playwright, no served dist.
+      - name: Install Playwright chromium
+        if: ${{ !inputs.preflight_only }}
+        run: npx playwright install --with-deps chromium
+
+      - name: Serve the exact dist locally
+        if: ${{ !inputs.preflight_only }}
+        run: |
+          npx --yes serve -s dist -l 4173 &
+          npx --yes wait-on http://localhost:4173
+
+      # The ONLY step that receives the service-role secret. It never reaches the
+      # build/bundle. The runner preflights, runs the live suite once, and the
+      # suite always tears its fixtures down.
+      - name: Run live customer acceptance (once, always cleanup)
+        id: live
+        env:
+          STAGING_DOMAINS_LIVE: "1"
+          STAGING_DOMAINS_PREFLIGHT_ONLY: ${{ inputs.preflight_only && '1' || '0' }}
+          ACCEPTANCE_BASE_URL: http://localhost:4173
+          INTENDED_COMMIT: ${{ inputs.commit }}
+          ACC_RUN_ID: gha${{ github.run_id }}
+          # Selects the suite AND its fixture footprint: the contacts run adds a
+          # primary-org customer + 2 contacts; the customers run is unchanged.
+          ACC_SUITE: ${{ inputs.suite }}
+          ACC_CONTACT_COUNT: ${{ inputs.suite == 'contacts' && '2' || '0' }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          TERAGON_ADMIN_EMAIL: ${{ secrets.TERAGON_ADMIN_EMAIL }}
+          TERAGON_ADMIN_PASSWORD: ${{ secrets.TERAGON_ADMIN_PASSWORD }}
+        run: npm run test:domains:live
+
+      # Upload only the redacted machine report (never traces with runtime data).
+      - name: Upload redacted report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-customer-report
+          path: e2e/live-domains/_report.json
+          if-no-files-found: warn

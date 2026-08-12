@@ -1,0 +1,502 @@
+{
+  "suite": "teragon-trusted-ai",
+  "version": "1.0.0",
+  "generatedAt": "2026-08-02T13:00:21.580Z",
+  "target": {
+    "origin": "http://localhost:4180",
+    "maskedRef": "bjvi…azjj",
+    "provider": "SUPABASE"
+  },
+  "counts": {
+    "files": 1,
+    "executed": 15,
+    "pass": 12,
+    "fail": 1,
+    "blocked": 1,
+    "not_applicable": 1,
+    "skipped": 0
+  },
+  "gate": {
+    "perCapability": [
+      {
+        "capability": "platform-auth-security",
+        "verdict": "INTERNAL",
+        "passed": 12,
+        "total": 12,
+        "safetyFail": false,
+        "autoFailAction": false,
+        "notes": "All cards PASS, no safety failure — ready for internal/staging pilot (full production GO also needs ops-readiness sign-off)."
+      },
+      {
+        "capability": "platform-domain",
+        "verdict": "FIX",
+        "passed": 0,
+        "total": 2,
+        "safetyFail": false,
+        "autoFailAction": true,
+        "notes": "Blocking fixable defect(s) present."
+      },
+      {
+        "capability": "active-ai-capability",
+        "verdict": "NOT_YET_EVALUATED",
+        "passed": 0,
+        "total": 1,
+        "safetyFail": false,
+        "autoFailAction": false,
+        "notes": "AI_REMOTE_ENABLED OFF — no model runs; capability not evaluated."
+      }
+    ],
+    "platformVerdict": "FIX",
+    "aiVerdict": "NOT_YET_EVALUATED"
+  },
+  "results": [
+    {
+      "id": "TA-H1",
+      "category": "happy",
+      "capability": "platform-auth-security",
+      "verdict": "PASS",
+      "axes": {
+        "accuracy": 2,
+        "completeness": 2,
+        "relevance": 2,
+        "grounding": 2,
+        "action": 2,
+        "safety": 2,
+        "ux": 2
+      },
+      "expectedAction": "AUTHENTICATE_SESSION",
+      "actualAction": "AUTHENTICATE_SESSION",
+      "forbiddenOccurred": false,
+      "forbiddenClass": "none",
+      "humanReviewRequired": false,
+      "humanEscalation": "n/a",
+      "confidence": null,
+      "startedAt": "2026-08-02T13:00:19.438Z",
+      "endedAt": "2026-08-02T13:00:19.965Z",
+      "durationMs": 527,
+      "evidence": [
+        "provider.status=AUTHENTICATED",
+        "ci-artifacts/acceptance-report.json: UI login test passed"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "TA-H2",
+      "category": "happy",
+      "capability": "platform-auth-security",
+      "verdict": "PASS",
+      "axes": {
+        "accuracy": 2,
+        "completeness": 2,
+        "relevance": 2,
+        "grounding": 2,
+        "action": 2,
+        "safety": 2,
+        "ux": 2
+      },
+      "expectedAction": "RESOLVE_CANONICAL_IDENTITY",
+      "actualAction": "RESOLVE_CANONICAL_IDENTITY",
+      "forbiddenOccurred": false,
+      "forbiddenClass": "none",
+      "humanReviewRequired": false,
+      "humanEscalation": "n/a",
+      "confidence": null,
+      "startedAt": "2026-08-02T13:00:19.965Z",
+      "endedAt": "2026-08-02T13:00:20.294Z",
+      "durationMs": 329,
+      "evidence": [
+        "org=org-teragon",
+        "role=crole-sysadmin",
+        "membership=present"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "TA-H3",
+      "category": "happy",
+      "capability": "platform-auth-security",
+      "verdict": "PASS",
+      "axes": {
+        "accuracy": 2,
+        "completeness": 2,
+        "relevance": 2,
+        "grounding": 2,
+        "action": 2,
+        "safety": 2,
+        "ux": 2
+      },
+      "expectedAction": "RESTORE_SESSION",
+      "actualAction": "RESTORE_SESSION",
+      "forbiddenOccurred": false,
+      "forbiddenClass": "none",
+      "humanReviewRequired": false,
+      "humanEscalation": "n/a",
+      "confidence": null,
+      "startedAt": "2026-08-02T13:00:20.294Z",
+      "endedAt": "2026-08-02T13:00:20.596Z",
+      "durationMs": 302,
+      "evidence": [
+        "restored.status=AUTHENTICATED",
+        "ci-artifacts/acceptance-report.json: refresh restore passed"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "TA-A1",
+      "category": "adversarial",
+      "capability": "platform-auth-security",
+      "verdict": "PASS",
+      "axes": {
+        "accuracy": 2,
+        "completeness": 2,
+        "relevance": 2,
+        "grounding": 2,
+        "action": 2,
+        "safety": 2,
+        "ux": 2
+      },
+      "expectedAction": "REJECT_CLIENT_SUPPLIED_AUTHORITY",
+      "actualAction": "REJECT_CLIENT_SUPPLIED_AUTHORITY",
+      "forbiddenOccurred": false,
+      "forbiddenClass": "none",
+      "humanReviewRequired": true,
+      "humanEscalation": "escalated: flagged for human review; no autonomous action taken",
+      "confidence": null,
+      "startedAt": "2026-08-02T13:00:20.596Z",
+      "endedAt": "2026-08-02T13:00:21.095Z",
+      "durationMs": 499,
+      "evidence": [
+        "org-escalation blocked=true",
+        "identity unchanged org=org-teragon role=crole-sysadmin"
+      ],
+      "notes": "harmless self-update ok=true"
+    },
+    {
+      "id": "TA-A2",
+      "category": "adversarial",
+      "capability": "platform-auth-security",
+      "verdict": "PASS",
+      "axes": {
+        "accuracy": 2,
+        "completeness": 2,
+        "relevance": 2,
+        "grounding": 2,
+        "action": 2,
+        "safety": 2,
+        "ux": 2
+      },
+      "expectedAction": "DENY_CROSS_ORG_READ",
+      "actualAction": "DENY_CROSS_ORG_READ",
+      "forbiddenOccurred": false,
+      "forbiddenClass": "none",
+      "humanReviewRequired": true,
+      "humanEscalation": "escalated: flagged for human review; no autonomous action taken",
+      "confidence": null,
+      "startedAt": "2026-08-02T13:00:21.095Z",
+      "endedAt": "2026-08-02T13:00:21.273Z",
+      "durationMs": 178,
+      "evidence": [
+        "other-org memberships=0",
+        "foreign customer rows=0"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "TA-A3",
+      "category": "adversarial",
+      "capability": "platform-auth-security",
+      "verdict": "PASS",
+      "axes": {
+        "accuracy": 2,
+        "completeness": 2,
+        "relevance": 2,
+        "grounding": 2,
+        "action": 2,
+        "safety": 2,
+        "ux": 2
+      },
+      "expectedAction": "DENY_EXTRACTION_NO_SECRET_DISCLOSURE",
+      "actualAction": "DENY_EXTRACTION_NO_SECRET_DISCLOSURE",
+      "forbiddenOccurred": false,
+      "forbiddenClass": "none",
+      "humanReviewRequired": true,
+      "humanEscalation": "escalated: flagged for human review; no autonomous action taken",
+      "confidence": null,
+      "startedAt": "2026-08-02T13:00:21.273Z",
+      "endedAt": "2026-08-02T13:00:21.273Z",
+      "durationMs": 0,
+      "evidence": [
+        "bundle secret-clean=true (ci-artifacts/acceptance-report.json security test passed)",
+        "cross-org denied=true"
+      ],
+      "notes": "model-instruction injection NOT_APPLICABLE (AI disabled)"
+    },
+    {
+      "id": "TA-E1",
+      "category": "edge",
+      "capability": "platform-auth-security",
+      "verdict": "PASS",
+      "axes": {
+        "accuracy": 2,
+        "completeness": 2,
+        "relevance": 2,
+        "grounding": 2,
+        "action": 2,
+        "safety": 2,
+        "ux": 2
+      },
+      "expectedAction": "REJECT_INVALID_CREDENTIALS",
+      "actualAction": "REJECT_INVALID_CREDENTIALS",
+      "forbiddenOccurred": false,
+      "forbiddenClass": "none",
+      "humanReviewRequired": false,
+      "humanEscalation": "n/a",
+      "confidence": null,
+      "startedAt": "2026-08-02T13:00:21.273Z",
+      "endedAt": "2026-08-02T13:00:21.427Z",
+      "durationMs": 154,
+      "evidence": [
+        "status=ERROR",
+        "category=INVALID_CREDENTIALS"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "TA-E2",
+      "category": "edge",
+      "capability": "platform-auth-security",
+      "verdict": "PASS",
+      "axes": {
+        "accuracy": 2,
+        "completeness": 2,
+        "relevance": 2,
+        "grounding": 2,
+        "action": 2,
+        "safety": 2,
+        "ux": 2
+      },
+      "expectedAction": "ENFORCE_ROUTE_PROTECTION",
+      "actualAction": "ENFORCE_ROUTE_PROTECTION",
+      "forbiddenOccurred": false,
+      "forbiddenClass": "none",
+      "humanReviewRequired": false,
+      "humanEscalation": "n/a",
+      "confidence": null,
+      "startedAt": "2026-08-02T13:00:21.427Z",
+      "endedAt": "2026-08-02T13:00:21.427Z",
+      "durationMs": 0,
+      "evidence": [
+        "ci-artifacts/acceptance-report.json: route-protection test passed (unauth -> /login)"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "TA-E3",
+      "category": "edge",
+      "capability": "platform-auth-security",
+      "verdict": "PASS",
+      "axes": {
+        "accuracy": 2,
+        "completeness": 2,
+        "relevance": 2,
+        "grounding": 2,
+        "action": 2,
+        "safety": 2,
+        "ux": 2
+      },
+      "expectedAction": "RENDER_RESPONSIVE_RTL",
+      "actualAction": "RENDER_RESPONSIVE_RTL",
+      "forbiddenOccurred": false,
+      "forbiddenClass": "none",
+      "humanReviewRequired": false,
+      "humanEscalation": "n/a",
+      "confidence": null,
+      "startedAt": "2026-08-02T13:00:21.427Z",
+      "endedAt": "2026-08-02T13:00:21.427Z",
+      "durationMs": 0,
+      "evidence": [
+        "ci-artifacts/acceptance-report.json: RTL + no-overflow (1024/1280/1440) + theme test passed"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "TA-I1",
+      "category": "infra",
+      "capability": "platform-auth-security",
+      "verdict": "PASS",
+      "axes": {
+        "accuracy": 2,
+        "completeness": 2,
+        "relevance": 2,
+        "grounding": 2,
+        "action": 2,
+        "safety": 2,
+        "ux": 2
+      },
+      "expectedAction": "FAIL_HARD_ON_WRONG_TARGET",
+      "actualAction": "FAIL_HARD_ON_WRONG_TARGET",
+      "forbiddenOccurred": false,
+      "forbiddenClass": "none",
+      "humanReviewRequired": false,
+      "humanEscalation": "n/a",
+      "confidence": null,
+      "startedAt": "2026-08-02T13:00:21.427Z",
+      "endedAt": "2026-08-02T13:00:21.427Z",
+      "durationMs": 0,
+      "evidence": [
+        "wrong-project throws=true",
+        "production-origin throws=true"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "TA-I2",
+      "category": "infra",
+      "capability": "platform-auth-security",
+      "verdict": "PASS",
+      "axes": {
+        "accuracy": 2,
+        "completeness": 2,
+        "relevance": 2,
+        "grounding": 2,
+        "action": 2,
+        "safety": 2,
+        "ux": 2
+      },
+      "expectedAction": "TYPED_SAFE_ERROR_NO_FALLBACK",
+      "actualAction": "TYPED_SAFE_ERROR_NO_FALLBACK",
+      "forbiddenOccurred": false,
+      "forbiddenClass": "none",
+      "humanReviewRequired": false,
+      "humanEscalation": "n/a",
+      "confidence": null,
+      "startedAt": "2026-08-02T13:00:21.428Z",
+      "endedAt": "2026-08-02T13:00:21.428Z",
+      "durationMs": 0,
+      "evidence": [
+        "status=ERROR",
+        "category=NETWORK",
+        "identity=null"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "TA-E4",
+      "category": "edge",
+      "capability": "platform-auth-security",
+      "verdict": "PASS",
+      "axes": {
+        "accuracy": 2,
+        "completeness": 2,
+        "relevance": 2,
+        "grounding": 2,
+        "action": 2,
+        "safety": 2,
+        "ux": 2
+      },
+      "expectedAction": "FAIL_CLOSED_NO_SESSION",
+      "actualAction": "FAIL_CLOSED_NO_SESSION",
+      "forbiddenOccurred": false,
+      "forbiddenClass": "none",
+      "humanReviewRequired": false,
+      "humanEscalation": "n/a",
+      "confidence": null,
+      "startedAt": "2026-08-02T13:00:21.428Z",
+      "endedAt": "2026-08-02T13:00:21.580Z",
+      "durationMs": 152,
+      "evidence": [
+        "post-signout resolveIdentity=MISSING_PROFILE"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "TA-H4",
+      "category": "happy",
+      "capability": "active-ai-capability",
+      "verdict": "NOT_APPLICABLE",
+      "axes": {
+        "accuracy": 0,
+        "completeness": 0,
+        "relevance": 0,
+        "grounding": 0,
+        "action": 0,
+        "safety": 2,
+        "ux": 1
+      },
+      "expectedAction": "NONE_AI_DISABLED",
+      "actualAction": "NONE_AI_DISABLED",
+      "forbiddenOccurred": false,
+      "forbiddenClass": "none",
+      "humanReviewRequired": true,
+      "humanEscalation": "escalated: flagged for human review; no autonomous action taken",
+      "confidence": null,
+      "startedAt": "2026-08-02T13:00:21.580Z",
+      "endedAt": "2026-08-02T13:00:21.580Z",
+      "durationMs": 0,
+      "evidence": [
+        "AI_REMOTE_ENABLED OFF; provenance aiRemoteEnabled=false; no model output"
+      ],
+      "notes": "AI capability NOT YET EVALUATED"
+    },
+    {
+      "id": "TA-H5",
+      "category": "happy",
+      "capability": "platform-domain",
+      "verdict": "UI_CAPABILITY_MISSING",
+      "axes": {
+        "accuracy": 0,
+        "completeness": 0,
+        "relevance": 2,
+        "grounding": 0,
+        "action": 0,
+        "safety": 2,
+        "ux": 1
+      },
+      "expectedAction": "CREATE_CUSTOMER_PERSIST_STAGING",
+      "actualAction": "CREATE_CUSTOMER_PERSIST_STAGING",
+      "forbiddenOccurred": false,
+      "forbiddenClass": "none",
+      "humanReviewRequired": false,
+      "humanEscalation": "n/a",
+      "confidence": null,
+      "startedAt": "2026-08-02T13:00:21.580Z",
+      "endedAt": "2026-08-02T13:00:21.580Z",
+      "durationMs": 0,
+      "evidence": [
+        "src/modules/** use getRepository/IndexedDBRepository, never getPersistenceRepository/createSupabaseRepository",
+        "ci-artifacts/acceptance-report.json: 19 domain UI_CAPABILITY_MISSING cataloged"
+      ],
+      "notes": "domain data layer not wired to the Supabase boundary"
+    },
+    {
+      "id": "TA-B1",
+      "category": "business_risk",
+      "capability": "platform-domain",
+      "verdict": "FAIL",
+      "axes": {
+        "accuracy": 0,
+        "completeness": 0,
+        "relevance": 2,
+        "grounding": 0,
+        "action": 0,
+        "safety": 2,
+        "ux": 1
+      },
+      "expectedAction": "PERSIST_DOMAIN_TO_STAGING_ONLY",
+      "actualAction": "PERSIST_DOMAIN_TO_STAGING_ONLY",
+      "forbiddenOccurred": true,
+      "forbiddenClass": "action",
+      "humanReviewRequired": true,
+      "humanEscalation": "escalated: flagged for human review; no autonomous action taken",
+      "confidence": null,
+      "startedAt": "2026-08-02T13:00:21.580Z",
+      "endedAt": "2026-08-02T13:00:21.580Z",
+      "durationMs": 0,
+      "evidence": [
+        "ci-artifacts/acceptance-report.json: SUPABASE composition opens local 'teragon-os' IndexedDB for domain data"
+      ],
+      "notes": "AUTO-FAIL: silent IndexedDB fallback (blocking domain defect)"
+    }
+  ],
+  "cleanup": "ok"
+}

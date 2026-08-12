@@ -49,6 +49,7 @@ import { ApprovalPanel } from "@/components/approval";
 import { AgentNetworkLive } from "./AgentNetworkLive";
 import { ManagementBand } from "./ManagementBand";
 import { MemoryBand } from "./MemoryBand";
+import { OperationsBrief } from "./OperationsBrief";
 import { useCopilot } from "@/modules/ai-copilot/copilotApi";
 import { dashboardKpis, salesFunnel, recentActivity } from "@/domain/selectors";
 import {
@@ -426,6 +427,9 @@ function CommandCenterInner(): ReactElement {
         </div>
       </div>
 
+      {/* Phase 7 — executive AI-operations brief + action inbox (real signals only). */}
+      <OperationsBrief />
+
       {/* VC-C — four PRIMARY KPIs only: the operational counts that genuinely
           drive the operator's next action. Zero stays neutral (muted) because a
           zero count is neither success nor attention. Amber marks a metric only
@@ -434,7 +438,7 @@ function CommandCenterInner(): ReactElement {
           Passive analytics (revenue, pipeline value, course %) moved to
           "מדדים נוספים" — quieter, but never deleted. */}
       <div
-        style={gridStyle("repeat(auto-fit, minmax(180px, 1fr))", "var(--os-space-4)")}
+        style={gridStyle("repeat(auto-fit, minmax(min(100%, 180px), 1fr))", "var(--os-space-4)")}
         data-testid="command-kpis"
       >
         <KpiCard
@@ -602,9 +606,15 @@ function CommandCenterInner(): ReactElement {
         ownerName={userName(CEO_USER_ID)}
       />
 
-      {/* ONE operational summary — the follow-up queue (actionable). Kept
-          permanently visible, but styled subordinate to the focal panel. */}
-      <Panel variant="panel" style={{ padding: "var(--os-space-5)" }} data-testid="ops-summary">
+      {/* S13.1 declutter: the follow-up queue is secondary to the AI decision
+          center and the agent summary, so it opens on demand instead of always
+          competing on the first viewport. Still in the DOM (searchable). */}
+      <details className="os-more-metrics" data-testid="ops-summary">
+        <summary>תור פולואו-אפ · לידים שמועד המעקב שלהם הגיע</summary>
+        <Panel
+          variant="panel"
+          style={{ padding: "var(--os-space-5)", marginBlockStart: "var(--os-space-3)" }}
+        >
         <SectionTitle
           title="תור פולואו-אפ"
           subtitle="לידים פתוחים שמועד המעקב שלהם הגיע"
@@ -647,7 +657,8 @@ function CommandCenterInner(): ReactElement {
             ))
           )}
         </div>
-      </Panel>
+        </Panel>
+      </details>
 
       {/* SECONDARY — moved out of the initial focal view into ONE disclosure:
           sales funnel, course/service/revenue trends, today's timeline and the

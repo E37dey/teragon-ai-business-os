@@ -13,9 +13,11 @@ import {
 } from "@/layout";
 import { Drawer, OsIcon, ToastProvider } from "@/design-system";
 import type { RankedSearchHit } from "@/domain/selectors";
-import { APP_ROUTES } from "./routes";
 import { CANONICAL_USER } from "./identity";
-import { MODE_LABEL, useAppMode } from "./mode";
+import { DomainNotConnectedGate } from "@/persistence/composition/DomainNotConnectedGate";
+import { useAuth } from "@/auth/useAuth";
+import { resolveShellUser } from "./shellAccount";
+import { ShellLogoutButton } from "./ShellLogoutButton";
 import { NAV_GROUPS, activeItemForPath, groupOfPath } from "./nav/navGroups";
 import { useNavBadges } from "./nav/useNavBadges";
 import { loadShellState, saveShellState, type ShellState } from "./shellState";
@@ -37,35 +39,17 @@ import { CopilotProvider } from "@/modules/ai-copilot/copilotContext";
 import { useCopilot } from "@/modules/ai-copilot/copilotApi";
 import { GlowOrb } from "@/design-system";
 
-/** Honest default rail until each screen ships its contextual rail (PAGE_CONTRACT). */
-function DefaultRail() {
-  const location = useLocation();
-  const mode = useAppMode();
-  const route = APP_ROUTES.find(
-    (r) => r.navPath === location.pathname || r.path === location.pathname,
-  );
-  return (
-    <div style={{ display: "grid", gap: "0.5rem", fontSize: "var(--os-font-13, 13px)" }}>
-      <div>{MODE_LABEL[mode]}</div>
-      {route ? (
-        <div style={{ color: "var(--os-muted)" }}>
-          ה-rail ההקשרי של «{route.title}» ייבנה יחד עם המסך (גל {route.wave}).
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 interface PaletteState {
   mode: PaletteMode;
   initialQuery: string;
 }
 
-/** Rail slot content — the page's PageRail when provided, else the honest default. */
-function RailSlot(): ReactElement {
-  const pageRail = useRailContent();
-  return <>{pageRail ?? <DefaultRail />}</>;
-}
+// Product V2 rail policy (S13.1): NO permanent left rail by default. A rail is
+// shown only for routes where it materially contributes an action/value — kept to
+// Memory (import/export controls) and Agents (fleet + approvals cross-link). Every
+// other page owns the full-width workspace. Pages may still opt out via
+// HideShellRail; a published PageRail on a non-allowlisted route is simply not shown.
+const RAIL_ALLOWLIST: ReadonlySet<string> = new Set(["/memory", "/agents"]);
 
 export default function OsShell(): ReactElement {
   return (
@@ -102,6 +86,11 @@ function NavCopilotCard(): ReactElement {
 function OsShellInner(): ReactElement {
   const location = useLocation();
   const navigate = useNavigate();
+
+  // ── canonical identity (S9.1-B2) ── SUPABASE shows the real server-resolved
+  // user (never the static CANONICAL_USER); LOCAL keeps the approved local user.
+  const { mode, status, identity } = useAuth();
+  const shellUser = resolveShellUser(mode, status, identity, CANONICAL_USER);
 
   // ── persisted shell state (nav groups + rail) ──
   const [shellState, setShellState] = useState<ShellState>(() => loadShellState());
@@ -169,6 +158,9 @@ function OsShellInner(): ReactElement {
   const { unreadCount } = useNotifications();
   // A dense page may opt out of the shell rail (HideShellRail) for a full-width canvas.
   const railHidden = useRailHidden();
+  // Product V2: render a permanent rail only for allowlisted routes that publish one.
+  const pageRail = useRailContent();
+  const showRail = !railHidden && RAIL_ALLOWLIST.has(activeId ?? "") && pageRail != null;
 
   // Ctrl+K / ⌘K — open (or close) the command palette
   useEffect(() => {
@@ -230,7 +222,7 @@ function OsShellInner(): ReactElement {
         onToggleGroup={toggleGroup}
         activeNavId={activeId}
         activeRoute={location.pathname}
-        user={CANONICAL_USER}
+        user={shellUser}
         renderLink={renderLink}
         headerProps={{
           onQuickAdd: () => setQuickCreate({ view: "menu" }),
@@ -241,6 +233,7 @@ function OsShellInner(): ReactElement {
           actions: (
             <>
               <ThemeSelect />
+              <ShellLogoutButton />
               <button
                 type="button"
                 className="os-header__iconbtn os-header__hamburger"
@@ -255,19 +248,24 @@ function OsShellInner(): ReactElement {
         }}
         copilotSlot={<NavCopilotCard />}
         railContent={
-          railHidden ? undefined : (
+          showRail ? (
             <LeftIntelligenceRail
               title="לוח הקשר"
               collapsible
               collapsed={shellState.railCollapsed}
               onToggleCollapsed={toggleRail}
             >
-              <RailSlot />
+              {pageRail}
             </LeftIntelligenceRail>
-          )
+          ) : undefined
         }
       >
-        <Outlet />
+        {/* S9.1-B: in SUPABASE mode legacy IndexedDB-backed pages never mount —
+            the central gate shows the Hebrew internal-preview notice instead. The
+            shell chrome (nav/header) is preserved. LOCAL renders the page as before. */}
+        <DomainNotConnectedGate>
+          <Outlet />
+        </DomainNotConnectedGate>
       </AppShell>
 
       {/* tablet: primary nav as an RTL drawer */}

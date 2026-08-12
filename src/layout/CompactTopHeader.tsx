@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { OsIcon, SearchInput } from "../design-system";
 import "../styles/components.css";
@@ -32,10 +32,6 @@ export interface CompactTopHeaderProps {
   className?: string;
 }
 
-function formatClock(d: Date): string {
-  return d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
-}
-
 function formatGregorian(d: Date): string {
   return d.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
@@ -56,8 +52,8 @@ function formatHebrewDate(d: Date): string {
 
 /**
  * CompactTopHeader — avatar + name/role, quick actions (+, bell w/ badge,
- * mail), global smart search with ⌘K hint, Hebrew + Gregorian date, live clock.
- * The clock and dates are REAL (Intl over Date.now) — never mocked.
+ * mail), global smart search with ⌘K hint, and a single Hebrew + Gregorian date.
+ * S13.1: the decorative live clock was removed to calm the header. Dates are REAL.
  */
 export function CompactTopHeader({
   user,
@@ -72,13 +68,8 @@ export function CompactTopHeader({
   actions,
   className = "",
 }: CompactTopHeaderProps): ReactElement {
-  const [now, setNow] = useState<Date>(() => new Date());
+  const [now] = useState<Date>(() => new Date());
   const [query, setQuery] = useState("");
-
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(new Date()), 30_000);
-    return () => window.clearInterval(id);
-  }, []);
 
   const hebrewDate = formatHebrewDate(now);
   const initial = user.name.trim().charAt(0) || "?";
@@ -96,6 +87,19 @@ export function CompactTopHeader({
       </div>
 
       <div className="os-header__actions">
+        {/* Explicit mobile search control. The full-width inline search below is
+            hidden at ≤640px (it cannot shrink under its own min-content); this
+            button opens the SAME global search overlay, keyboard-accessible. */}
+        <button
+          type="button"
+          className="os-header__iconbtn os-header__search-btn"
+          onClick={onSearchOpen}
+          disabled={!onSearchOpen}
+          aria-label="חיפוש גלובלי"
+          title="חיפוש גלובלי"
+        >
+          <OsIcon name="search" size={15} />
+        </button>
         <button
           type="button"
           className="os-header__iconbtn"
@@ -121,19 +125,22 @@ export function CompactTopHeader({
             <span className="os-header__count">{notificationsCount}</span>
           )}
         </button>
-        <button
-          type="button"
-          className="os-header__iconbtn"
-          onClick={onMail}
-          disabled={!onMail}
-          aria-label={typeof mailCount === "number" ? `הודעות (${mailCount})` : "הודעות"}
-          title={onMail ? "הודעות" : "הודעות — יחובר בהמשך"}
-        >
-          <OsIcon name="mail" size={15} />
-          {typeof mailCount === "number" && mailCount > 0 && (
-            <span className="os-header__count">{mailCount}</span>
-          )}
-        </button>
+        {/* Mail is shown ONLY when actually wired — a perpetually-disabled control is
+            clutter and notifications already covers inbound messages (S11.2-B). */}
+        {onMail && (
+          <button
+            type="button"
+            className="os-header__iconbtn"
+            onClick={onMail}
+            aria-label={typeof mailCount === "number" ? `הודעות (${mailCount})` : "הודעות"}
+            title="הודעות"
+          >
+            <OsIcon name="mail" size={15} />
+            {typeof mailCount === "number" && mailCount > 0 && (
+              <span className="os-header__count">{mailCount}</span>
+            )}
+          </button>
+        )}
         {actions}
       </div>
 
@@ -156,8 +163,6 @@ export function CompactTopHeader({
           </>
         )}
         <span className="os-num">{formatGregorian(now)}</span>
-        <span className="os-header__sep" aria-hidden="true" />
-        <span className="os-header__clock">{formatClock(now)}</span>
       </div>
     </header>
   );

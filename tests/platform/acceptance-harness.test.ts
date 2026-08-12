@@ -42,27 +42,34 @@ describe("acceptance env guard — never a silent skip", () => {
   });
 });
 
-describe("acceptance spec encodes the required failure guards", () => {
+describe("live acceptance spec (S7.3B-PREP) encodes the required guards", () => {
   const src = readFileSync(resolve(process.cwd(), "e2e/acceptance/staging-acceptance.accept.ts"), "utf8");
 
-  it("fails when no tests execute (executed-count guard)", () => {
-    expect(src).toMatch(/executed === 0/);
-    expect(src).toMatch(/no tests executed/i);
+  it("encodes the executed-count guard (never a silent no-op)", () => {
+    expect(src).toMatch(/at least one acceptance test must execute/);
+    expect(src).toContain("executed++");
   });
 
-  it("fails on a silent IndexedDB fallback + wrong Supabase project", () => {
-    expect(src).toContain("assertConnectedToSupabase");
-    expect(src).toMatch(/no silent IndexedDB fallback/i);
-    expect(src).toMatch(/every Supabase request must target the intended staging project/i);
+  it("detects IndexedDB in the Supabase composition + wrong Supabase project", () => {
+    expect(src).toContain("indexedDbInSupabaseComposition");
+    expect(src).toContain("wrongSupabaseHosts");
   });
 
-  it("fails when the deployed commit != intended commit", () => {
-    expect(src).toMatch(/deployed build must expose the intended commit/i);
+  it("verifies the intended commit + provider provenance before login", () => {
     expect(src).toContain("ENV.intendedCommit");
+    expect(src).toContain("observedCommit");
+    expect(src).toMatch(/provider.*SUPABASE|SUPABASE.*provider/);
   });
 
-  it("guards prototype flags OFF and CSP present", () => {
-    expect(src).toMatch(/Business Graph prototype must be OFF/);
-    expect(src).toMatch(/content-security-policy/i);
+  it("guards prototype flags OFF and scans for Google Fonts + privileged material", () => {
+    expect(src).toContain("graphFacadeEnabled");
+    expect(src).toContain("graphOperatorAuthEnabled");
+    expect(src).toContain("googleFontRequests");
+    expect(src).toContain("scanBundleForSecrets");
+  });
+
+  it("records missing UI capabilities honestly (never fabricates a domain PASS)", () => {
+    expect(src).toContain("uiCapabilityMissing");
+    expect(src).toMatch(/UI_CAPABILITY_MISSING|capability/i);
   });
 });

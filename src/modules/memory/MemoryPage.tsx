@@ -48,6 +48,9 @@ import { ExportPanel } from "@/memory/export/ui/ExportPanel";
 import { obsidianStatus } from "@/memory/export/status";
 import { recomputeBacklinks } from "@/memory/markdown/wikilinks";
 import { LinkGraphView } from "./components/LinkGraph";
+import { MemoryEntriesWorkspace } from "./MemoryEntriesWorkspace";
+import { ObsidianVaultPanel } from "./obsidian/ObsidianVaultPanel";
+import { KnowledgeGraphPanel } from "./obsidian/KnowledgeGraphPanel";
 import { NoteView } from "./components/NoteView";
 import { ProposalQueue, type ProposalControls } from "./components/ProposalQueue";
 
@@ -396,11 +399,29 @@ export default function MemoryPage(): ReactElement {
       </PageRail>
 
       <div>
-        <h1 style={{ margin: 0, fontSize: "var(--os-text-xl, 20px)" }}>זיכרון ארגוני</h1>
-        <div style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-sm, 13px)" }}>
-          ארבע שכבות זיכרון · הצעות באישור אנושי · גרסאות בלתי-ניתנות-לשינוי · מצב הדגמה מקומי
+        <h1 style={{ margin: 0, fontSize: "var(--os-text-xl, 20px)" }}>זיכרון מקומי</h1>
+        <div style={{ color: "var(--os-text-2)", fontSize: "var(--os-text-sm, 13px)", marginTop: "0.25rem" }}>
+          נשמר מקומית במכשיר זה (IndexedDB) — אינו מחובר לכספת Obsidian או לשירות ענן.
         </div>
       </div>
+
+      {/* S14.2 (Phase 1) — compact READ-ONLY connection to a local Obsidian Vault
+          (distinct from IndexedDB memory; no auto-import). */}
+      <ObsidianVaultPanel />
+
+      {/* Live Obsidian knowledge graph (read-only note/link metadata; not sync). */}
+      <KnowledgeGraphPanel />
+
+      {/* S13.4 (PR D) — the real, durable local-memory CRUD is the primary surface. */}
+      <MemoryEntriesWorkspace />
+
+      {/* The existing governed proposal/approval/version system remains available as
+          an advanced surface below (its records live in a separate collection). */}
+      <SectionTitle
+        icon="shield"
+        title="זיכרון ממשל וקבלה (מתקדם)"
+        subtitle="ארבע שכבות · הצעות באישור אנושי · גרסאות בלתי-ניתנות-לשינוי · ייבוא/ייצוא"
+      />
 
       {/* VC-E: four primary KPIs only — each drives the human-approval workflow
           (governance state). Zero stays neutral (0 is not success and not
