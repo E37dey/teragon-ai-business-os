@@ -1,8 +1,11 @@
 # PR D — Real Local Memory (S13.4)
 
 Turns `/memory` into a genuinely persistent, searchable, editable, **org-scoped** local-memory
-capability, reusing the existing IndexedDB repository infrastructure. **Obsidian is not connected** — the
-honest label "זיכרון מקומי" is kept and the page states plainly that data is local-only.
+capability, reusing the existing IndexedDB repository infrastructure. **The `memoryEntries` CRUD store added
+by this PR has no Obsidian bridge — it is IndexedDB-only.** (Note: the *separate* governed memory system,
+`memoryRecords`, does have a functional manual Obsidian-compatible import/export bridge — see
+OBSIDIAN_MEMORY_REALITY.md, verdict corrected S13.7. This PR does not add or change that bridge.) The honest
+label "זיכרון מקומי" is kept and the page states plainly that this store's data is local-only.
 
 **Scope honesty:** no remote LLM, no MCP, no vector DB, no Obsidian API, no Supabase migration, no external
 storage, no autonomous agent memory writes. `AI_REMOTE_ENABLED` unchanged. No Customers/Contacts
@@ -119,10 +122,12 @@ additive (`if (!contains) createObjectStore`), so existing users upgrade non-des
   fully relocating it behind a tab is deferred (needs its e2e updated).
 - Agent-engine memory retrieval + agent save-proposal path are deferred (see AI read integration).
 
-## Explicit statement
+## Explicit statement (corrected S13.7)
 
-**Obsidian is not connected.** This is local IndexedDB memory on one device — no Obsidian vault, no cloud,
-no remote model.
+**This PR's `memoryEntries` store is IndexedDB-only on one device — no Obsidian bridge, no cloud, no remote
+model.** Separately, the governed memory (`memoryRecords`) **does** have a functional **manual** Obsidian-
+compatible import/export bridge (not a live vault sync, no direct local-folder access). The earlier blanket
+phrasing "Obsidian is not connected" was imprecise and is corrected here and in OBSIDIAN_MEMORY_REALITY.md.
 
 ## Source files
 

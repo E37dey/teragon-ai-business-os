@@ -46,6 +46,13 @@ read-only local-memory adapter for agents.
 **Data taxonomy (distinct categories — not conflated):**
 - **LIVE_VALIDATED** = actual Supabase-backed, RLS-validated domains: Customers / Contacts / Customer-Detail.
 - **Local persistent** = IndexedDB (`memoryEntries` v7 real local-memory CRUD; governed `memoryRecords`).
+- **Obsidian bridge (manual, functional)** = the governed memory has a wired **Obsidian-compatible
+  import/export** (`src/memory/import|export/*`): manual file-picker import of `.md`/`.markdown`/`.zip`
+  (frontmatter + wikilinks) → governed pipeline → **proposals only** (human-approved writes); audited +
+  checksummed export **download**. It is **user-triggered and functional**, but **not** a live two-way vault
+  sync and has **no direct local-folder access** (`status.ts`: "ייבוא וייצוא Obsidian פעיל" + "גישה מקומית
+  ישירה אינה פעילה"). Obsidian is the file-format transport; IndexedDB is the storage — architecturally
+  distinct. The `memoryEntries` CRUD has **no** Obsidian bridge.
 - **Deterministic demo** = local synthetic agent/action behaviour (the 14 actions run on frozen demo data).
 - **Supporting / UI surfaces** = presentation/reference screens; **not** represented as backend-connected.
 

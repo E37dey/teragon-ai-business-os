@@ -69,7 +69,7 @@ Removed the decorative live clock and its 30s timer; kept a single Hebrew + Greg
 
 ## 5. Honest memory label — before → after
 
-S13.0 proved **OBSIDIAN MEMORY NOT CONNECTED** (LOCAL_ONLY / IndexedDB). Renamed the user-facing surface:
+S13.0 classified the memory as LOCAL_ONLY / IndexedDB *(corrected S13.7: a manual Obsidian import/export bridge is in fact connected; only a live vault sync is absent)*. Renamed the user-facing surface:
 
 | | Before | After |
 |---|---|---|

@@ -73,7 +73,7 @@ COMPLETED/FAILED); always-on record-derived activity feed; on-demand evidence/to
 
 ## Verdicts
 
-- **Obsidian:** `NOT CONNECTED` (LOCAL_ONLY / IndexedDB). Rename now; real adapter later (PR D).
+- **Obsidian:** *(corrected S13.7)* a **manual, functional import/export bridge is connected** (Obsidian-compatible Markdown/ZIP, governed); **no live vault sync**. Storage is IndexedDB.
 - **Prime Agent:** feasibility **~4.5/10 for this academic project** — MIT, powerful, but **no native
   Windows** (needs WSL2/Docker), **requires a paid provider**, and is **explicitly not a sandbox**. POC-only,
   deferred to **PR F**, gated on the security boundary. High *product* potential (8/10) later.
