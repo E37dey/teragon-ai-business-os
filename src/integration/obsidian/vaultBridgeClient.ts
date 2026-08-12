@@ -12,7 +12,7 @@
 //
 // Origin enforcement stays PLUGIN-SIDE (the bridge rejects unexpected Origins).
 
-import { expireObsidianAuth } from "./obsidianCredential";
+import { expireObsidianAuth, runTrustedReauth } from "./obsidianCredential";
 
 export const OBSIDIAN_BRIDGE_URL = "http://127.0.0.1:5200";
 const REQUEST_TIMEOUT_MS = 4000;
@@ -124,7 +124,7 @@ function mapStatus(status: number): BridgeErrorCode {
  * Single bounded GET. Never throws — always resolves to a typed, sanitized
  * result. A down/blocked bridge is a clean fail-closed result, not an exception.
  */
-async function bridgeGet<T>(path: string, token: string | null, baseUrl: string): Promise<BridgeResult<T>> {
+async function rawGet<T>(path: string, token: string | null, baseUrl: string): Promise<BridgeResult<T>> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
@@ -142,11 +142,6 @@ async function bridgeGet<T>(path: string, token: string | null, baseUrl: string)
         return { ok: false, code: "ERROR", status: 200 };
       }
     }
-    // Central auth-expiry chokepoint: a 401 on a request that DID carry a token
-    // means the paired token rotated (Obsidian/plugin restart) and is now stale.
-    // Clear it + notify every surface exactly once. A tokenless probe (e.g.
-    // /health) can never be an expiry, so it never fires here.
-    if (token && res.status === 401) expireObsidianAuth();
     return { ok: false, code: mapStatus(res.status), status: res.status };
   } catch (err) {
     const name = (err as { name?: string } | null)?.name;
@@ -154,6 +149,21 @@ async function bridgeGet<T>(path: string, token: string | null, baseUrl: string)
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function bridgeGet<T>(path: string, token: string | null, baseUrl: string): Promise<BridgeResult<T>> {
+  let r = await rawGet<T>(path, token, baseUrl);
+  // Central 401 recovery chokepoint. A credentialed 401 means the bridge session is
+  // stale (plugin restart / expiry). Attempt trusted-device re-auth ONCE (single-flight,
+  // shared across concurrent 401s), then retry the request ONCE with the fresh session.
+  // Only if re-auth cannot recover do we expire → the manual reconnect fallback. A
+  // tokenless probe (/health) can never be an expiry, so it never enters here.
+  if (token && r.status === 401) {
+    const fresh = await runTrustedReauth();
+    if (fresh && fresh !== token) r = await rawGet<T>(path, fresh, baseUrl);
+    if (r.status === 401) expireObsidianAuth();
+  }
+  return r;
 }
 
 /** GET /health — unauthenticated reachability probe (no vault content). */
@@ -252,7 +262,7 @@ function map403(error: string | undefined): BridgeErrorCode {
   return "ORIGIN_REJECTED";
 }
 
-async function bridgePost<T>(path: string, token: string, body: unknown, baseUrl: string, timeoutMs: number = REQUEST_TIMEOUT_MS): Promise<BridgeResult<T>> {
+async function rawPost<T>(path: string, token: string, body: unknown, baseUrl: string, timeoutMs: number): Promise<BridgeResult<T>> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -270,8 +280,6 @@ async function bridgePost<T>(path: string, token: string, body: unknown, baseUrl
       data = undefined;
     }
     if (res.status === 200) return { ok: true, code: "OK", status: 200, data: data as T };
-    // A write is always credentialed; a 401 here is the same stale-token expiry.
-    if (res.status === 401) expireObsidianAuth();
     let code: BridgeErrorCode;
     if (res.status === 409) code = (data as { error?: string } | undefined)?.error === "already_exists" ? "EXISTS" : "CONFLICT";
     else if (res.status === 413) code = "TOO_LARGE";
@@ -284,6 +292,20 @@ async function bridgePost<T>(path: string, token: string, body: unknown, baseUrl
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function bridgePost<T>(path: string, token: string, body: unknown, baseUrl: string, timeoutMs: number = REQUEST_TIMEOUT_MS): Promise<BridgeResult<T>> {
+  let r = await rawPost<T>(path, token, body, baseUrl, timeoutMs);
+  // Same central 401 recovery as reads: try trusted-device re-auth once, retry once with
+  // the fresh session, else expire. Re-authentication only re-establishes the bridge
+  // SESSION — the write still requires the SEPARATE writeKey/HMAC capability + the native
+  // Obsidian confirmation, so this never grants write authority.
+  if (r.status === 401) {
+    const fresh = await runTrustedReauth();
+    if (fresh && fresh !== token) r = await rawPost<T>(path, fresh, body, baseUrl, timeoutMs);
+    if (r.status === 401) expireObsidianAuth();
+  }
+  return r;
 }
 
 // Each write requires BOTH the pairing token (connection) AND a write capability minted

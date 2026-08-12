@@ -154,6 +154,11 @@ export function createBridge(opts) {
   const trust = opts.trustStore ?? null;
   const sessions = new Map(); // sessionBearer -> { deviceId, exp }  (short-lived, in-memory)
   const challenges = new Map(); // challengeId -> { deviceId, nonce, exp, origin }  (one-time)
+  // The pairing token bootstraps trust ONCE per plugin load: after the first NEW device
+  // registers, the token can no longer enrol a DIFFERENT device (re-pairing the same
+  // device stays idempotent). Enrolling another device requires a fresh pairing token
+  // (a plugin reload rotates it).
+  let registrationOpen = true;
 
   function pruneSessions(now) {
     for (const [k, v] of sessions) if (v.exp <= now) sessions.delete(k);
@@ -289,6 +294,8 @@ export function createBridge(opts) {
         return send(res, 400, { error: "bad_request", cid }, cors);
       }
       const existing = trust.get(deviceId);
+      // A used pairing code cannot enrol a NEW (different) device this plugin load.
+      if (!existing && !registrationOpen) return send(res, 403, { error: "pairing_consumed", cid }, cors);
       if (!existing && trust.list().filter((d) => !d.revoked).length >= MAX_TRUSTED_DEVICES) {
         return send(res, 403, { error: "too_many_devices", cid }, cors);
       }
@@ -304,6 +311,7 @@ export function createBridge(opts) {
         revoked: false,
       };
       trust.put(record);
+      if (!existing) registrationOpen = false; // pairing token consumed for new-device enrolment
       const { sessionToken, expiresAt } = issueSession(deviceId, now);
       return send(res, 200, { ok: true, deviceId, fingerprint, sessionToken, expiresAt, bridgeInstanceId, cid }, cors);
     }

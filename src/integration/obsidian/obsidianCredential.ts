@@ -148,3 +148,24 @@ export function expireObsidianAuth(): void {
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Trusted-device re-auth handler registry.
+//
+// The bridge client's 401 chokepoint asks this registry to recover the session
+// via trusted-device challenge-response BEFORE falling back to the manual
+// reconnect UI. trustedAuth.ts registers its (single-flight) handler on import;
+// when unregistered (e.g. bridge-only tests) recovery is a no-op and behavior
+// falls back to expiry exactly as before.
+type ReauthHandler = () => Promise<string | null>;
+let reauthHandler: ReauthHandler | null = null;
+
+/** Register (or clear with null) the trusted-device re-auth handler. */
+export function setTrustedReauthHandler(handler: ReauthHandler | null): void {
+  reauthHandler = handler;
+}
+
+/** Run trusted re-auth if a handler is registered; resolves to a fresh bearer or null. */
+export function runTrustedReauth(): Promise<string | null> {
+  return reauthHandler ? reauthHandler() : Promise.resolve(null);
+}

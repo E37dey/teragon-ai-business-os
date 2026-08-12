@@ -182,6 +182,19 @@ describe("Trusted Device Pairing — bridge protocol", () => {
     expect((await post(base, "/auth/challenge", { deviceId: dev.deviceId }, {}, OTHER_ORIGIN)).status).toBe(403);
   });
 
+  it("the pairing token is one-time: a used code cannot enrol a SECOND device (re-pair of the same device is idempotent)", async () => {
+    const ts = makeTrustStore();
+    const { base } = await bridgeWith(ts);
+    const a = await makeDevice();
+    const b = await makeDevice();
+    expect((await post(base, "/auth/register", { deviceId: a.deviceId, publicKey: a.publicKey }, { Authorization: `Bearer ${BOOTSTRAP}` })).status).toBe(200);
+    // same code, DIFFERENT device → rejected
+    expect((await post(base, "/auth/register", { deviceId: b.deviceId, publicKey: b.publicKey }, { Authorization: `Bearer ${BOOTSTRAP}` })).status).toBe(403);
+    // same device re-pairs (idempotent) → still allowed
+    expect((await post(base, "/auth/register", { deviceId: a.deviceId, publicKey: a.publicKey }, { Authorization: `Bearer ${BOOTSTRAP}` })).status).toBe(200);
+    expect(ts.list().length).toBe(1);
+  });
+
   it("backward compatible: without a trustStore the auth endpoints are inert and the fixed token still works", async () => {
     const { base } = await bridgeWith(null);
     expect((await post(base, "/auth/challenge", { deviceId: "x" })).status).toBe(404);

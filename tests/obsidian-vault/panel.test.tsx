@@ -19,9 +19,27 @@ vi.mock("@/integration/obsidian/vaultBridgeClient", async (importOriginal) => {
     openInObsidian: vi.fn(),
   };
 });
+// Trusted-device layers are exercised by their own suites; here we isolate the panel UX.
+// First-pair registers the device and stores a short-lived SESSION bearer (not the code).
+vi.mock("@/integration/obsidian/deviceIdentity", () => ({
+  hasDeviceIdentity: vi.fn(async () => false),
+  forgetDevice: vi.fn(async () => {}),
+  ensureDeviceIdentity: vi.fn(async () => ({ deviceId: "dev-test", publicKeyJwk: {} })),
+  getDeviceIdentity: vi.fn(async () => null),
+  signChallenge: vi.fn(async () => null),
+}));
+vi.mock("@/integration/obsidian/trustedAuth", () => ({
+  registerDevice: vi.fn(async () => {
+    sessionStorage.setItem("teragon.obsidian.pairingToken", "session-token");
+    return { ok: true, code: "ok" };
+  }),
+  reauthenticate: vi.fn(async () => null),
+  hasSession: vi.fn(() => false),
+}));
 
 import { getConnectionInfo, probeHealth } from "@/integration/obsidian/vaultBridgeClient";
 import { getObsidianToken } from "@/integration/obsidian/obsidianCredential";
+import { registerDevice } from "@/integration/obsidian/trustedAuth";
 import { ObsidianVaultPanel } from "@/modules/memory/obsidian/ObsidianVaultPanel";
 
 const mockedConn = vi.mocked(getConnectionInfo);
@@ -55,7 +73,7 @@ async function connect(): Promise<void> {
   mockedConn.mockResolvedValue(CONNECTED);
   fireEvent.click(screen.getByTestId("obsidian-connect-btn"));
   fireEvent.change(screen.getByTestId("obsidian-token-input"), { target: { value: "paste-token" } });
-  fireEvent.click(screen.getByText("התחבר"));
+  fireEvent.click(screen.getByTestId("obsidian-pairing-submit"));
   await waitFor(() => expect(screen.getByTestId("obsidian-connected")).toBeTruthy());
 }
 
@@ -75,7 +93,8 @@ describe("ObsidianVaultPanel", () => {
     expect(screen.getByTestId("obsidian-vault-name").textContent).toBe("TERAGON OS");
     // read-only connection (no writeEnabled) → write shown as disabled
     expect(screen.getByTestId("obsidian-readonly").textContent).toContain("קריאה בלבד");
-    expect(getObsidianToken()).toBe("paste-token");
+    // the stored bearer is the issued SESSION token, not the one-time pairing code
+    expect(getObsidianToken()).toBe("session-token");
   });
 
   it("disconnect CLEARS the credential and returns to disconnected", async () => {
@@ -86,12 +105,12 @@ describe("ObsidianVaultPanel", () => {
     expect(getObsidianToken()).toBeNull();
   });
 
-  it("invalid credential fails closed (error state, no connection, nothing stored)", async () => {
+  it("invalid pairing code fails closed (registration denied, no connection, nothing stored)", async () => {
+    vi.mocked(registerDevice).mockResolvedValueOnce({ ok: false, code: "denied" });
     renderPanel();
-    mockedConn.mockResolvedValue({ ok: false, code: "UNAUTHORIZED", status: 401 });
     fireEvent.click(screen.getByTestId("obsidian-connect-btn"));
     fireEvent.change(screen.getByTestId("obsidian-token-input"), { target: { value: "bad" } });
-    fireEvent.click(screen.getByText("התחבר"));
+    fireEvent.click(screen.getByTestId("obsidian-pairing-submit"));
     await waitFor(() => expect(screen.getByTestId("obsidian-error")).toBeTruthy());
     expect(screen.queryByTestId("obsidian-connected")).toBeNull();
     expect(getObsidianToken()).toBeNull();
