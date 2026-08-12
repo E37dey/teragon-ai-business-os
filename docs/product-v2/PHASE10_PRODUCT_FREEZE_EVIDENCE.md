@@ -1,0 +1,101 @@
+# Phase 10 — Product Freeze / Release Candidate — evidence
+
+The current TERAGON is one coherent, demo-ready, security-truthful product. **No new capabilities
+added** (no Agent #8, no action #15, no pack #3, no new CRM mutation, no migration). This turn is
+audit + validation + documentation + a Draft PR — `origin/main` untouched.
+
+- **Base SHA:** `cc5811355b1d57f09f7960eadacebb298635bb44`
+- **Final Phase-10 source SHA:** see the branch head (`feature/teragon-phase10-product-freeze`).
+- Companion docs: `TERAGON_FINAL_DEMO_SCRIPT.md`, `TERAGON_RELEASE_READINESS_CHECKLIST.md`,
+  `PHASE10_KNOWN_LIMITATIONS.md`; prior audit/evidence for Phases 3–9 + Trusted Device retained.
+
+## Route inventory (33)
+Index `/` (מרכז הפיקוד / CommandCenterPage) · `/crm` · `/customers` · `/customers/:id` (detail) ·
+`/contacts` · `/sales` · `/courses` · `/service` · `/printers` · `/organizations` · `/tasks` ·
+`/documents` · `/automations` · `/ai-workspace` · `/agents` · `/agents/collaboration` · `/memory` ·
+`/knowledge` · `/learning` · `/analytics` · `/governance` · `/implementation` · `/personas` ·
+`/stage-gates` · `/training-materials` · `/quick-start` · `/faq` · `/support` · `/administration` ·
+`/system-health` · `/settings` · `/submission` · `/submission/presentation`. Public `/login`; dev
+`/design`; `*` → NotFound. Query params live and resolving: `?run=`, `?pack=`, `?view=`, `?record=`.
+
+## Invariants (source-verified + test-asserted)
+- **7 agents**: ag-orchestrator, ag-hunter, ag-fixer, ag-mentor, ag-nexa, ag-wiki, ag-flow.
+- **14 actions** (2/agent), incl. two `LOCAL_DEMO_MUTATION_WITH_APPROVAL` demo actions.
+- **2 packs**: governed-knowledge-capture (governedActionSupported), operational-recovery.
+- **12 approval actions** (frozen); **6 BusinessSignal types**; **3 ExecutionPayload kinds**.
+- `AI_REMOTE_ENABLED=false`; migrations 001–014 (**no 015**).
+
+## Governed mutation capabilities (exactly two)
+1. **Obsidian governed write** (create/update/append) — proposal → approve → separate writeKey/HMAC
+   → native Obsidian confirmation → read-back. No delete/rename/move; no autonomous/background write.
+2. **Phase-9 Governed Follow-up Task** (create) — `workflow_failed` → recommendation → explicit
+   proposal → ApprovalEngine → human approve/reject → CREATE ONE TASK → read-back verified.
+No other governed CRM mutation is wired to product. Lead/Quote/Ticket/Task-update/Customer remain
+out of scope.
+
+## Approval semantic truth
+Every approval shows the real mutation: task creation → **"יצירת משימה"** (never "אוטומציה חיצונית");
+the `external-automation` enum is an internal authorization bucket only (test-asserted). recommendation
+≠ proposal ≠ approval ≠ native Obsidian confirmation; no auto-approval.
+
+## Command Center semantics
+Actionable / pending / verified / failed separated truthfully; verified follow-up Task surfaces once
+in Recent Activity (info); the original `workflow_failed` stays actionable (a follow-up Task ≠ a
+repaired workflow); counts derive from the same records shown; no duplicate urgency / count drift.
+
+## Trusted Device (unchanged, prior live-validated)
+Pair once → restart Obsidian/plugin → automatic ECDSA P-256 challenge-response → new short-lived
+session, **no new pairing code**. Non-exportable browser key; public-only plugin registry; Origin +
+Vault binding; one-time challenge + TTL; replay/revoke/forget/single-flight-401 all fail-closed.
+Trusted-device auth does not grant write authority; Phase-3 write boundary intact.
+
+## Persistence truth map
+| Class | Artifacts |
+|---|---|
+| PERSISTENT LOCAL (IndexedDB) | Tasks, Customers, Contacts, approvals, auditEvents, agentEvents, memoryRecords/entries, and all domain collections |
+| PERSISTENT LOCAL (separate IndexedDB) | Trusted-device asymmetric identity (non-exportable private key + public JWK + deviceId) |
+| RUNTIME-ONLY (in-memory, bounded) | Workflow event log + derived BusinessSignals (wiped on reload) |
+| SESSION-ONLY (sessionStorage) | Obsidian bridge session bearer + writeKey |
+| PLUGIN-PERSISTED (Obsidian data.json) | Trusted-device **public** registry (outside this repo) |
+| REMOTE SUPABASE | Not used by the demo pilot (no server durability claimed) |
+
+## Live validation this turn
+- **Responsive (live, in-app):** `/`, `/ai-workspace`, `/tasks`, `/customers`, `/contacts`, `/memory`
+  (+ `/customers/:id`) at **375 / 768 / 1440** → **0 horizontal overflow** everywhere. Phase-9 modal
+  at **375 / 390** → 0 overflow (prior turn).
+- **Axe (live, in-app, wcag2a/2aa):** Command Center, Tasks, AI Workspace → **0 critical / 0 serious**.
+  Phase-9 proposal-preview / verified / rejected → 0/0 (prior turn). CI Accessibility gate covers the
+  pilot pages at 1440/390.
+- **Governed Follow-up Task (prior turn, real app + real ApprovalEngine + real IndexedDB):** reject
+  (delta 0), approve (one verified task, trusted owner, allowlisted), idempotency (same intent no dup /
+  new intent new task), injection (authority unaffected, no auto-approve), verified→Recent Activity.
+- **Trusted Device restart (prior turn, real Obsidian Desktop):** pair once → restart → no new code →
+  Customer Success.md reads.
+
+## Security review
+`scan:secrets` CLEAN; no secret in logs/URLs/fixtures/screenshots/evidence. Origin allowlist (no `*`),
+loopback-only bridge. No `dangerouslySetInnerHTML`; 0 dead CTAs; single non-UI `console.log`
+(`server/redact.ts`). No auth/approval bypass; Agent flows never mutate repositories directly.
+`AI_REMOTE_ENABLED=false`. Demo Mode fail-closed ON (synthetic data; outbound side effects blocked).
+
+## Migration / database freeze
+No Phase-10 migration; no `015`; no Supabase schema change; production untouched.
+
+## Tests / build / CI
+typecheck ✅ · typecheck:tests ✅ · oxlint (4 pre-existing) ✅ · `scan:secrets` CLEAN · production
+build ✅ (296 KB / gzip 92 KB). Freeze-critical suites (phase5–9, obsidian, agents, command-center)
+**218/218 in isolation**. Full local vitest shows timing flakes on this heavily-loaded machine (24
+lingering node processes) + the pre-existing `tests/platform/*` shebang transform errors — **GitHub
+Static CI (clean runner) is authoritative and green**; this branch is byte-identical code to the
+CI-green base plus docs only.
+
+## Known limitations
+See `PHASE10_KNOWN_LIMITATIONS.md` — incl. `AI_REMOTE_ENABLED=false`, `HTTPS_TO_LOOPBACK=UNVALIDATED`,
+XSS-can-invoke-signing, trusted-device ≠ write authority, single-tenant pilot / no Task
+`organizationId` / no multi-org claim, runtime-only signals, no auto-sync, production untouched.
+
+## Cleanup
+No dev bypass, no temp token/bearer/relay, no console-only production dependency, no committed
+secrets. Synthetic demo tasks/signals from validation live only in the ephemeral in-app preview
+browser's IndexedDB — not user production data. Legitimate Trusted Device state in the real vault is
+preserved. Working tree contains only the intended Phase-10 docs.
