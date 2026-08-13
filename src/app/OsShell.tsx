@@ -58,6 +58,10 @@ const RAIL_ALLOWLIST: ReadonlySet<string> = new Set([
   // path (not "/agents"), so without this entry the shell silently dropped that rail
   // and a visible conflict could not be resolved or approved from the UI.
   "/agents/collaboration",
+  // /learning publishes ProposalReviewPanel — the ONLY approve / reject / rollback
+  // controls for a learning rule (named-reviewer governed). Without this entry a
+  // proposal could be seen but never approved or rolled back.
+  "/learning",
 ]);
 
 export default function OsShell(): ReactElement {
