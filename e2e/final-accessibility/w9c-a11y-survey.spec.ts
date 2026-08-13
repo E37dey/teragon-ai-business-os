@@ -49,11 +49,11 @@ test("a11y: heading hierarchy — no route declares multiple h1 (missing-h1 repo
 test("a11y: keyboard arrows move focus through the grouped nav", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("nav.os-nav").first()).toBeVisible({ timeout: 30_000 });
-  await page.getByRole("button", { name: "ניהול העסק" }).focus();
+  await page.getByRole("button", { name: "מרכז השליטה" }).focus();
   await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("link", { name: /מרכז השליטה/ })).toBeFocused();
   await page.keyboard.press("ArrowUp");
-  await expect(page.getByRole("button", { name: "ניהול העסק" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "מרכז השליטה" })).toBeFocused();
 });
 
 // ---- visible focus indicator: a focused nav link has a non-zero outline/ring ----

@@ -18,12 +18,12 @@ import { collectConsoleErrors, nonNetworkErrors } from "../analytics/w8f-helpers
  * unchanged across two samples ~1s apart).
  */
 async function settledBlockers(page: Page): Promise<number> {
+  // S13.1 "Product V2 context-rail reduction" removed the submission auditor rail from
+  // /submission, so the page's own "חוסמים פתוחים:" summary is the single source. Settling
+  // is still proven by reading the SAME value twice a second apart (below).
   const read = async (): Promise<number> => {
     const summary = (await page.getByText(/חוסמים פתוחים:/).textContent()) ?? "";
-    const rail = (await page.getByText(/חוסמים ·/).first().textContent()) ?? "";
-    const s = Number(/חוסמים פתוחים:\s*(\d+)/.exec(summary)?.[1] ?? "-1");
-    const r = Number(/(\d+)\s*חוסמים/.exec(rail)?.[1] ?? "-2");
-    return s === r ? s : -1;
+    return Number(/חוסמים פתוחים:\s*(\d+)/.exec(summary)?.[1] ?? "-1");
   };
   let stable = -1;
   await expect(async () => {

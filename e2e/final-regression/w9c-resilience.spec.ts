@@ -115,7 +115,7 @@ test("resilience: migration runs once — schemaVersion stable across reloads", 
 // canonical NAV_GROUPS labels (src/app/nav/navGroups.ts).
 const WARM_LINKS = [
   { label: "לקוחות ולידים", url: /\/crm$/ }, // /crm
-  { label: "מכירות והתאמת מדפסות", url: /\/sales$/ }, // /sales
+  { label: "מכירות והצעות מחיר", url: /\/sales$/ }, // /sales
   { label: "דוחות וניתוחים", url: /\/analytics$/ }, // /analytics
 ];
 
