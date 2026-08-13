@@ -8,6 +8,7 @@ import {
   gotoGovernance,
   gotoSettings,
   gotoSystemHealth,
+  openGovernanceIncidents,
 } from "./w8f-helpers";
 
 const OUT = "docs/screenshots/wave8";
@@ -98,6 +99,7 @@ const SURFACES: { slug: string; prepare: Prepare }[] = [
     slug: "10-governance-incident-drawer",
     prepare: async (page) => {
       await gotoGovernance(page);
+      await openGovernanceIncidents(page);
       const zone = page.getByTestId("zone-incidents");
       await zone.scrollIntoViewIfNeeded();
       await page.getByTestId("incident-title").fill("W8F — תקרית ויזואלית");
