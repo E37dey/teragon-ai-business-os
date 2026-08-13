@@ -25,7 +25,10 @@ test("7 objections render; selecting one opens the full LACE detail — zero con
   expect(errors).toEqual([]);
 });
 
-test("simulator: DISMISSIVE input triggers phrasing warnings (deterministic rules)", async ({
+// S13.1 "Product V2 context-rail reduction": the deterministic conversation simulator is a
+// rail-ONLY surface and the permanent rail is no longer rendered on /faq (limited to
+// /memory, /agents and the Coordination Room). Kept so they run unchanged if restored.
+test.skip("simulator: DISMISSIVE input triggers phrasing warnings (deterministic rules)", async ({
   page,
 }) => {
   const errors = collectConsoleErrors(page);
@@ -40,7 +43,7 @@ test("simulator: DISMISSIVE input triggers phrasing warnings (deterministic rule
   expect(errors).toEqual([]);
 });
 
-test("simulator: GOOD input gets constructive feedback and NO numeric score", async ({ page }) => {
+test.skip("simulator: GOOD input gets constructive feedback and NO numeric score", async ({ page }) => {
   const errors = collectConsoleErrors(page);
   await gotoFaq(page);
 

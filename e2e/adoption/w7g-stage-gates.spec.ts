@@ -62,10 +62,10 @@ test("the six canonical gates render with KPI row and readiness rail — zero co
     await expect(page.getByRole("button", { name: `שער ${key} — ${name}` })).toBeVisible();
   }
   await expect(page.getByText("שערי Go")).toBeVisible();
-  await expect(page.getByText("מבקר המוכנות")).toBeVisible();
-  await expect(
-    page.getByText("כל המספרים נגזרים מהמאמת הדטרמיניסטי — אין שער שעובר על סמך אחוז."),
-  ).toBeVisible();
+  // S13.1 "Product V2 context-rail reduction": "מבקר המוכנות" (and its no-percentage
+  // disclosure) is a rail-ONLY surface, and the permanent rail is no longer rendered on
+  // /stage-gates. The six gates + KPI row asserted above are the page's own content.
+  await expect(page.getByText("מבקר המוכנות")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

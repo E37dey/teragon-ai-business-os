@@ -21,9 +21,11 @@ test("roadmap: exactly 6 stage cards + programme health + rollout waves — zero
   for (let i = 1; i <= 5; i += 1) {
     await expect(page.getByTestId(`rollout-wave-${i}`)).toBeVisible();
   }
-  // the honesty rail derives from real records
-  await expect(page.getByTestId("rail-pilot-readiness")).toBeVisible();
-  await expect(page.getByTestId("rail-missing-evidence")).toBeVisible();
+  // S13.1 "Product V2 context-rail reduction": the advisory auditor rail
+  // ("מבקר ההטמעה") is no longer rendered as a permanent rail — only /memory,
+  // /agents and the Coordination Room publish one. The page still owns every
+  // substantive figure asserted above, all derived from real records.
+  await expect(page.getByTestId("rail-pilot-readiness")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
