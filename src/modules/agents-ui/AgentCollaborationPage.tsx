@@ -277,6 +277,19 @@ export default function AgentCollaborationPage(): ReactElement {
   }
 
   const selectedNode = layout?.nodes.find((n) => n.id === selectedNodeId) ?? null;
+  // Selected-path emphasis (presentation only): when a node is selected, the nodes it is
+  // directly connected to (plus itself) stay full-strength; everything else dims so the
+  // real relationship reads at a glance. Derived purely from the real layout edges — no
+  // topology, node or edge is invented.
+  const relatedNodeIds = ((): Set<string> | null => {
+    if (selectedNodeId === null || !layout) return null;
+    const s = new Set<string>([selectedNodeId]);
+    for (const e of layout.edges) {
+      if (e.from === selectedNodeId) s.add(e.to);
+      if (e.to === selectedNodeId) s.add(e.from);
+    }
+    return s;
+  })();
   const pendingApprovalOfRun = records?.approvals.find((a) => a.status === "ממתין") ?? null;
   const anyApprovalOfRun = records?.approvals[0] ?? null;
   const panelApproval = pendingApprovalOfRun ?? anyApprovalOfRun;
@@ -690,6 +703,11 @@ export default function AgentCollaborationPage(): ReactElement {
                         color: "var(--os-text)",
                         cursor: "pointer",
                         overflow: "hidden",
+                        // Selected-path emphasis (presentation only): while a node is selected,
+                        // nodes not directly related to it fade back so the real relationship
+                        // reads at a glance. relatedNodeIds is derived purely from layout.edges.
+                        opacity: relatedNodeIds && !relatedNodeIds.has(n.id) ? 0.35 : 1,
+                        transition: "opacity var(--os-motion-fast, 120ms) ease",
                       }}
                     >
                       <span

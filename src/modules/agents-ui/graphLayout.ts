@@ -6,9 +6,14 @@ import type { RunGraph, RunGraphEdge, RunGraphNode } from "@/agents";
 
 export const NODE_W = 168;
 export const NODE_H = 52;
-const COL_GAP = 64;
-const ROW_GAP = 22;
-const PADDING = 16;
+// Wider column gap gives the left→right orchestration flow (run → agents → tasks →
+// conflicts → approvals) clear directional breathing room and uses more of the canvas;
+// larger row gap + padding lift the layout from "cramped cluster" to an operations console.
+// Tuned constants only — the tested structural invariants (column order, no overlap,
+// in-bounds) are unchanged.
+const COL_GAP = 120;
+const ROW_GAP = 30;
+const PADDING = 24;
 
 const KIND_COLUMN: Record<RunGraphNode["kind"], number> = {
   run: 0,
