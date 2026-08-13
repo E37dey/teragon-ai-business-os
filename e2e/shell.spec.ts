@@ -12,7 +12,7 @@ async function gotoReady(page: Page, path = "/"): Promise<void> {
 test.describe("grouped navigation", () => {
   test("groups expand/collapse and persist after reload", async ({ page }) => {
     await gotoReady(page);
-    const serviceGroup = page.getByRole("button", { name: "שירות והדרכה" });
+    const serviceGroup = page.getByRole("button", { name: "תפעול ואוטומציה" });
     // VC-B collapses non-active nav groups by default (on "/" the service group
     // is not active) — so it starts collapsed and its links are hidden.
     await expect(serviceGroup).toHaveAttribute("aria-expanded", "false");
@@ -25,7 +25,7 @@ test.describe("grouped navigation", () => {
 
     // the explicit expand persists across reload
     await page.reload();
-    await expect(page.getByRole("button", { name: "שירות והדרכה" })).toHaveAttribute(
+    await expect(page.getByRole("button", { name: "תפעול ואוטומציה" })).toHaveAttribute(
       "aria-expanded",
       "true",
     );
@@ -34,13 +34,13 @@ test.describe("grouped navigation", () => {
 
   test("active route's group auto-expands and the item is highlighted", async ({ page }) => {
     await gotoReady(page);
-    const serviceGroup = page.getByRole("button", { name: "שירות והדרכה" });
+    const serviceGroup = page.getByRole("button", { name: "תפעול ואוטומציה" });
     // close the group, then deep-link into a route inside it
     if ((await serviceGroup.getAttribute("aria-expanded")) === "true") {
       await serviceGroup.click();
     }
     await page.goto("/service");
-    await expect(page.getByRole("button", { name: "שירות והדרכה" })).toHaveAttribute(
+    await expect(page.getByRole("button", { name: "תפעול ואוטומציה" })).toHaveAttribute(
       "aria-expanded",
       "true",
     );
@@ -50,8 +50,8 @@ test.describe("grouped navigation", () => {
 
   test("service badge shows the real open-ticket count from the seed", async ({ page }) => {
     await gotoReady(page);
-    // VC-B: expand the "שירות והדרכה" group so its service link (and badge) show.
-    await page.getByRole("button", { name: "שירות והדרכה" }).click();
+    // VC-B: expand the "תפעול ואוטומציה" group so its service link (and badge) show.
+    await page.getByRole("button", { name: "תפעול ואוטומציה" }).click();
     const serviceLink = page.getByRole("link", { name: /שירות ותיקונים/ });
     const badge = serviceLink.locator(".os-nav__badge");
     await expect(badge).toBeVisible();
@@ -61,16 +61,16 @@ test.describe("grouped navigation", () => {
 
   test("keyboard: arrows move between nav controls, Home/End jump", async ({ page }) => {
     await gotoReady(page);
-    await page.getByRole("button", { name: "ניהול העסק" }).focus();
+    await page.getByRole("button", { name: "מרכז השליטה" }).focus();
     await page.keyboard.press("ArrowDown");
     await expect(page.getByRole("link", { name: /מרכז השליטה/ })).toBeFocused();
     await page.keyboard.press("ArrowUp");
-    await expect(page.getByRole("button", { name: "ניהול העסק" })).toBeFocused();
+    await expect(page.getByRole("button", { name: "מרכז השליטה" })).toBeFocused();
     await page.keyboard.press("End");
     const last = page.locator('[data-nav-focusable="true"]').last();
     await expect(last).toBeFocused();
     await page.keyboard.press("Home");
-    await expect(page.getByRole("button", { name: "ניהול העסק" })).toBeFocused();
+    await expect(page.getByRole("button", { name: "מרכז השליטה" })).toBeFocused();
   });
 });
 
