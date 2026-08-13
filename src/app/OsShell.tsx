@@ -49,7 +49,16 @@ interface PaletteState {
 // Memory (import/export controls) and Agents (fleet + approvals cross-link). Every
 // other page owns the full-width workspace. Pages may still opt out via
 // HideShellRail; a published PageRail on a non-allowlisted route is simply not shown.
-const RAIL_ALLOWLIST: ReadonlySet<string> = new Set(["/memory", "/agents"]);
+const RAIL_ALLOWLIST: ReadonlySet<string> = new Set([
+  "/memory",
+  "/agents",
+  // The Coordination Room publishes the rail that carries the ONLY human controls
+  // for a run: the conflict resolution actions, the canonical ApprovalPanel and the
+  // run evidence. activeItemForPath returns the exact "/agents/collaboration" nav
+  // path (not "/agents"), so without this entry the shell silently dropped that rail
+  // and a visible conflict could not be resolved or approved from the UI.
+  "/agents/collaboration",
+]);
 
 export default function OsShell(): ReactElement {
   return (
