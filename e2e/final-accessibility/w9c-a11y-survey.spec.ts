@@ -25,7 +25,14 @@ test("a11y: document direction is RTL on representative routes", async ({ page }
 // h1 at all. axe classifies "page-has-heading-one" as best-practice/moderate;
 // the offender list is written to the survey artifact and documented honestly
 // in docs/FINAL_ACCESSIBILITY_REPORT.md rather than silently passed.
-test("a11y: heading hierarchy — no route declares multiple h1 (missing-h1 reported)", async ({
+// Both whole-product surveys below walk ALL 31 canonical routes in a SINGLE test
+// (navigate + settle + inspect per route). The 60s project default is a per-test
+// budget, so on a loaded machine they time out mid-walk — a harness limit, not a
+// product finding. Give them a budget proportional to the route count; the gates
+// they assert (no multiple-h1, zero serious/critical) are unchanged.
+test("a11y: heading hierarchy — no route declares multiple h1 (missing-h1 reported)", {
+  timeout: 180_000,
+}, async ({
   page,
 }) => {
   const multiple: { path: string; h1: number }[] = [];
@@ -125,7 +132,9 @@ async function tally(page: Page): Promise<Tally> {
   return { counts, rules };
 }
 
-test("a11y: minor/moderate survey across all 31 routes (reported, zero serious/critical)", async ({
+test("a11y: minor/moderate survey across all 31 routes (reported, zero serious/critical)", {
+  timeout: 420_000,
+}, async ({
   page,
 }) => {
   const perRoute: Record<string, Record<string, number>> = {};
