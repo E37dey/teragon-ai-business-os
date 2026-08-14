@@ -1029,8 +1029,10 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--os-space-4);
-  padding: var(--os-space-9) var(--os-space-6);
+  gap: var(--os-space-3);
+  /* VC/RC2: an empty state is passive information — keep it calm and compact so
+     it never reads as a "giant empty card" that competes with real data. */
+  padding: var(--os-space-7) var(--os-space-6);
   text-align: center;
   border: 1px dashed var(--os-border-strong);
   border-radius: var(--os-radius-lg);
