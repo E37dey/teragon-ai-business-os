@@ -24,19 +24,19 @@ export const PORTAL_META: Readonly<Record<Portal, PortalMeta>> = Object.freeze({
     portal: "manager",
     labelHe: "מנהל",
     taglineHe: "ניהול, בקרה וקבלת החלטות",
-    landing: "/",
+    landing: "/home",
   },
   student: {
     portal: "student",
     labelHe: "תלמיד",
     taglineHe: "למידה, משימות והתקדמות",
-    landing: "/",
+    landing: "/home",
   },
   technician: {
     portal: "technician",
     labelHe: "טכנאי",
     taglineHe: "משימות שטח, ידע טכני ושירות",
-    landing: "/",
+    landing: "/home",
   },
 });
 

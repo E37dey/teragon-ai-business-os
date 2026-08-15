@@ -22,6 +22,7 @@ import { PORTALS, portalForRole, type Portal } from "./portals";
  *  Student/Technician are explicit least-privilege sets. */
 const STUDENT_ROUTES: ReadonlySet<string> = new Set([
   "/",
+  "/home",
   "/learning",
   "/knowledge",
   "/courses",
@@ -38,6 +39,7 @@ const STUDENT_ROUTES: ReadonlySet<string> = new Set([
 
 const TECHNICIAN_ROUTES: ReadonlySet<string> = new Set([
   "/",
+  "/home",
   "/tasks",
   "/service",
   "/printers",

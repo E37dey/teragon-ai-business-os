@@ -21,6 +21,8 @@ import { ShellLogoutButton } from "./ShellLogoutButton";
 import { NAV_GROUPS, activeItemForPath, groupOfPath } from "./nav/navGroups";
 import { useCurrentRole } from "@/authorization/roleStore";
 import { canAccessRoute } from "@/authorization/portalRoutes";
+import { useActiveDemoAccount, exitDemoPortal } from "@/authorization/portalSession";
+import { PORTAL_META, portalForRole } from "@/authorization/portals";
 import { useNavBadges } from "./nav/useNavBadges";
 import { loadShellState, saveShellState, type ShellState } from "./shellState";
 import { CommandPalette, type PaletteMode } from "./commands/CommandPalette";
@@ -150,26 +152,35 @@ function OsShellInner(): ReactElement {
   // never disagree). Default operator = sysadmin/manager portal ⇒ full nav (RC2
   // behaviour unchanged); Student/Technician portals show their curated set.
   const role = useCurrentRole();
-  const navGroups: readonly NavGroupSpec[] = useMemo(
-    () =>
-      NAV_GROUPS.map((g) => ({
-        id: g.id,
-        label: g.label,
-        items: g.items
-          .filter((item) => canAccessRoute(role, item.path))
-          .map((item) => {
-            const badge = badges[item.path];
-            return {
-              id: item.path,
-              label: item.label,
-              icon: item.icon,
-              href: item.path,
-              ...(typeof badge === "number" && badge > 0 ? { badge } : {}), // VC-B: hide zero badges
-            };
-          }),
-      })).filter((g) => g.items.length > 0),
-    [badges, role],
-  );
+  const activeDemo = useActiveDemoAccount();
+  const navGroups: readonly NavGroupSpec[] = useMemo(() => {
+    const groups = NAV_GROUPS.map((g) => ({
+      id: g.id,
+      label: g.label,
+      items: g.items
+        .filter((item) => canAccessRoute(role, item.path))
+        .map((item) => {
+          const badge = badges[item.path];
+          return {
+            id: item.path,
+            label: item.label,
+            icon: item.icon,
+            href: item.path,
+            ...(typeof badge === "number" && badge > 0 ? { badge } : {}), // VC-B: hide zero badges
+          };
+        }),
+    })).filter((g) => g.items.length > 0);
+    // vNext — in a demo portal, "בית" (the role-composed /home) is the first
+    // destination. Only added for demo sessions, so the default operator's nav is
+    // byte-for-byte the RC2 nav.
+    if (activeDemo !== null) {
+      return [
+        { id: "portal-home", label: "בית", items: [{ id: "/home", label: "בית", icon: "home", href: "/home" }] },
+        ...groups,
+      ];
+    }
+    return groups;
+  }, [badges, role, activeDemo]);
 
   // ── overlays ──
   const [palette, setPalette] = useState<PaletteState | null>(null);
@@ -254,6 +265,23 @@ function OsShellInner(): ReactElement {
           onSearchOpen: () => setPalette({ mode: "search", initialQuery: "" }),
           actions: (
             <>
+              {activeDemo !== null && (
+                <span className="portal-indicator" data-testid="portal-indicator">
+                  {PORTAL_META[portalForRole(role)].labelHe}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      exitDemoPortal();
+                      navigate("/welcome", { replace: true });
+                    }}
+                    className="portal-indicator__exit"
+                    data-testid="portal-exit"
+                    title="יציאה מסביבת הדגמה"
+                  >
+                    יציאה
+                  </button>
+                </span>
+              )}
               <ThemeSelect />
               <ShellLogoutButton />
               <button

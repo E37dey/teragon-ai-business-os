@@ -41,6 +41,15 @@ export function AccessDenied({ reasonHe }: { reasonHe?: string }): ReactElement 
       <div style={{ fontSize: "var(--os-text-2xs, 11px)", color: "var(--os-muted)" }}>
         {AUTHZ_DEMO_LABEL_HE} — אין כאן מנגנון אימות אמיתי
       </div>
+      <div style={{ marginBlockStart: "var(--os-space-2)" }}>
+        <a
+          href="/home"
+          data-testid="authz-back-home"
+          style={{ color: "var(--os-cyan-text, var(--accent-primary))", fontSize: "var(--os-text-sm, 13px)" }}
+        >
+          חזרה לסביבה שלי ←
+        </a>
+      </div>
     </div>
   );
 }

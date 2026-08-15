@@ -17,6 +17,7 @@ import { APP_ROUTES } from "./routes";
 import { RouteAccessGuard } from "@/authorization/react";
 import { RequireAuth } from "@/auth/RequireAuth";
 const PortalWelcome = lazy(() => import("@/auth/PortalWelcome"));
+const PortalHome = lazy(() => import("@/modules/portals/PortalHome"));
 import DesignShowcase from "@/design-system/showcase/DesignShowcase";
 
 // Module page registry — path → lazy page (single place the shell learns about modules).
@@ -100,6 +101,19 @@ export const appRouteObjects: RouteObject[] = [
           </RequireAuth>
         ),
         children: [
+          // vNext — role-composed Home (dispatched by the live portal). Guarded
+          // like every module route; demo users land here after login. Not in
+          // APP_ROUTES so the canonical route registry/tests stay unchanged.
+          {
+            path: "home",
+            element: (
+              <RouteAccessGuard path="/home">
+                <Suspense fallback={<div className="os-route-loading" aria-busy="true" />}>
+                  <PortalHome />
+                </Suspense>
+              </RouteAccessGuard>
+            ),
+          },
           ...APP_ROUTES.filter((r) => r.path !== "/submission/presentation").map(
             (r): RouteObject => {
               const element = routeElement(r.path, r.title, r.wave);
