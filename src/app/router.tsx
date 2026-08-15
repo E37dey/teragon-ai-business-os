@@ -16,6 +16,7 @@ import {
 import { APP_ROUTES } from "./routes";
 import { RouteAccessGuard } from "@/authorization/react";
 import { RequireAuth } from "@/auth/RequireAuth";
+const PortalWelcome = lazy(() => import("@/auth/PortalWelcome"));
 import DesignShowcase from "@/design-system/showcase/DesignShowcase";
 
 // Module page registry — path → lazy page (single place the shell learns about modules).
@@ -80,6 +81,15 @@ export const appRouteObjects: RouteObject[] = [
       { path: "/submission/presentation", element: <TopLevelPresentation /> },
       // Public login route — standalone, never gated (prevents redirect loops).
       { path: "/login", element: <LoginRoute /> },
+      // vNext — demo portal welcome / login entry (standalone, full-screen, open).
+      {
+        path: "/welcome",
+        element: (
+          <Suspense fallback={<div className="os-route-loading" aria-busy="true" />}>
+            <PortalWelcome />
+          </Suspense>
+        ),
+      },
       {
         path: "/",
         // Route protection: everything inside OsShell requires an authenticated

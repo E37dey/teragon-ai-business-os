@@ -2908,3 +2908,74 @@ select:focus-visible {
   opacity: 1;
   outline: none;
 }
+
+/* vNext — demo portal welcome / login entry */
+.portal-welcome {
+  min-block-size: 100vh;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: var(--os-space-5);
+  padding: var(--os-space-8) var(--os-space-4);
+  background: var(--os-bg);
+  color: var(--os-text);
+}
+.portal-welcome__brand { text-align: center; }
+.portal-welcome__logo { font-size: 1.6rem; font-weight: 800; letter-spacing: 0.08em; }
+.portal-welcome__sub { font-size: 0.72rem; color: var(--os-text-2); letter-spacing: 0.14em; }
+.portal-welcome__section { inline-size: 100%; max-inline-size: 860px; text-align: center; }
+.portal-welcome__title { font-size: 1.15rem; font-weight: 700; margin: 0 0 var(--os-space-2); }
+.portal-welcome__hint { font-size: 0.85rem; color: var(--os-text-2); margin: 0 0 var(--os-space-4); }
+.portal-welcome__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: var(--os-space-3);
+}
+.portal-card {
+  display: grid;
+  gap: var(--os-space-2);
+  padding: var(--os-space-4);
+  text-align: start;
+}
+.portal-card__label { font-size: 1.05rem; font-weight: 700; }
+.portal-card__tag { font-size: 0.8rem; color: var(--os-text-2); }
+.portal-card__name { font-size: 0.78rem; color: var(--os-muted); }
+.portal-welcome__form {
+  inline-size: 100%;
+  max-inline-size: 360px;
+  display: grid;
+  gap: var(--os-space-2);
+}
+.portal-welcome__flabel { font-size: 0.78rem; color: var(--os-text-2); }
+.portal-welcome__input {
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--os-radius-sm, 8px);
+  border: 1px solid var(--os-border);
+  background: var(--os-raised);
+  color: var(--os-text);
+  font: inherit;
+}
+.portal-welcome__error { color: var(--danger-text); font-size: 0.8rem; }
+.portal-welcome__creds {
+  inline-size: 100%;
+  max-inline-size: 520px;
+  font-size: 0.75rem;
+  color: var(--os-text-2);
+  border: 1px dashed var(--os-border);
+  border-radius: var(--os-radius-sm, 8px);
+  padding: var(--os-space-3);
+}
+.portal-welcome__creds ul { margin: var(--os-space-2) 0 0; padding-inline-start: 1rem; display: grid; gap: 2px; }
+.portal-welcome__creds-note { margin: var(--os-space-2) 0 0; color: var(--os-muted); }
+/* header portal indicator */
+.portal-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--os-space-2);
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--os-radius-full, 999px);
+  background: var(--os-raised);
+  border: 1px solid var(--os-border);
+  font-size: 0.72rem;
+  color: var(--os-text-2);
+}
