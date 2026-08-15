@@ -7,6 +7,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, ReactElement } from "react";
 import { OsIcon } from "@/design-system";
 import { rankedSearch, type RankedSearchHit } from "@/domain/selectors";
+import { useCurrentRole } from "@/authorization/roleStore";
+import { canAccessRoute } from "@/authorization/portalRoutes";
 import { useGlobalSearchData } from "@/app/search/useGlobalSearchData";
 import { COMMANDS, filterCommands, type Command, type CommandContext } from "./registry";
 
@@ -44,10 +46,21 @@ export function CommandPalette({
     () => (mode === "commands" ? filterCommands(query) : []),
     [mode, query],
   );
-  const searchResults: readonly RankedSearchHit[] = useMemo(
-    () => (mode === "search" ? rankedSearch(data, query, SEARCH_LIMIT) : []),
-    [mode, data, query],
-  );
+  // vNext — role/portal-SCOPED search: filter unauthorized hits at the SOURCE so
+  // an unauthorized result never renders (never "show then block on click"). Each
+  // hit's destination route is checked with the same canAccessRoute the guard
+  // uses; dynamic detail routes (/customers/cu-1) fall back to their base.
+  const role = useCurrentRole();
+  const searchResults: readonly RankedSearchHit[] = useMemo(() => {
+    if (mode !== "search") return [];
+    const baseOf = (route: string): string => {
+      const seg = route.split("/").filter(Boolean);
+      return seg.length > 1 ? `/${seg[0]}` : route;
+    };
+    return rankedSearch(data, query, SEARCH_LIMIT * 2)
+      .filter((h) => canAccessRoute(role, h.route) || canAccessRoute(role, baseOf(h.route)))
+      .slice(0, SEARCH_LIMIT);
+  }, [mode, data, query, role]);
 
   const count = mode === "commands" ? commandResults.length : searchResults.length;
   const clamped = count === 0 ? 0 : Math.min(highlighted, count - 1);

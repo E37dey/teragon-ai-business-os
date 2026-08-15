@@ -9,7 +9,7 @@ async function loginAs(page: Page, portal: "manager" | "student" | "technician")
   await page.goto(`${BASE}/welcome`);
   await page.getByTestId(`demo-prefill-${portal}`).click();
   await page.getByTestId("demo-login-submit").click();
-  await expect(page).toHaveURL(new RegExp(`${BASE}/(\\?.*)?$`));
+  await expect(page).toHaveURL(`${BASE}/home`); // vNext: role home is the landing
 }
 
 test.describe("vNext role portals — direct-URL RBAC", () => {
@@ -58,5 +58,42 @@ test.describe("vNext role portals — direct-URL RBAC", () => {
     await loginAs(page, "student");
     await page.goto(`${BASE}/analytics`);
     await expect(page.getByTestId("authz-access-denied")).toBeVisible(); // student denied again
+  });
+});
+
+test.describe("vNext role portals — homes + session", () => {
+  const B = "http://localhost:4180";
+  async function login(page, portal) {
+    await page.goto(`${B}/welcome`);
+    await page.getByTestId(`demo-prefill-${portal}`).click();
+    await page.getByTestId("demo-login-submit").click();
+    await expect(page).toHaveURL(`${B}/home`);
+  }
+  test("each portal lands on its DISTINCT /home", async ({ page }) => {
+    await login(page, "manager");
+    await expect(page.getByTestId("manager-kpis")).toBeVisible();
+    await login(page, "student");
+    await expect(page.getByTestId("student-continue")).toBeVisible();
+    await expect(page.getByTestId("manager-kpis")).toHaveCount(0); // no leak
+    await login(page, "technician");
+    await expect(page.getByTestId("tech-current-job")).toBeVisible();
+    await expect(page.getByTestId("student-continue")).toHaveCount(0);
+  });
+  test("portal indicator + exit returns to welcome; state does not leak", async ({ page }) => {
+    await login(page, "student");
+    await expect(page.getByTestId("portal-indicator")).toBeVisible();
+    await page.getByTestId("portal-exit").click();
+    await expect(page).toHaveURL(`${B}/welcome`);
+    // after exit, a fresh manager login shows the manager home (rebuilt)
+    await login(page, "manager");
+    await expect(page.getByTestId("manager-kpis")).toBeVisible();
+  });
+  test("onboarding shows then dismisses (persisted)", async ({ page }) => {
+    await login(page, "student");
+    await expect(page.getByTestId("portal-onboarding")).toBeVisible();
+    await page.getByTestId("onboarding-dismiss").click();
+    await expect(page.getByTestId("portal-onboarding")).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByTestId("portal-onboarding")).toHaveCount(0); // stays dismissed
   });
 });
