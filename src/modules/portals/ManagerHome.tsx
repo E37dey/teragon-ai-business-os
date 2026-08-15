@@ -8,12 +8,17 @@ import { KpiCard, OsButton, Panel, SectionTitle } from "@/design-system";
 import { useCollection } from "@/app/data/hooks";
 import type { Approval, Task } from "@/domain/types";
 import type { AgentRun } from "@/domain/agents";
+import { scopeRecords } from "@/authorization/recordScope";
+import { useScopeContext } from "@/authorization/useScope";
 import { OperationsBrief } from "@/modules/command-center/OperationsBrief";
 import { PortalOnboarding } from "./PortalOnboarding";
 
 export default function ManagerHome(): ReactElement {
-  const approvals = useCollection<Approval>("approvals").data ?? [];
-  const tasks = useCollection<Task>("tasks").data ?? [];
+  const { portal, scope } = useScopeContext();
+  // RECORD SCOPE: the manager portal is broad (org-scoped upstream), but it still
+  // reads through the SAME central policy — no surface bypasses scopeRecords().
+  const approvals = scopeRecords("approvals", portal, scope, useCollection<Approval>("approvals").data ?? []);
+  const tasks = scopeRecords("tasks", portal, scope, useCollection<Task>("tasks").data ?? []);
   const runs = useCollection<AgentRun>("agentRuns").data ?? [];
 
   const pending = approvals.filter((a) => a.status === "ממתין").length;

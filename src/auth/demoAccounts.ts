@@ -24,6 +24,12 @@ export interface DemoAccount {
   readonly canonicalRole: CanonicalRoleId;
   /** derived presentation portal (must equal portalForRole(canonicalRole)). */
   readonly portal: Portal;
+  /**
+   * RECORD-SCOPE identity — the seed identity whose records form this account's
+   * scoped experience (see recordScope.ts). Operational owner for technician,
+   * student id for student; null = broad (manager, org-scoped by capability).
+   */
+  readonly scope: { readonly ownerId?: string; readonly studentId?: string } | null;
 }
 
 export const DEMO_ACCOUNTS: readonly DemoAccount[] = Object.freeze([
@@ -34,6 +40,7 @@ export const DEMO_ACCOUNTS: readonly DemoAccount[] = Object.freeze([
     password: "TeragonManager2026!",
     canonicalRole: "crole-bizmgr",
     portal: "manager",
+    scope: null,
   },
   {
     userId: "demo-student",
@@ -42,6 +49,7 @@ export const DEMO_ACCOUNTS: readonly DemoAccount[] = Object.freeze([
     password: "TeragonStudent2026!",
     canonicalRole: "crole-viewer",
     portal: "student",
+    scope: { studentId: "st-1" },
   },
   {
     userId: "demo-technician",
@@ -50,6 +58,7 @@ export const DEMO_ACCOUNTS: readonly DemoAccount[] = Object.freeze([
     password: "TeragonTech2026!",
     canonicalRole: "crole-service",
     portal: "technician",
+    scope: { ownerId: "u-ran" },
   },
 ]);
 

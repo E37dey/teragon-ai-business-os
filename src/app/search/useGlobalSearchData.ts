@@ -18,6 +18,8 @@ import type {
 } from "@/domain/types";
 import type { RankedSearchData } from "@/domain/selectors";
 import { useCollection } from "@/app/data/hooks";
+import { scopeRecords } from "@/authorization/recordScope";
+import { useScopeContext } from "@/authorization/useScope";
 
 export interface GlobalSearchDataResult {
   data: RankedSearchData;
@@ -55,22 +57,42 @@ export function useGlobalSearchData(): GlobalSearchDataResult {
     memoryRecords,
   ];
 
+  // RECORD SCOPE at the SOURCE: an unauthorized row must never become a rankable
+  // hit (never "rank everything, then hide on click"). Route scope in the palette
+  // already drops hits whose destination the portal can't open; this closes the
+  // remaining gap — collections a portal CAN open but whose ROWS are owner-scoped.
+  const { portal, scope } = useScopeContext();
+  const scopedTickets = scopeRecords("serviceTickets", portal, scope, tickets.data ?? []);
+  const scopedTasks = scopeRecords("tasks", portal, scope, tasks.data ?? []);
+  // technician customer context is narrowed to the customers on their OWN tickets;
+  // manager is broad; student searches no operational customers/roster.
+  const allowedCustomerIds = new Set(
+    scopedTickets.map((t) => t.customerId).filter((id): id is string => typeof id === "string"),
+  );
+  const scopedCustomers =
+    portal === "manager"
+      ? customers.data ?? []
+      : portal === "technician"
+        ? (customers.data ?? []).filter((c) => allowedCustomerIds.has(c.id))
+        : [];
+  const scopedStudents = portal === "manager" ? students.data ?? [] : [];
+
   return {
     isLoading: all.some((q) => q.isLoading),
     data: {
-      customers: customers.data ?? [],
-      leads: leads.data ?? [],
-      organizations: organizations.data ?? [],
-      quotations: quotations.data ?? [],
+      customers: scopedCustomers,
+      leads: portal === "manager" ? leads.data ?? [] : [],
+      organizations: portal === "manager" ? organizations.data ?? [] : [],
+      quotations: portal === "manager" ? quotations.data ?? [] : [],
       printerModels: printerModels.data ?? [],
-      customerPrinters: customerPrinters.data ?? [],
+      customerPrinters: portal === "manager" ? customerPrinters.data ?? [] : [],
       courses: courses.data ?? [],
-      students: students.data ?? [],
-      tickets: tickets.data ?? [],
-      tasks: tasks.data ?? [],
-      documents: documents.data ?? [],
+      students: scopedStudents,
+      tickets: scopedTickets,
+      tasks: scopedTasks,
+      documents: portal === "manager" ? documents.data ?? [] : [],
       knowledgeNotes: knowledgeNotes.data ?? [],
-      memoryRecords: memoryRecords.data ?? [],
+      memoryRecords: portal === "manager" ? memoryRecords.data ?? [] : [],
     },
   };
 }

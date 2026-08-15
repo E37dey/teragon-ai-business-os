@@ -6,13 +6,23 @@ import { Link } from "react-router-dom";
 import { EmptyState, OsButton, Panel, SectionTitle, StatusChip } from "@/design-system";
 import { useCollection } from "@/app/data/hooks";
 import type { ServiceTicket, Task } from "@/domain/types";
+import { scopeRecords } from "@/authorization/recordScope";
+import { useScopeContext } from "@/authorization/useScope";
 import { PortalOnboarding } from "./PortalOnboarding";
 
 const PRIORITY_ORDER: Record<string, number> = { "גבוהה": 0, "בינונית": 1, "נמוכה": 2 };
 
 export default function TechnicianHome(): ReactElement {
-  const tickets = useCollection<ServiceTicket>("serviceTickets").data ?? [];
-  const tasks = useCollection<Task>("tasks").data ?? [];
+  const { portal, scope } = useScopeContext();
+  // RECORD SCOPE: a technician sees ONLY tickets/tasks they own (assignee).
+  // Enforced centrally — technician A can never read technician B's queue.
+  const tickets = scopeRecords(
+    "serviceTickets",
+    portal,
+    scope,
+    useCollection<ServiceTicket>("serviceTickets").data ?? [],
+  );
+  const tasks = scopeRecords("tasks", portal, scope, useCollection<Task>("tasks").data ?? []);
 
   const openTickets = [...tickets]
     .filter((t) => t.status !== "נסגר" && t.status !== "טופל")

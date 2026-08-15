@@ -5,7 +5,9 @@ import type { ReactElement } from "react";
 import { Link } from "react-router-dom";
 import { EmptyState, OsButton, Panel, SectionTitle, StatusChip } from "@/design-system";
 import { useCollection } from "@/app/data/hooks";
-import type { Course, Enrollment, Task } from "@/domain/types";
+import type { Course, Enrollment } from "@/domain/types";
+import { scopeRecords } from "@/authorization/recordScope";
+import { useScopeContext } from "@/authorization/useScope";
 import { PortalOnboarding } from "./PortalOnboarding";
 
 function stageProgress(en: Enrollment): { done: number; total: number; pct: number } {
@@ -15,17 +17,32 @@ function stageProgress(en: Enrollment): { done: number; total: number; pct: numb
 }
 
 export default function StudentHome(): ReactElement {
-  const enrollments = useCollection<Enrollment>("enrollments").data ?? [];
+  const { portal, scope } = useScopeContext();
+  // RECORD SCOPE: a student sees ONLY their OWN enrollment (studentId). Enforced
+  // centrally — a student can never read another student's progress. Courses are
+  // shared reference content; the student has no operational tasks of their own,
+  // so "my tasks" is derived from THIS enrollment's pending stages (also scoped).
+  const enrollments = scopeRecords(
+    "enrollments",
+    portal,
+    scope,
+    useCollection<Enrollment>("enrollments").data ?? [],
+  );
   const courses = useCollection<Course>("courses").data ?? [];
-  const tasks = useCollection<Task>("tasks").data ?? [];
 
-  // the learner's current enrollment (demo: first) + its course + next stage.
+  // the learner's current enrollment + its course + next stage.
   const enrollment = enrollments[0] ?? null;
   const course = enrollment ? courses.find((c) => c.id === enrollment.courseId) ?? null : null;
   const prog = enrollment ? stageProgress(enrollment) : null;
   const nextIdx = enrollment ? enrollment.stages.findIndex((s) => s.status !== "אושר") : -1;
   const nextStage = nextIdx >= 0 ? enrollment!.stages[nextIdx] : null;
-  const openTasks = tasks.filter((t) => t.status !== "הושלמה").slice(0, 3);
+  // pending stages of the student's OWN enrollment — their real "tasks".
+  const openStages = enrollment
+    ? enrollment.stages
+        .map((s, i) => ({ i, status: s.status }))
+        .filter((s) => s.status !== "אושר")
+        .slice(0, 3)
+    : [];
 
   return (
     <div className="portal-home portal-home--student" dir="rtl">
@@ -77,21 +94,21 @@ export default function StudentHome(): ReactElement {
       <div className="portal-grid">
         {/* my tasks */}
         <Panel className="portal-card" data-testid="student-tasks">
-          <SectionTitle title="המשימות שלי" subtitle="פעילויות ותרגילים" icon="clock" />
-          {openTasks.length === 0 ? (
+          <SectionTitle title="המשימות שלי" subtitle="השלבים שלפניך בקורס" icon="clock" />
+          {openStages.length === 0 ? (
             <EmptyState title="אין לך משימה פעילה כרגע" reason="חזרו ללמידה או עיינו בידע." />
           ) : (
             <ul className="portal-list">
-              {openTasks.map((t) => (
-                <li key={t.id}>
-                  <span className="portal-list__title">{t.title}</span>
-                  <StatusChip status="פעיל" label={t.status} />
+              {openStages.map((s) => (
+                <li key={s.i}>
+                  <span className="portal-list__title">שלב {s.i + 1}</span>
+                  <StatusChip status="פעיל" label={s.status} />
                 </li>
               ))}
             </ul>
           )}
-          <Link to="/tasks" className="portal-card__more">
-            כל המשימות ←
+          <Link to="/learning" className="portal-card__more">
+            כל השלבים ←
           </Link>
         </Panel>
 
