@@ -19,6 +19,8 @@ import { useAuth } from "@/auth/useAuth";
 import { resolveShellUser } from "./shellAccount";
 import { ShellLogoutButton } from "./ShellLogoutButton";
 import { NAV_GROUPS, activeItemForPath, groupOfPath } from "./nav/navGroups";
+import { useCurrentRole } from "@/authorization/roleStore";
+import { canAccessRoute } from "@/authorization/portalRoutes";
 import { useNavBadges } from "./nav/useNavBadges";
 import { loadShellState, saveShellState, type ShellState } from "./shellState";
 import { CommandPalette, type PaletteMode } from "./commands/CommandPalette";
@@ -143,23 +145,30 @@ function OsShellInner(): ReactElement {
 
   // ── derived badges ──
   const badges = useNavBadges();
+  // vNext — capability/portal-aware nav: only the items the live role+portal may
+  // access are OFFERED (same decision the route guard enforces, so nav and access
+  // never disagree). Default operator = sysadmin/manager portal ⇒ full nav (RC2
+  // behaviour unchanged); Student/Technician portals show their curated set.
+  const role = useCurrentRole();
   const navGroups: readonly NavGroupSpec[] = useMemo(
     () =>
       NAV_GROUPS.map((g) => ({
         id: g.id,
         label: g.label,
-        items: g.items.map((item) => {
-          const badge = badges[item.path];
-          return {
-            id: item.path,
-            label: item.label,
-            icon: item.icon,
-            href: item.path,
-            ...(typeof badge === "number" && badge > 0 ? { badge } : {}), // VC-B: hide zero badges
-          };
-        }),
-      })),
-    [badges],
+        items: g.items
+          .filter((item) => canAccessRoute(role, item.path))
+          .map((item) => {
+            const badge = badges[item.path];
+            return {
+              id: item.path,
+              label: item.label,
+              icon: item.icon,
+              href: item.path,
+              ...(typeof badge === "number" && badge > 0 ? { badge } : {}), // VC-B: hide zero badges
+            };
+          }),
+      })).filter((g) => g.items.length > 0),
+    [badges, role],
   );
 
   // ── overlays ──

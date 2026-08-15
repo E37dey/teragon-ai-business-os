@@ -16,6 +16,7 @@ import {
   permissionRequirement,
   type Permission,
 } from "./permissions";
+import { canAccessRoute } from "./portalRoutes";
 import { useCurrentRole } from "./roleStore";
 
 const deniedPanel: CSSProperties = {
@@ -41,6 +42,29 @@ export function AccessDenied({ reasonHe }: { reasonHe?: string }): ReactElement 
         {AUTHZ_DEMO_LABEL_HE} — אין כאן מנגנון אימות אמיתי
       </div>
     </div>
+  );
+}
+
+/**
+ * LAYER (a) route wrapper — gates a whole ROUTE on the effective access decision
+ * (canonical RBAC AND the derived portal scope). Reads the LIVE role every render
+ * so a typed URL / deep link / role switch is evaluated the same way as a nav
+ * click; a denied route shows the honest AccessDenied state (never blank, never a
+ * silent leak of the page before denial).
+ */
+export function RouteAccessGuard({
+  path,
+  children,
+}: {
+  path: string;
+  children: ReactNode;
+}): ReactElement {
+  const role = useCurrentRole();
+  if (canAccessRoute(role, path)) return <>{children}</>;
+  return (
+    <AccessDenied
+      reasonHe={`אין לך הרשאה לגשת למסך «${path}» בסביבת העבודה שלך (${AUTHZ_DEMO_LABEL_HE})`}
+    />
   );
 }
 

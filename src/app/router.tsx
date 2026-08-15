@@ -14,6 +14,7 @@ import {
   TopLevelPresentation,
 } from "./routerPages";
 import { APP_ROUTES } from "./routes";
+import { RouteAccessGuard } from "@/authorization/react";
 import { RequireAuth } from "@/auth/RequireAuth";
 import DesignShowcase from "@/design-system/showcase/DesignShowcase";
 
@@ -55,12 +56,19 @@ const MODULE_PAGES: Record<string, LazyExoticComponent<ComponentType>> = {
 
 function routeElement(path: string, title: string, wave: number) {
   const Page = MODULE_PAGES[path];
-  if (!Page) return <RoutedPlaceholder title={title} wave={wave} />;
-  return (
+  const inner = Page ? (
     <Suspense fallback={<div className="os-route-loading" aria-busy="true" />}>
       <Page />
     </Suspense>
+  ) : (
+    <RoutedPlaceholder title={title} wave={wave} />
   );
+  // vNext — LAYER (a) route access is now ENFORCED here: the effective decision
+  // (canonical RBAC AND derived portal scope) gates every module route, so a
+  // typed URL / deep link is denied for a role/portal that lacks it, not merely
+  // hidden from the nav. Default role is sysadmin (full access) so existing
+  // behaviour is unchanged.
+  return <RouteAccessGuard path={path}>{inner}</RouteAccessGuard>;
 }
 
 export const appRouteObjects: RouteObject[] = [
