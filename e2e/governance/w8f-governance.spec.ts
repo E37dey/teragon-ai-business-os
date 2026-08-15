@@ -3,7 +3,7 @@
 // filters + item detail, incident create → assign, and the system-health
 // incidents section. Zero console errors.
 import { test, expect } from "@playwright/test";
-import { collectConsoleErrors, gotoGovernance } from "../analytics/w8f-helpers";
+import { collectConsoleErrors, gotoGovernance, openGovernanceIncidents } from "../analytics/w8f-helpers";
 
 test("policy list → policy detail shows the CURRENT append-only version content", async ({
   page,
@@ -70,6 +70,7 @@ test("incident: create with title+description+severity → assign to a named use
 }) => {
   const errors = collectConsoleErrors(page);
   await gotoGovernance(page);
+  await openGovernanceIncidents(page);
 
   const zone = page.getByTestId("zone-incidents");
   await zone.scrollIntoViewIfNeeded();
@@ -95,6 +96,7 @@ test("incident: create with title+description+severity → assign to a named use
 test("system-health incidents section is present on the governance page", async ({ page }) => {
   const errors = collectConsoleErrors(page);
   await gotoGovernance(page);
+  await openGovernanceIncidents(page);
 
   const zone = page.getByTestId("zone-health-incidents");
   await zone.scrollIntoViewIfNeeded();

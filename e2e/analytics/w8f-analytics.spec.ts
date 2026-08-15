@@ -51,13 +51,38 @@ test("chart drilldown opens the REAL source records with in-app routes", async (
   const errors = collectConsoleErrors(page);
   await gotoAnalytics(page);
 
-  // leads_new's drilldown card lives in group ב — select it via the group nav
+  // group ב hosts the sales metrics. Use quotation_conversion, whose source
+  // records are the DECIDED quotations — not period-scoped, so the seed always
+  // yields real rows (independent of the "current period"). Assert the links
+  // INSIDE the drilldown dialog so the always-present sidebar nav can't satisfy
+  // the assertion.
+  await page.getByRole("tab", { name: "ב · מכירות ולקוחות" }).click();
+  await page
+    .getByRole("button", { name: "שיעור המרת הצעות מחיר (מצטבר) — פתיחת רשומות המקור" })
+    .click();
+  const drawer = page.getByRole("dialog", {
+    name: "רשומות המקור — שיעור המרת הצעות מחיר (מצטבר)",
+  });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.locator("a[href='/sales']").first()).toBeVisible({ timeout: 15_000 });
+  expect(errors).toEqual([]);
+});
+
+test("chart drilldown shows an honest empty state for a zero-record period (no fake link)", async ({
+  page,
+}) => {
+  const errors = collectConsoleErrors(page);
+  await gotoAnalytics(page);
+
+  // leads_new is period-scoped; the frozen demo seed has 0 new leads in the
+  // default range, so its drilldown must render the truthful empty state and
+  // NEVER fabricate a source row / link. This is the honest zero-data contract.
   await page.getByRole("tab", { name: "ב · מכירות ולקוחות" }).click();
   await page.getByRole("button", { name: "לידים חדשים — פתיחת רשומות המקור" }).click();
-  await expect(page.getByText("רשומות המקור — לידים חדשים")).toBeVisible();
-  // the drawer lists real lead records that link to /crm
-  const links = page.locator("a[href='/crm']");
-  await expect(links.first()).toBeVisible({ timeout: 15_000 });
+  const drawer = page.getByRole("dialog", { name: "רשומות המקור — לידים חדשים" });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByText("אין רשומות מקור")).toBeVisible();
+  await expect(drawer.locator("a[href='/crm']")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

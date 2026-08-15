@@ -53,9 +53,11 @@ describe("/analytics page", () => {
     renderPage();
     await waitFor(() => expect(screen.getByText("NPS לקוחות")).toBeTruthy(), { timeout: 5000 });
     expect(screen.getAllByText("טרם נמדד").length).toBeGreaterThan(0);
-    // the NPS card's value button must not display 0
-    const npsBtn = screen.getByLabelText("NPS לקוחות — פתיחת רשומות המקור");
-    expect(npsBtn.textContent).toBe("טרם נמדד");
+    // P0–P2: unmeasured metrics collapse into the compact "מדדים שטרם נמדדו" strip.
+    // NPS renders there with an explicit "טרם נמדד" label — never a fake 0.
+    const npsBtn = screen.getByLabelText("NPS לקוחות — טרם נמדד. פתיחת רשומות המקור");
+    expect(npsBtn.textContent).toContain("טרם נמדד");
+    expect(npsBtn.textContent).not.toContain("0");
   });
 
   it("publishes the 'מבקר המדדים' rail with real findings", { timeout: 20000 }, async () => {

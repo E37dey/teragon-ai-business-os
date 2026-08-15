@@ -36,7 +36,10 @@ test("«נסה זאת» navigates to the action's REAL route inside the shell", 
   expect(errors).toEqual([]);
 });
 
-test("rail coach: a planned action gets a deterministic verdict against the policy", async ({
+// S13.1 "Product V2 context-rail reduction": the deterministic policy coach lives ONLY in
+// the page rail, which is no longer rendered on /quick-start (permanent rails are limited
+// to /memory, /agents and the Coordination Room). Kept so it runs unchanged if restored.
+test.skip("rail coach: a planned action gets a deterministic verdict against the policy", async ({
   page,
 }) => {
   const errors = collectConsoleErrors(page);

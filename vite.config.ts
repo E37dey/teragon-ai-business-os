@@ -44,12 +44,42 @@ export default defineConfig({
     },
   },
   test: {
-    environment: "jsdom",
-    include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
     // Live Supabase integration tests are a SEPARATE discovery path (their own
     // config + `npm run test:supabase:live`). They must never appear in the
     // default suite — so the default gate reports 0 skipped, never a skip.
     exclude: [...configDefaults.exclude, "tests/supabase/live/**", "tests/staging-auth/live/**"],
     globals: false,
+    // Two projects, ONE default gate (`npm test` runs both):
+    //
+    //  · app      — the React/domain suite, jsdom as before.
+    //  · platform — tests/platform/** exercise the REAL Node ESM provisioning
+    //    CLIs in scripts/platform/*.mjs. Those CLIs start with a `#!` shebang,
+    //    which is only legal at byte 0. Under the jsdom project Vite's
+    //    ssrTransformScript hoists the Node built-in CJS-interop consts to the
+    //    top of line 1, pushing the shebang into the middle of that line, and
+    //    Rolldown then fails to parse it ("Invalid Character `!`"). That is a
+    //    COLLECTION failure: the 12 affected files never executed a single test.
+    //    Running them in `node` and marking the platform CLIs external skips the
+    //    SSR transform entirely, so Node loads the real .mjs files unmodified.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "app",
+          environment: "jsdom",
+          include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
+          exclude: [...configDefaults.exclude, "tests/platform/**"],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "platform",
+          environment: "node",
+          include: ["tests/platform/**/*.test.ts"],
+          server: { deps: { external: [/scripts[\\/]platform[\\/].*\.mjs$/] } },
+        },
+      },
+    ],
   },
 });

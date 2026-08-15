@@ -291,7 +291,7 @@ test("offline (honest scope): with the SPA loaded, /memory keeps reading from In
     if ((await collapsed.count()) === 0) break;
     await collapsed.click();
   }
-  await page.getByRole("link", { name: "זיכרון Obsidian" }).first().click(); // warm the /memory chunk
+  await page.getByRole("link", { name: "זיכרון מקומי" }).first().click(); // warm the /memory chunk
   await expect(page.getByTestId("memory-page")).toBeVisible({ timeout: 20_000 });
 
   await context.setOffline(true);

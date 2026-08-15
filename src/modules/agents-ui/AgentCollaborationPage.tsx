@@ -277,6 +277,19 @@ export default function AgentCollaborationPage(): ReactElement {
   }
 
   const selectedNode = layout?.nodes.find((n) => n.id === selectedNodeId) ?? null;
+  // Selected-path emphasis (presentation only): when a node is selected, the nodes it is
+  // directly connected to (plus itself) stay full-strength; everything else dims so the
+  // real relationship reads at a glance. Derived purely from the real layout edges — no
+  // topology, node or edge is invented.
+  const relatedNodeIds = ((): Set<string> | null => {
+    if (selectedNodeId === null || !layout) return null;
+    const s = new Set<string>([selectedNodeId]);
+    for (const e of layout.edges) {
+      if (e.from === selectedNodeId) s.add(e.to);
+      if (e.to === selectedNodeId) s.add(e.from);
+    }
+    return s;
+  })();
   const pendingApprovalOfRun = records?.approvals.find((a) => a.status === "ממתין") ?? null;
   const anyApprovalOfRun = records?.approvals[0] ?? null;
   const panelApproval = pendingApprovalOfRun ?? anyApprovalOfRun;
@@ -639,6 +652,35 @@ export default function AgentCollaborationPage(): ReactElement {
                     style={{ position: "absolute", insetInlineStart: 0, insetBlockStart: 0 }}
                     aria-hidden="true"
                   >
+                    {/* RC2 orchestration flow: small directional arrowheads make the real
+                        left→right run → agents → tasks → conflicts → approvals direction
+                        legible. Anchored at the target node's edge (boundary-anchored edges),
+                        so they never overlap a node. Pure decoration over the real edges —
+                        no topology, node or edge is invented. */}
+                    <defs>
+                      <marker
+                        id="coord-arrow"
+                        markerWidth="7"
+                        markerHeight="7"
+                        refX="6"
+                        refY="3"
+                        orient="auto"
+                        markerUnits="userSpaceOnUse"
+                      >
+                        <path d="M0,0 L6,3 L0,6 Z" fill="rgba(112,158,220,.32)" />
+                      </marker>
+                      <marker
+                        id="coord-arrow-hi"
+                        markerWidth="7"
+                        markerHeight="7"
+                        refX="6"
+                        refY="3"
+                        orient="auto"
+                        markerUnits="userSpaceOnUse"
+                      >
+                        <path d="M0,0 L6,3 L0,6 Z" fill="var(--accent-primary, #4A73B8)" />
+                      </marker>
+                    </defs>
                     {layout.edges.map((e, i) => {
                       const highlighted =
                         selectedNodeId !== null &&
@@ -657,6 +699,7 @@ export default function AgentCollaborationPage(): ReactElement {
                           }
                           strokeWidth={highlighted ? 1.5 : 1}
                           strokeDasharray={e.kind === "message" ? "4 4" : undefined}
+                          markerEnd={highlighted ? "url(#coord-arrow-hi)" : "url(#coord-arrow)"}
                         />
                       );
                     })}
@@ -690,6 +733,11 @@ export default function AgentCollaborationPage(): ReactElement {
                         color: "var(--os-text)",
                         cursor: "pointer",
                         overflow: "hidden",
+                        // Selected-path emphasis (presentation only): while a node is selected,
+                        // nodes not directly related to it fade back so the real relationship
+                        // reads at a glance. relatedNodeIds is derived purely from layout.edges.
+                        opacity: relatedNodeIds && !relatedNodeIds.has(n.id) ? 0.35 : 1,
+                        transition: "opacity var(--os-motion-fast, 120ms) ease",
                       }}
                     >
                       <span

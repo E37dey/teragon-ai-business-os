@@ -10,6 +10,7 @@ import {
   gotoGovernance,
   gotoSettings,
   gotoSystemHealth,
+  openGovernanceIncidents,
 } from "./w8f-helpers";
 
 interface ViolationSummary {
@@ -69,6 +70,7 @@ test("axe: analytics drilldown drawer open — ZERO serious/critical", async ({ 
 
 test("axe: governance incident detail open — ZERO serious/critical", async ({ page }) => {
   await gotoGovernance(page);
+  await openGovernanceIncidents(page);
   const zone = page.getByTestId("zone-incidents");
   await zone.scrollIntoViewIfNeeded();
   await page.getByTestId("incident-title").fill("W8F — תקרית נגישות");

@@ -549,36 +549,66 @@ export default function AnalyticsPage(): ReactElement {
             />
           )}
 
-          {visibleGroups.map((g) => (
-            <section key={g} style={{ display: "grid", gap: "var(--os-space-4)" }}>
-              <SectionTitle icon="target" title={ANALYTICS_GROUP_TITLES[g]} />
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-                  gap: "var(--os-space-4)",
-                }}
-              >
-                {metrics
-                  .filter((m) => m.group === g)
-                  .map((m) => {
-                    const series = seriesByKey.get(m.key);
-                    if (series === undefined) return null;
-                    return (
-                      <MetricCard
-                        key={m.key}
-                        def={m}
-                        series={series}
-                        comparison={comparisons.get(m.key) ?? null}
-                        tableMode={tableMode}
-                        accent={SERIES_ACCENT}
-                        onDrill={openDrill}
-                      />
-                    );
-                  })}
-              </div>
-            </section>
-          ))}
+          {visibleGroups.map((g) => {
+            // VC-F §5 / P0-P2: measured metrics are the primary full cards;
+            // unmeasured metrics (latest === null ⇒ "טרם נמדד") collapse into a
+            // single compact secondary strip so they never dominate the page
+            // (worst at 390px). Truthfulness is unchanged — null stays null,
+            // every metric still opens its real source records on click.
+            const groupMetrics = metrics.filter((m) => m.group === g);
+            const measured = groupMetrics.filter((m) => {
+              const s = seriesByKey.get(m.key);
+              return s !== undefined && latestMeasured(s.points) !== null;
+            });
+            const unmeasured = groupMetrics.filter((m) => {
+              const s = seriesByKey.get(m.key);
+              return s !== undefined && latestMeasured(s.points) === null;
+            });
+            return (
+              <section key={g} style={{ display: "grid", gap: "var(--os-space-4)" }}>
+                <SectionTitle
+                  icon="target"
+                  title={ANALYTICS_GROUP_TITLES[g]}
+                  subtitle={`${measured.length} נמדדים · ${unmeasured.length} טרם נמדדו`}
+                />
+                {measured.length > 0 && (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                      gap: "var(--os-space-4)",
+                    }}
+                  >
+                    {measured.map((m) => {
+                      const series = seriesByKey.get(m.key);
+                      if (series === undefined) return null;
+                      return (
+                        <MetricCard
+                          key={m.key}
+                          def={m}
+                          series={series}
+                          comparison={comparisons.get(m.key) ?? null}
+                          tableMode={tableMode}
+                          accent={SERIES_ACCENT}
+                          onDrill={openDrill}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+                {measured.length === 0 && (
+                  <EmptyState
+                    icon="gauge"
+                    title="אף מדד בקבוצה זו נמדד עדיין"
+                    reason="כל המדדים כאן עדיין ללא מדידה (טרם נמדד) — אין נתוני אמת בתקופה שנבחרה. הערכים אינם מוצגים כאפס."
+                  />
+                )}
+                {unmeasured.length > 0 && (
+                  <UnmeasuredStrip metrics={unmeasured} seriesByKey={seriesByKey} onDrill={openDrill} />
+                )}
+              </section>
+            );
+          })}
 
           {/* VC-F: detailed definitions, calculation methods, source records and
               passive catalogue totals live here — never in the primary view */}
@@ -1006,6 +1036,83 @@ function MetricCard({
           {measuredCount} נקודות מדודות מתוך {series.points.length}
         </p>
       )}
+    </Panel>
+  );
+}
+
+// VC-F §5 / P0-P2: the compact secondary group for metrics that are NOT yet
+// measured. Instead of a wall of full-height "טרם נמדד" cards, each unmeasured
+// metric is one quiet, dense row inside a single panel — still fully honest
+// (null stays "טרם נמדד", never 0) and still clickable to open the real source
+// records that explain why it is not measured.
+function UnmeasuredStrip({
+  metrics,
+  seriesByKey,
+  onDrill,
+}: {
+  metrics: readonly AnalyticsMetricDef[];
+  seriesByKey: ReadonlyMap<string, MetricSeries>;
+  onDrill: (def: AnalyticsMetricDef, period: AnalyticsPeriod, contextHe: string) => void;
+}): ReactElement {
+  const firstPeriod = (def: AnalyticsMetricDef): AnalyticsPeriod => {
+    const p = seriesByKey.get(def.key)?.points[0];
+    return { startISO: p?.periodStart ?? "", endISO: p?.periodEnd ?? "", labelHe: "" };
+  };
+  return (
+    <Panel style={{ padding: "var(--os-space-4)", display: "grid", gap: "var(--os-space-3)" }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: "var(--os-space-2)", flexWrap: "wrap" }}>
+        <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--os-text-2)" }}>
+          מדדים שטרם נמדדו
+        </span>
+        <span className="os-chip os-chip--muted os-num">{metrics.length}</span>
+        <span style={{ fontSize: "0.72rem", color: "var(--os-muted)" }}>
+          אין נתוני אמת בתקופה — הערכים אינם מוצגים כאפס
+        </span>
+      </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+          gap: "var(--os-space-2)",
+        }}
+      >
+        {metrics.map((m) => (
+          <button
+            key={m.key}
+            type="button"
+            onClick={() => onDrill(m, firstPeriod(m), `המדד אינו נמדד — ${m.sourceHe}`)}
+            aria-label={`${m.titleHe} — טרם נמדד. פתיחת רשומות המקור`}
+            style={{
+              all: "unset",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "var(--os-space-2)",
+              border: "1px solid var(--os-border)",
+              borderRadius: "8px",
+              padding: "0.45rem 0.65rem",
+              background: "var(--os-surface-1, transparent)",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "0.82rem",
+                color: "var(--os-text-2)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={`${m.titleHe} · ${m.sourceHe}`}
+            >
+              {m.titleHe}
+            </span>
+            <span className="os-chip os-chip--muted" style={{ flexShrink: 0, fontSize: "0.68rem" }}>
+              {NOT_MEASURED_HE}
+            </span>
+          </button>
+        ))}
+      </div>
     </Panel>
   );
 }

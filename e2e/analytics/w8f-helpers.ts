@@ -32,8 +32,27 @@ export async function gotoAnalytics(page: Page): Promise<void> {
 export async function gotoGovernance(page: Page): Promise<void> {
   await page.goto("/governance");
   await expect(page.getByText("ממשל ובקרת AI").first()).toBeVisible({ timeout: 30_000 });
+  // S13.2 declutter: the governed reference zones (policies, boundaries,
+  // permissions, protected prompts, audit) render inside a collapsed-by-default
+  // disclosure ("opens on demand"). Open it so the bootstrap-settled zones —
+  // incl. zone-policies — are visible for assertions and screenshots. This is
+  // the real cause of the earlier "zone-policies hidden" timeouts, not a slow boot.
+  const reference = page.getByTestId("governance-reference");
+  await expect(reference).toBeVisible({ timeout: 30_000 });
+  const alreadyOpen = await reference.evaluate((el) => (el as HTMLDetailsElement).open);
+  if (!alreadyOpen) await reference.locator("summary").click();
   // the idempotent governance bootstrap settles (policies zone renders rows)
   await expect(page.getByTestId("zone-policies")).toBeVisible({ timeout: 30_000 });
+}
+
+/** Open the on-demand incidents disclosure (S13.2 declutter collapses it) so
+ *  zone-incidents and the incident form are interactable. */
+export async function openGovernanceIncidents(page: Page): Promise<void> {
+  const disclosure = page.getByTestId("governance-incidents-d");
+  await expect(disclosure).toBeVisible({ timeout: 30_000 });
+  const alreadyOpen = await disclosure.evaluate((el) => (el as HTMLDetailsElement).open);
+  if (!alreadyOpen) await disclosure.locator("summary").click();
+  await expect(page.getByTestId("zone-incidents")).toBeVisible({ timeout: 30_000 });
 }
 
 export async function gotoAdministration(page: Page): Promise<void> {

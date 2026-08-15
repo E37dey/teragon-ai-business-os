@@ -44,7 +44,11 @@ test("the Training Matrix renders and a material click opens the material drawer
   expect(errors).toEqual([]);
 });
 
-test("auditor warnings in the rail are CLICKABLE and scroll to the persona anchor", async ({
+// S13.1 "Product V2 context-rail reduction" removed the permanent context rail from
+// every route except /memory, /agents and the Coordination Room. "מבקר הפרסונות" is a
+// rail-ONLY surface, so it is intentionally not rendered on /personas today. The spec is
+// kept (not deleted) so it runs again unchanged if the rail is restored for this route.
+test.skip("auditor warnings in the rail are CLICKABLE and scroll to the persona anchor", async ({
   page,
 }) => {
   const errors = collectConsoleErrors(page);

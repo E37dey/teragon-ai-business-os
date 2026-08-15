@@ -1029,8 +1029,10 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--os-space-4);
-  padding: var(--os-space-9) var(--os-space-6);
+  gap: var(--os-space-3);
+  /* VC/RC2: an empty state is passive information — keep it calm and compact so
+     it never reads as a "giant empty card" that competes with real data. */
+  padding: var(--os-space-7) var(--os-space-6);
   text-align: center;
   border: 1px dashed var(--os-border-strong);
   border-radius: var(--os-radius-lg);
@@ -2740,13 +2742,27 @@ select:focus-visible {
 .an-trend__grid {
   stroke: var(--os-border-thin, var(--os-border));
   stroke-width: 1;
-  opacity: 0.45;
+  opacity: 0.55;
+}
+/* the framed L-axis (baseline + left) reads a step stronger than the inner grid
+   so the plot has real edges without shouting. */
+.an-trend__axis {
+  stroke: var(--os-border-strong, var(--os-border));
+  stroke-width: 1;
+  opacity: 0.9;
 }
 .an-trend__ylabel,
 .an-trend__xlabel {
-  fill: var(--os-muted);
-  font-size: 10px;
+  /* text-2, not muted — the scale must be readable at a glance (the old muted
+     mono read as debug text and made the chart feel dead). */
+  fill: var(--os-text-2);
+  font-size: 10.5px;
   font-family: var(--os-font-mono, ui-monospace, monospace);
+  letter-spacing: 0.01em;
+}
+/* the always-on "now" anchor — subtle, precise, never a giant marker. */
+.an-trend__last {
+  filter: drop-shadow(0 0 2px var(--os-bg, rgba(0, 0, 0, 0.6)));
 }
 .an-trend__guide {
   stroke: var(--accent-primary-border, var(--os-border));

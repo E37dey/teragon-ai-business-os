@@ -47,20 +47,19 @@ test("readiness is NEVER green while blockers exist + blocker click-through navi
   const errors = collectConsoleErrors(page);
   await gotoSubmission(page);
 
-  // the auditor rail reports blockers + warnings
-  await expect(page.getByText("מבקר ההגשה")).toBeVisible();
-  await expect(page.getByText(/חוסמים ·/).first()).toBeVisible();
+  // S13.1 "Product V2 context-rail reduction": the "מבקר ההגשה" auditor rail is no longer
+  // rendered on /submission (permanent rails are limited to /memory, /agents and the
+  // Coordination Room), so the page's own blocker summary is the single source here.
+  await expect(page.getByText("מבקר ההגשה")).toHaveCount(0);
 
   // the idempotent bootstraps (bridge/objections/materials/programme) settle
-  // asynchronously — wait until the summary line and the rail agree on the
-  // SAME blocker count before asserting the readiness contract
+  // asynchronously — wait until the summary line reports a real blocker count
+  // before asserting the readiness contract
   let blockers = 0;
   await expect(async () => {
     const summary = (await page.getByText(/חוסמים פתוחים:/).textContent()) ?? "";
-    const rail = (await page.getByText(/חוסמים ·/).first().textContent()) ?? "";
     const s = Number(/חוסמים פתוחים:\s*(\d+)/.exec(summary)?.[1] ?? "-1");
-    const r = Number(/(\d+)\s*חוסמים/.exec(rail)?.[1] ?? "-2");
-    expect(s).toBe(r);
+    expect(s).toBeGreaterThanOrEqual(0);
     blockers = s;
   }).toPass({ timeout: 20_000 });
 
@@ -85,12 +84,11 @@ test("readiness is NEVER green while blockers exist + blocker click-through navi
     expect(chipText, `blockers=${blockers}`).not.toBe(READY_GREEN);
   }).toPass({ timeout: 20_000 });
 
-  // click-through: the presenter-notes finding navigates OUT to its target
-  // route (/submission/presentation) — a fresh context has no presenter notes
-  const finding = page.locator("button", { hasText: "הערות מרצה חסרות" }).first();
-  await expect(finding).toBeVisible();
-  await finding.click();
-  await expect(page).toHaveURL(/\/submission\/presentation$/, { timeout: 15_000 });
+  // The per-finding click-through buttons (e.g. "הערות מרצה חסרות" → /submission/presentation)
+  // are rendered ONLY by SubmissionRail, which S13.1 no longer mounts on this route. The
+  // readiness contract above — blockers counted from the page's own summary, and the chip
+  // never falsely green — is unaffected and remains the substance of this test.
+  await expect(page.locator("button", { hasText: "הערות מרצה חסרות" })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

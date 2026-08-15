@@ -21,7 +21,7 @@ const SIZES = [
 
 type Prepare = (page: Page) => Promise<void>;
 
-const SURFACES: { slug: string; prepare: Prepare }[] = [
+const SURFACES: { slug: string; prepare: Prepare; skip?: boolean }[] = [
   { slug: "01-implementation", prepare: gotoImplementation },
   {
     slug: "02-implementation-asis-tobe",
@@ -66,8 +66,13 @@ const SURFACES: { slug: string; prepare: Prepare }[] = [
   },
   { slug: "08-quick-start", prepare: gotoQuickStart },
   { slug: "09-faq", prepare: gotoFaq },
+  // S13.1 "Product V2 context-rail reduction" removed the permanent rail from /faq, and the
+  // LACE conversation simulator is a rail-ONLY surface — there is no longer a screen state to
+  // capture here. The "09-faq" surface above still covers the page itself. Restore this entry
+  // if the rail is brought back for /faq.
   {
     slug: "10-faq-lace-simulator",
+    skip: true,
     prepare: async (page) => {
       await gotoFaq(page);
       await page
@@ -129,7 +134,8 @@ const SURFACES: { slug: string; prepare: Prepare }[] = [
 
 for (const surface of SURFACES) {
   for (const size of SIZES) {
-    test(`${surface.slug} @ ${size.name}`, async ({ page }) => {
+    const run = surface.skip === true ? test.skip : test;
+    run(`${surface.slug} @ ${size.name}`, async ({ page }) => {
       await page.setViewportSize({ width: size.width, height: size.height });
       await surface.prepare(page);
       await page.waitForTimeout(400);
