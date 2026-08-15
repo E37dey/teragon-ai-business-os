@@ -20,12 +20,13 @@ export interface TrendChartProps {
   onPointClick: (pointIndex: number) => void;
 }
 
-const H = 210; // reduced, executive height — no longer dominates the screen
-const PAD_T = 14;
-const PAD_B = 28;
-const PAD_L = 12;
-const PAD_R = 14;
+const H = 232; // executive height — present without dominating the screen
+const PAD_T = 16;
+const PAD_B = 32; // room for a populated date axis
+const PAD_L = 48; // a REAL left y-axis gutter so scale labels are readable, not floating
+const PAD_R = 16;
 const GRID = 4; // horizontal gridlines / y-axis ticks
+const N_XLABELS = 6; // distributed date labels along the bottom (not just first/mid/last)
 
 // compact axis number (no unit clutter on the scale itself)
 function axisLabel(v: number): string {
@@ -80,8 +81,21 @@ export function TrendChart({ points, accent, unit, titleHe, onPointClick }: Tren
   const measuredIdx = points.map((p, i) => (p.value === null ? -1 : i)).filter((i) => i >= 0);
   const firstIdx = measuredIdx[0] ?? 0;
   const lastIdx = measuredIdx[measuredIdx.length - 1] ?? points.length - 1;
-  const midIdx = measuredIdx[Math.floor(measuredIdx.length / 2)] ?? firstIdx;
-  const xLabelIdx = Array.from(new Set([firstIdx, midIdx, lastIdx]));
+  // Distribute date labels evenly across the measured points (always incl. first
+  // and last) so the axis is populated — not three lonely labels on a wide chart.
+  // Fewer labels on narrow (mobile) widths so they never crowd/overlap.
+  const nx = w < 520 ? 3 : N_XLABELS;
+  const xLabelIdx =
+    measuredIdx.length <= nx
+      ? measuredIdx
+      : Array.from(
+          new Set(
+            Array.from({ length: nx }, (_, k) =>
+              measuredIdx[Math.round((k * (measuredIdx.length - 1)) / (nx - 1))] ?? firstIdx,
+            ),
+          ),
+        );
+  const lastVal = points[lastIdx]?.value ?? null;
 
   const hoverPoint = hover === null ? null : points[hover];
 
@@ -98,12 +112,13 @@ export function TrendChart({ points, accent, unit, titleHe, onPointClick }: Tren
       >
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={stroke} stopOpacity="0.20" />
+            <stop offset="0%" stopColor={stroke} stopOpacity="0.30" />
+            <stop offset="55%" stopColor={stroke} stopOpacity="0.10" />
             <stop offset="100%" stopColor={stroke} stopOpacity="0" />
           </linearGradient>
         </defs>
 
-        {/* subtle horizontal gridlines + left y-axis scale */}
+        {/* horizontal gridlines + a readable left y-axis scale in its own gutter */}
         {gridVals.map((gv, k) => {
           const gy = y(gv);
           return (
@@ -115,12 +130,23 @@ export function TrendChart({ points, accent, unit, titleHe, onPointClick }: Tren
                 y2={gy}
                 className="an-trend__grid"
               />
-              <text x={PAD_L} y={gy - 3} className="an-trend__ylabel">
+              <text
+                x={PAD_L - 8}
+                y={gy}
+                className="an-trend__ylabel"
+                textAnchor="end"
+                dominantBaseline="middle"
+              >
                 {axisLabel(gv)}
               </text>
             </g>
           );
         })}
+
+        {/* framed L-axis (baseline + left) — gives the plot real edges so the line
+            reads as data ON a chart, not a thread floating in a dark panel */}
+        <line x1={PAD_L} x2={w - PAD_R} y1={baseY} y2={baseY} className="an-trend__axis" />
+        <line x1={PAD_L} x2={PAD_L} y1={PAD_T} y2={baseY} className="an-trend__axis" />
 
         {/* soft area fill under each measured segment */}
         {segments.map((seg) => {
@@ -148,12 +174,27 @@ export function TrendChart({ points, accent, unit, titleHe, onPointClick }: Tren
           );
         })}
 
-        {/* x-axis period labels (first · mid · last measured) */}
+        {/* always-visible "current value" anchor at the last measured point — the
+            single strongest signal that the chart is live, not a placeholder. */}
+        {lastVal !== null && (
+          <circle
+            className="an-trend__last"
+            cx={x(lastIdx)}
+            cy={y(lastVal)}
+            r={3.5}
+            fill={stroke}
+            stroke="var(--os-raised)"
+            strokeWidth={2}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* x-axis period labels — distributed across the measured range */}
         {xLabelIdx.map((i) => (
           <text
             key={`x-${i}`}
             x={x(i)}
-            y={H - 8}
+            y={H - 10}
             className="an-trend__xlabel"
             textAnchor={i === firstIdx ? "start" : i === lastIdx ? "end" : "middle"}
           >
