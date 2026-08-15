@@ -29,9 +29,11 @@ describe("W7-G 7.25 — direct-URL access model (honest: no auth, closed route t
     for (const r of APP_ROUTES.filter((r) => r.path !== "/submission/presentation")) {
       expect(paths).toContain(r.path);
     }
-    // …and the ONLY non-canonical child is the catch-all
+    // …and the ONLY non-canonical children are the catch-all and the vNext
+    // role-composed /home (a documented, RouteAccessGuard-gated dispatch route,
+    // intentionally kept OUT of the canonical APP_ROUTES registry).
     const extras = paths.filter(
-      (p) => p !== "/*" && !APP_ROUTES.some((r) => r.path === p),
+      (p) => p !== "/*" && p !== "/home" && !APP_ROUTES.some((r) => r.path === p),
     );
     expect(extras).toEqual([]);
     expect((shell?.children ?? []).some((c) => c.path === "*")).toBe(true);
