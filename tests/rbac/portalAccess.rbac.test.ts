@@ -38,6 +38,16 @@ describe("Manager (bizmgr) — broad operational ALLOW", () => {
   }
 });
 
+describe("Manager (bizmgr) != sysadmin — sysadmin-only capabilities stay DENIED", () => {
+  // The manager PORTAL is broad, but the CAPABILITY layer must not promote bizmgr
+  // to sysadmin. These routes are sysadmin-only and must be denied to the manager
+  // even though the portal would otherwise allow every module.
+  for (const p of ["/administration", "/system-health", "/settings"]) {
+    it(`DENY bizmgr ${p}`, () => expect(canView(MANAGER, p)).toBe(false));
+    it(`(sanity) sysadmin ALLOW ${p}`, () => expect(canView("crole-sysadmin", p)).toBe(true));
+  }
+});
+
 describe("Student (viewer) — DENY executive, ALLOW learning", () => {
   for (const p of ["/analytics", "/automations", "/agents", "/agents/collaboration", "/memory", "/governance", "/administration", "/system-health", "/settings"]) {
     it(`DENY ${p}`, () => expect(canView(STUDENT, p)).toBe(false));
