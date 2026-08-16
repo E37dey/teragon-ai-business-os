@@ -22,7 +22,7 @@ import { NAV_GROUPS, activeItemForPath, groupOfPath } from "./nav/navGroups";
 import { useCurrentRole } from "@/authorization/roleStore";
 import { canAccessRoute } from "@/authorization/portalRoutes";
 import { useActiveDemoAccount, exitDemoPortal } from "@/authorization/portalSession";
-import { PORTAL_META, portalForRole } from "@/authorization/portals";
+import { PORTAL_META } from "@/authorization/portals";
 import { useNavBadges } from "./nav/useNavBadges";
 import { loadShellState, saveShellState, type ShellState } from "./shellState";
 import { CommandPalette, type PaletteMode } from "./commands/CommandPalette";
@@ -153,6 +153,12 @@ function OsShellInner(): ReactElement {
   // behaviour unchanged); Student/Technician portals show their curated set.
   const role = useCurrentRole();
   const activeDemo = useActiveDemoAccount();
+  // vNext — the header identity derives from the AUTHENTICATED demo account (its
+  // name + portal label), never the static CANONICAL_USER and never a login card.
+  // With no demo session the default operator identity is preserved (RC2 behaviour).
+  const headerUser = activeDemo
+    ? { name: activeDemo.nameHe, role: PORTAL_META[activeDemo.portal].labelHe }
+    : shellUser;
   const navGroups: readonly NavGroupSpec[] = useMemo(() => {
     const groups = NAV_GROUPS.map((g) => ({
       id: g.id,
@@ -255,7 +261,7 @@ function OsShellInner(): ReactElement {
         onToggleGroup={toggleGroup}
         activeNavId={activeId}
         activeRoute={location.pathname}
-        user={shellUser}
+        user={headerUser}
         renderLink={renderLink}
         headerProps={{
           onQuickAdd: () => setQuickCreate({ view: "menu" }),
@@ -267,7 +273,11 @@ function OsShellInner(): ReactElement {
             <>
               {activeDemo !== null && (
                 <span className="portal-indicator" data-testid="portal-indicator">
-                  {PORTAL_META[portalForRole(role)].labelHe}
+                  {/* WORKSPACE, not a second copy of the role — the header shows
+                      "who am I" (name + role); this shows "which workspace". */}
+                  <span className="portal-indicator__label">
+                    סביבת {PORTAL_META[activeDemo.portal].labelHe}
+                  </span>
                   <button
                     type="button"
                     onClick={() => {

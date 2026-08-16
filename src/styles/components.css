@@ -3008,4 +3008,5 @@ select:focus-visible {
 .portal-onboarding__close { background: none; border: none; color: var(--os-muted); cursor: pointer; font-size: 0.9rem; }
 .portal-onboarding__steps { margin: 0; padding-inline-start: 1.1rem; display: grid; gap: 3px; font-size: 0.82rem; color: var(--os-text-2); }
 .portal-onboarding__actions { display: flex; gap: var(--os-space-2); flex-wrap: wrap; margin-block-start: var(--os-space-2); }
+.portal-indicator__label { color: var(--os-text-2); font-weight: 500; }
 .portal-indicator__exit { margin-inline-start: var(--os-space-2); background: none; border: none; color: var(--os-cyan-text, var(--accent-primary)); cursor: pointer; font: inherit; font-size: 0.7rem; }

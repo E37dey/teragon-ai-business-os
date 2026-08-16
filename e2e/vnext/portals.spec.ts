@@ -97,3 +97,58 @@ test.describe("vNext role portals — homes + session", () => {
     await expect(page.getByTestId("portal-onboarding")).toHaveCount(0); // stays dismissed
   });
 });
+
+test.describe("vNext role portals — header identity + workspace + switching", () => {
+  const B = "http://localhost:4180";
+  const IDENTITY = {
+    manager: { name: "צחי זוסטייהם", role: "מנהל", workspace: "סביבת מנהל" },
+    student: { name: "תלמיד דמו", role: "תלמיד", workspace: "סביבת תלמיד" },
+    technician: { name: "טכנאי דמו", role: "טכנאי", workspace: "סביבת טכנאי" },
+  } as const;
+
+  async function login(page: Page, portal: "manager" | "student" | "technician") {
+    await page.goto(`${B}/welcome`);
+    await page.getByTestId(`demo-prefill-${portal}`).click();
+    await page.getByTestId("demo-login-submit").click();
+    await expect(page).toHaveURL(`${B}/home`);
+  }
+  async function assertIdentity(page: Page, portal: keyof typeof IDENTITY) {
+    const id = IDENTITY[portal];
+    await expect(page.locator(".os-header__name")).toHaveText(id.name);
+    await expect(page.locator(".os-header__role")).toHaveText(id.role);
+    await expect(page.getByTestId("portal-indicator")).toContainText(id.workspace);
+  }
+
+  test("header identity derives from the authenticated account, per portal", async ({ page }) => {
+    for (const portal of ["manager", "student", "technician"] as const) {
+      await login(page, portal);
+      await assertIdentity(page, portal);
+    }
+  });
+
+  test("switching Manager→Student→Technician leaves NO stale identity/role/home", async ({ page }) => {
+    await login(page, "manager");
+    await assertIdentity(page, "manager");
+    await expect(page.getByTestId("manager-kpis")).toBeVisible();
+
+    await page.getByTestId("portal-exit").click(); // logout
+    await expect(page).toHaveURL(`${B}/welcome`);
+
+    await login(page, "student");
+    await assertIdentity(page, "student"); // no stale "צחי"/"מנהל"
+    await expect(page.getByTestId("student-continue")).toBeVisible();
+    await expect(page.getByTestId("manager-kpis")).toHaveCount(0); // no stale home
+
+    await page.getByTestId("portal-exit").click();
+    await expect(page).toHaveURL(`${B}/welcome`);
+
+    await login(page, "technician");
+    await assertIdentity(page, "technician"); // no stale "תלמיד דמו"
+    await expect(page.getByTestId("tech-current-job")).toBeVisible();
+    await expect(page.getByTestId("student-continue")).toHaveCount(0);
+
+    // exit → default operator identity restored (no stale demo name)
+    await page.getByTestId("portal-exit").click();
+    await expect(page).toHaveURL(`${B}/welcome`);
+  });
+});
