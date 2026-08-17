@@ -18,4 +18,18 @@ Clean 1440-wide (mobile 390-wide) demo-state captures. RTL Hebrew UI, synthetic 
 | 12 | `12-mobile-student.png` | Student home @ 390px (mobile) |
 | 13 | `13-mobile-technician.png` | Technician home @ 390px (mobile) |
 
-**Note on 07 (Knowledge Map):** captured via the automated (unpaired) preview, so the Obsidian panel shows the connection UI and integration details rather than the *live* graph. The **live** Knowledge Map (63 nodes / 147 links / 6 clusters, connected) renders in the paired-Chrome demo — see `docs/submission/TEST_REPORT.md`. Capture the live map during the demo on the presenter's machine for a "connected" version.
+## ⚠️ 07 (Knowledge Map) — capture on the presenter's machine (30 seconds)
+
+`07-knowledge-map.png` currently shows the Obsidian integration panel from the **automated (unpaired) preview**, so its connection badge reads "disconnected". A **connected** replacement could **not** be exported by the browser automation for two reasons, both harness limitations (not product issues):
+1. The claude-in-chrome extension returns screenshots as **server-side IDs** and cannot write the pixels to this repo's filesystem.
+2. The live 63-node force-directed map **continuously animates**, which freezes the renderer and times out `Page.captureScreenshot`.
+
+**The connected state was verified live this session** (real paired Chrome, real bridge): `מחובר`, **Vault: TERAGON OS**, bridge `http://127.0.0.1:5200` v0.3.0-phase3, **write: human-approval only**, and the loaded **Knowledge Map = 63 nodes / 147 links / 6 clusters** — see `docs/submission/TEST_REPORT.md`.
+
+**To produce a connected `07-knowledge-map.png` yourself (recommended before the demo):**
+1. Open Obsidian Desktop with the **TERAGON OS** vault (bridge on `127.0.0.1:5200`).
+2. In the paired Chrome, open `http://localhost:4173/memory` → confirm the green **מחובר** badge.
+3. Click **"טען מפה"** (load map) and wait ~3–5 s for the graph to render.
+4. Take a full-window screenshot (OS screenshot tool) and save it as `docs/submission/screenshots/07-knowledge-map.png`.
+
+*(An OS-level screenshot avoids the animation-freeze that blocks the browser-automation capture.)*
