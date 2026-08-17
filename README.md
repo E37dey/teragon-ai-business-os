@@ -1,150 +1,108 @@
 # TERAGON AI BUSINESS OS
 
-מערכת הפעלה עסקית מבוססת-AI לעברית (RTL) — פרויקט גמר אקדמי. אפליקציית React/TypeScript
-המדגימה CRM, שירות, הדרכה, ידע ואוטומציה עם שכבת סוכני-AI **דטרמיניסטית ומקומית**,
-מתוך עמדה של **אישור אנושי (Human-in-the-Loop) ושקיפות מלאה** — הסוכנים **מציעים**,
-האדם **מחליט**.
+**A role-based AI Business Operating System.** One governed workspace that unifies business operations, knowledge, learning, service, customers, tasks, AI agents, and automation — while giving each type of user a distinct, purpose-built experience.
 
-> **הצהרת מהות (חשוב לבודק/ת):** זהו פרויקט אקדמי עם **נתונים סינתטיים בלבד**.
-> **אין** מסד נתונים אמיתי של חברה, **אין** שירות בתשלום, **אין** דרישת Production ו**אין**
-> מודל שפה מרוחק. `AI_REMOTE_ENABLED=false`. מוטציות דמו של סוכנים מאופסות לאחר רענון.
-> **רק** `Customers`, `Contacts` ו-`Customer Detail` הם **LIVE_VALIDATED** (Supabase + RLS);
-> **29 המסלולים הנותרים הם ACCEPTED_DEMO_ONLY** — מדגימים תהליכי מוצר, מודולים מקומיים
-> ו-AI דטרמיניסטי, ואינם דומיינים עסקיים מגובי-Supabase.
+> **Honesty statement (please read):** This is an academic project running on **synthetic demo data only**. There is no real company database, no paid service, and **no remote language model** (`AI_REMOTE_ENABLED=false`) — the AI layer is a **deterministic, local rules engine**. Persistence defaults to **`LOCAL_INDEXEDDB`** (in-browser). Only **Customers, Contacts, and Customer Detail** are Supabase-backed and RLS-validated; the remaining modules are **accepted demo surfaces** that demonstrate product flows, local modules, and deterministic AI. See [Known Limitations](docs/submission/KNOWN_LIMITATIONS.md).
 
-## תיאור המוצר (פסקה)
+---
 
-TERAGON הוא "מרכז פיקוד" עסקי: מסך שליטה עם KPI-ים וכרטיס החלטת-AI בעל אישור אנושי,
-ניהול לקוחות ואנשי קשר בזמן אמת (Supabase + RLS), ומודולים מקומיים למכירות, שירות,
-הדרכה, ידע, אוטומציה וממשל. שכבת ה-AI מורכבת מ**שבעה סוכנים** שכל אחד מציע **שתי פעולות
-עסקיות** דטרמיניסטיות (14 בסך הכול) — עם ראיות, הסבר "למה", ושער אישור לפני כל שינוי.
+## What TERAGON is
 
-## סטטוס פרסיסטנטיות
+TERAGON is a single AI-native workspace for running a small business — a 3D-printing training-and-service company is the reference customer. It combines CRM, service tickets, a learning/LMS track, a knowledge base, task management, analytics, automation, and a governed AI-agent layer. Crucially, it does **not** show everyone the same screen: a **Manager**, a **Student**, and a **Technician** each log in to a portal tailored to their job.
 
-- **חי (LIVE_VALIDATED):** `Customers`, `Contacts`, `Customer Detail` — Supabase עם
-  RLS לבידוד דיירים; 12/12 בדיקות קבלה חיות לכל דומיין.
-- **דמו מקומי (ACCEPTED_DEMO_ONLY):** כל שאר המסלולים — IndexedDB (זרע דטרמיניסטי) /
-  תוכן מובנה / מנוע חוקים מקומי. נושאים באנר "מצב הדגמה" קבוע ותוויות כנות.
+## The problem
 
-## יכולות עיקריות
+In most organizations, the things a person needs to do their job are scattered across disconnected systems:
 
-- מרכז שליטה עם אישורי-AI אנושיים (why · evidence · אשר/דחה).
-- CRM חי (לקוחות/אנשי קשר) עם ולידציה וכשל-סגור בטוח.
-- 7 סוכני-AI × 2 פעולות (14) — דטרמיניסטי, מקומי, מאושר-אנושית.
-- מודולים: מכירות, שירות, מדפסות, קורסים, משימות, מסמכים, אנליטיקה, ידע, זיכרון,
-  אוטומציות, ממשל, הטמעה, הגשה.
-- ניווט מקובץ (כולל "מעבדת AI · דמו מקומי" ו-"עוד"), מצב כהה, RTL מלא, רספונסיביות מלאה.
+- **business knowledge** lives in wikis and documents,
+- **tasks** live in a project tool,
+- **users and roles** live in an identity system,
+- **learning** lives in an LMS,
+- **service operations** live in a ticketing tool,
+- **AI assistants** are bolted on separately, and
+- **approvals** happen ad-hoc over chat and email.
 
-## סיכום ארכיטקטורה
+The result is context-switching, duplicated data, weak governance, and AI that acts without oversight.
 
-React SPA → hooks + `domainComposition` → repositories → מתאם **LOCAL (IndexedDB)** או
-**Supabase** → זהות/היקף-ארגון → **RLS** במסד. גבול קומפוזיציה **fail-closed** (ללא נפילה
-שקטה ל-IndexedDB במצב Supabase — ADR 0002). תרשימים מלאים:
-[docs/submission/ARCHITECTURE_OVERVIEW.md](docs/submission/ARCHITECTURE_OVERVIEW.md).
+## The solution
 
-## מחסנית טכנולוגית
+TERAGON puts all of it in **one governed workspace** — but instead of drowning every user in every feature, it derives a **portal** from the user's role and shows only what that person needs. AI agents can read knowledge, plan, and recommend, but **any sensitive action stops at an explicit human approval gate**. Knowledge is grounded in a **real Obsidian vault** over a local Trusted-Device bridge, and **nothing is written back without a human approving it**.
 
-React · TypeScript (strict) · Vite · TanStack Query · react-router-dom · Supabase (RLS) ·
-Vitest · Playwright (+ @axe-core/playwright) · oxlint. Node **22**.
+## Role Portals
 
-## AI דטרמיניסטי מקומי
+The 9 canonical RBAC roles are unchanged; a **portal** is *derived* from the role (never selectable) and only *further restricts* what the user sees.
 
-שכבת ה-AI רצה דרך `LocalRulesProvider` — מנוע חוקים דטרמיניסטי ש**לעולם אינו מתחזה
-ל-LLM** (`provider="local-rules"`, `model=null`). `AI_REMOTE_ENABLED=false`. אין LLM, אין
-MCP, אין קריאה חיצונית. כל תוצאה מציגה: **"מנוע חוקים מקומי — ללא מודל מרוחק"**.
+| Portal | Who | Primary question it answers |
+|---|---|---|
+| **Manager** | business managers/leadership | "What needs my attention?" — decisions, approvals, KPIs, analytics |
+| **Student** | learners | "What should I do next?" — continue learning, progress, mentor, knowledge |
+| **Technician** | field/service staff | "Which job do I handle now?" — current job by priority, assigned queue, technical knowledge, Fixer |
 
-### שבעה סוכנים · ארבע-עשרה פעולות
+## AI Agents
 
-Orchestrator (סקירת מצב, תוכנית פעולה) · Hunter (לקוחות חסרי מידע, אנשי קשר חסרים) ·
-Fixer (הצעת תיקון, **החלת תיקון מאושר**) · Flow (רצף המשך, **הצעת אוטומציה**) · Mentor
-(הסבר המלצה, רשימת שיפור) · Nexa (שאלת מערכת, הכוונה לפעולה) · Wiki (חיפוש ידע, סיכום
-ערך). **12 דטרמיניסטיות + 2 מאושרות-אישור.** ראו
-[docs/audits/AGENT_ACTION_MATRIX.md](docs/audits/AGENT_ACTION_MATRIX.md) ו-
-[src/agents/actions/README.md](src/agents/actions/README.md).
+Seven canonical, deterministic agents (`src/agents/definitions.ts`). Each **plans, retrieves, or recommends** — none performs a business mutation on its own.
 
-## מודל אבטחה
+| Agent (code name) | Hebrew | Role |
+|---|---|---|
+| **Teragon Orchestrator** | מנהל התזמור | Plans, routes, and synthesizes — breaks a goal into tasks, picks specialists, merges their output. Never acts itself. |
+| **Wiki** | סוכן ידע | Knowledge retrieval — searches the vault, reads notes, summarizes. |
+| **Mentor** | סוכן הדרכה | Learning guidance for students. |
+| **Hunter** | סוכן מכירות | Sales — reads customers/leads, drafts recommendations (never approves discounts or sends). |
+| **Flow** | סוכן אוטומציות | Automation orchestration. |
+| **Fixer** | סוכן שירות | Service diagnosis drafts (never closes tickets on its own). |
+| **Nexa** | סוכן שיווק וצמיחה | Marketing & growth. |
 
-RLS-first לבידוד דיירים (ADR 0001) · הרשאות סוכן deny-by-default (הגדרות קפואות) ·
-כשל-סגור ללא fallback שקט (ADR 0002) · תצפיתיות מסונֶנת (whitelist בן 6 שדות,
-correlationId, ללא PII) · HSTS · אין מפתחות בדפדפן (מפתח שרת נשאר בצד שרת).
+## Governed AI
 
-## איכות ובדיקות (עדות ממוזגת)
+AI can **recommend and orchestrate**; it cannot silently change the business. Every consequential step is **blocked, human-controlled** (`חסום · בשליטת אנוש`): a recommendation becomes a proposal only on explicit user action, and a governed write reaches the vault only after a human approves it. The engine carries the honest label *"local rules engine — no remote model."*
 
-`build`, `typecheck`, `typecheck:tests` נקיים · **2569/2569** בדיקות לוגיקה עוברות ·
-router smoke 36/36 · nav 9/9 · agent-actions 17/17 · a11y **18/18** · network **6/6** ·
-cross-browser **144** · overflow **0/32** ב-1440/1024/768/390. ⚠️ 12 קבצי
-`tests/platform/*` נכשלים **מקומית בלבד** (מגבלת טעינת Rolldown) — **אינם** כשלי-לוגיקה;
-**GitHub CI הוא הסמכות** ורץ ירוק. ציון סופי: **8.6/10, ללא חוסמים**
-([FINAL_PRODUCT_VERDICT](docs/final/FINAL_PRODUCT_VERDICT.md)). חבילת בדיקות Trusted-AI
-בסגנון "MVP→Trusted AI":
-[docs/submission/TRUSTED_AI_TEST_PACK_HE.md](docs/submission/TRUSTED_AI_TEST_PACK_HE.md).
+## Obsidian integration
 
-## התקנה והרצה מקומית
+TERAGON connects to a **real Obsidian Desktop vault** ("TERAGON OS") through a local bridge:
 
-```bash
-npm install
-npm run dev      # שרת פיתוח (Vite) — ברירת המחדל: מצב הדגמה מקומי (IndexedDB)
-```
+- **Trusted Device** — a non-exportable device key in the browser; pairing is one-time, no code needed on reconnect.
+- **Local bridge** — `http://127.0.0.1:5200` (the Obsidian `teragon-vault-bridge` plugin, v0.3.0-phase3).
+- **Real Vault + Knowledge Map** — a live force-directed graph of the vault's notes (verified: 63 documents / 147 links / 6 clusters).
+- **Governed reads / human-approved writes** — agents read the vault live; writes are **human-approval-only** with **zero automatic writes**.
 
-בנייה ותצוגה מקדימה:
+## Architecture
 
-```bash
-npm run build    # tsc -b && vite build
-npm run preview  # תצוגת ה-build המקומי
-```
+React 19 + TypeScript SPA (Vite). Centralized RBAC (`src/authorization`) with route- and record-scope guards. Local-first persistence via IndexedDB (`idb`), with Supabase RLS for the org-scoped customer surfaces. A deterministic AI layer (`src/agents`, `src/ai`) with an orchestrator + 7 agents and a governed-workflow engine. Obsidian integration via a Trusted-Device bridge (`src/integration/obsidian`). See [ARCHITECTURE.md](docs/submission/ARCHITECTURE.md).
 
-בדיקות ואיכות:
+## Security model
 
-```bash
-npm test                # vitest run
-npm run typecheck       # tsc -b --noEmit
-npm run typecheck:tests # tsc --noEmit -p tsconfig.tests.json
-npm run lint            # oxlint
-npm run scan:secrets    # סריקת סודות ב-bundle
-```
+- **RBAC** — 9 canonical roles, 24 capabilities, `can(role, permission)` deny-by-default; `RouteAccessGuard` wired into the router.
+- **Portal restriction** — a portal only *further* restricts a role; it can never escalate (bizmgr ≠ sysadmin, enforced and tested).
+- **Record-scoped demo** — students see only their own enrollment; technicians only their own assigned jobs; centralized in `src/authorization/recordScope.ts`.
+- **Trusted Device** — device-bound Obsidian access, human-approved writes.
+- **Human gates** — every sensitive AI action stops at explicit approval.
 
-מדריך מלא: [docs/submission/RUN_AND_DEMO_GUIDE.md](docs/submission/RUN_AND_DEMO_GUIDE.md).
+**Stated plainly:** `LOCAL_INDEXEDDB` record scoping is a **client-side least-privilege presentation policy, not a production server security boundary**. Supabase currently provides **organization-level** RLS. **Per-user / assignment-level RLS is future production hardening** (documented, not hidden).
 
-## משתני סביבה
+## Testing
 
-הרצה מקומית **אינה דורשת סודות**. ברירות המחדל של הלקוח: מצב הדגמה מופעל
-(`VITE_DEMO_MODE`), פרסיסטנטיות מקומית (`VITE_PERSISTENCE_PROVIDER=LOCAL_INDEXEDDB`),
-`AI_REMOTE_ENABLED=false`. משתני Supabase (`VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`)
-נדרשים **רק** להרצת מצב Supabase החי. משתני שרת (ספק AI) נקראים אך ורק בצד השרת ולעולם
-אינם עם קידומת `VITE_`. תבנית ללא ערכים אמיתיים: `.env.example`. **אין לחשוף מפתחות אמיתיים.**
+Final verified baseline (SHA `4a6aed7`): **Vitest 3041/3041**, **deterministic E2E 611 passed / 7 skipped / 0 failed**, Axe **0 serious / 0 critical** on new surfaces, typecheck / typecheck:tests / lint / build clean, secret-scan clean. Obsidian connection, governed-knowledge-capture, and operational-recovery verified live in the paired Chrome (the final recovery accept→completed was **human-verified** — see [TEST_REPORT.md](docs/submission/TEST_REPORT.md)).
 
-## מצב הדגמה
+## Demo
 
-מצב הדגמה מופעל כברירת מחדל: כל הנתונים סינתטיים, אין שליחת הודעות אמיתיות, ובאנר
-"מצב הדגמה" קבוע מוצג מעל כל מסלול. הרצה מקומית = מצב הדגמה מקומי (IndexedDB) ללא כל חיבור
-חיצוני. מדיניות: [docs/operations/DEMO_PILOT_POLICY.md](docs/operations/DEMO_PILOT_POLICY.md).
+Run locally (see [QUICK_START.md](docs/submission/QUICK_START.md)) and open the welcome page:
 
-## מבנה הפרויקט
+| Portal | Email | Password |
+|---|---|---|
+| Manager | `manager@teragon.demo` | `TeragonManager2026!` |
+| Student | `student@teragon.demo` | `TeragonStudent2026!` |
+| Technician | `technician@teragon.demo` | `TeragonTech2026!` |
 
-```
-src/
-  app/            # shell, routes, ניווט, rail, quick-create, commands
-  layout/         # AppShell, CompactTopHeader, workspace, nav
-  modules/        # מסכי המוצר (customers, crm, agents-ui, ...)
-  agents/         # 7 סוכנים + agents/actions (מנוע פעולות דמו מקומי)
-  ai/             # חוזה AIProvider + LocalRulesProvider + registry
-  persistence/    # composition seam + מתאמי Supabase
-  repositories/   # מתאמי LOCAL (IndexedDB) + זרע
-  authorization/  # routeGuard / RBAC
-  observability/  # errorSink + domainEvents (correlationId)
-docs/
-  final/ audits/ adr/ operations/ submission/
-tests/ e2e/
-```
+*Demo credentials only — not production secrets.*
 
-## מגבלות ידועות (מקובלות בהיקף אקדמי)
+## Future roadmap
 
-נתונים סינתטיים בלבד · רק 2 דומיינים חיים · AI דטרמיניסטי (לא גנרטיבי) · מוטציות דמו
-בזיכרון (מתאפסות ברענון) · אין גיבוי/שחזור (Production מחוץ להיקף) ·
-`AI_REMOTE_ENABLED=false`. פירוט: [FINAL_PRODUCT_VERDICT](docs/final/FINAL_PRODUCT_VERDICT.md).
+- Production **per-user / assignment-level Supabase RLS** (the named next security phase).
+- Enterprise identity (SSO/OIDC) and real authentication.
+- Deployment hardening and multi-tenant operations.
+- Broadening Supabase-backed surfaces beyond the customer domain.
 
-## אינדקס תיעוד
+---
 
-מדד הכניסה לחבילת ההגשה:
-**[docs/submission/SUBMISSION_INDEX.md](docs/submission/SUBMISSION_INDEX.md)** — קישורים
-לכל מסמכי הקבלה, הראיות, הארכיטקטורה, מדריך ההרצה, תסריט המצגת ושאלות הבודק.
+### Submission package
+`README.md` · [QUICK_START](docs/submission/QUICK_START.md) · [ARCHITECTURE](docs/submission/ARCHITECTURE.md) · [FEATURES](docs/submission/FEATURES.md) · [DEMO_SCRIPT](docs/submission/DEMO_SCRIPT.md) · [PRESENTATION_OUTLINE](docs/submission/PRESENTATION_OUTLINE.md) · [ONE_PAGER](docs/submission/TERAGON_ONE_PAGER.md) · [TECH_STACK](docs/submission/TECH_STACK.md) · [TEST_REPORT](docs/submission/TEST_REPORT.md) · [KNOWN_LIMITATIONS](docs/submission/KNOWN_LIMITATIONS.md) · [CHECKLIST](docs/submission/SUBMISSION_CHECKLIST.md)
