@@ -18,6 +18,10 @@ Facts only. All presentation/submission material must agree with this file.
 - **Workflow packs (2):** `governed-knowledge-capture` · `operational-recovery`
 - **Routes:** 34 canonical (`APP_ROUTES`)
 
+## Public lecturer demo
+- **Public URL:** **https://teragon-final-project-demo.netlify.app** (Netlify site `teragon-final-project-demo`, id `e2d9ec9a-b7b2-471c-9f7a-784ebbd91b62` — new & separate; `teragon-os-demo`/`teragon` untouched).
+- Verified live as an external visitor: 3 accounts authenticate, role denials enforced, SPA direct routes (no 404), no fatal console errors. Obsidian is local-only (CSP blocks the bridge → safe disconnected state). Synthetic data only; no secrets in bundle; static SPA (no server functions). See `docs/submission/PUBLIC_DEMO.md`.
+
 ## Demo credentials (demo-only)
 - Manager: `manager@teragon.demo` / `TeragonManager2026!`
 - Student: `student@teragon.demo` / `TeragonStudent2026!`
