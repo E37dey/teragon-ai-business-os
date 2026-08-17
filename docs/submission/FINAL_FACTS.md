@@ -5,8 +5,10 @@ Facts only. All presentation/submission material must agree with this file.
 ## Git
 - **Reviewed product baseline SHA:** `4a6aed7`
 - **Submission branch:** `chore/teragon-submission-package` (based on `4a6aed7`, zero source changes)
-- **Submission content commit:** `28884b0` (docs/screenshots) — branch HEAD advances with each doc commit; see `SUBMISSION_CHECKLIST.md`
-- **RC2 tag:** `68e229e` (untouched) · main / RC1 / release tags untouched · **no merge**
+- **Submission branch HEAD:** `0b84520` (advances per doc commit; verify with `git rev-parse chore/teragon-submission-package`). Content commits: `28884b0` (English package + screenshots) · `fcdb882` (Hebrew pack + FINAL_FACTS).
+- **RC2:** `release/v0.9.0-rc.2` = `68e229e` (commit); annotated tag `v0.9.0-rc.2` object = `3e89eab`, dereferences (`^{}`) to commit `68e229e`. **Untouched.**
+- **main:** local `main` = `38cfbaa` (stale local ref) — **not authoritative**; **`origin/main` = `4d4c9dc`** (authoritative remote). Both **untouched** by this submission branch.
+- **No merge.** RC1 / release tags untouched.
 
 ## Product
 - **Name:** TERAGON AI BUSINESS OS
