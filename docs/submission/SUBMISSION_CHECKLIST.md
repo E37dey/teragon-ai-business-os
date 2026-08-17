@@ -27,6 +27,6 @@
 
 ## Git
 - [x] Submission branch created from `4a6aed7`
-- [ ] Clean git status (after commit)
-- [ ] Final SHA recorded (after commit)
+- [x] Clean git status (only docs/screenshots committed; no source changes)
+- [x] Final SHA recorded: `28884b0` (submission commit) on `chore/teragon-submission-package` (pushed)
 - [x] No merge; `main` / `RC1` / `RC2` (`68e229e`) / release tags untouched
