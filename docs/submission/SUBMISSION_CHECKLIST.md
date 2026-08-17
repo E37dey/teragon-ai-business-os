@@ -15,6 +15,9 @@
 - [x] Test report ready — `docs/submission/TEST_REPORT.md`
 - [x] Limitations ready — `docs/submission/KNOWN_LIMITATIONS.md`
 - [x] Screenshots ready — `docs/submission/screenshots/` (13 + index)
+- [x] Final facts (single source of truth) — `docs/submission/FINAL_FACTS.md`
+- [x] Hebrew presenter pack — `docs/submission/he/` (PROJECT_SUMMARY, PRESENTATION_CONTENT, DEMO_SCRIPT, Q_AND_A, EVALUATOR_CHEATSHEET)
+- [~] Connected `07-knowledge-map.png` — automation cannot export paired-Chrome frames; live state verified; 30-sec presenter recipe in `screenshots/SCREENSHOTS.md`
 
 ## Verification
 - [x] Demo credentials verified (portal E2E 10/10; 3 accounts resolve to fixed roles)
@@ -28,5 +31,5 @@
 ## Git
 - [x] Submission branch created from `4a6aed7`
 - [x] Clean git status (only docs/screenshots committed; no source changes)
-- [x] Final SHA recorded: `28884b0` (submission commit) on `chore/teragon-submission-package` (pushed)
+- [x] Final SHA recorded: submission content on `chore/teragon-submission-package` (pushed; `28884b0` package, `fcdb882` Hebrew pack)
 - [x] No merge; `main` / `RC1` / `RC2` (`68e229e`) / release tags untouched
