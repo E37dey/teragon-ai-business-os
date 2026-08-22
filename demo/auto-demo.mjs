@@ -1,21 +1,24 @@
-// TERAGON — hands-free GUIDED auto-demo (presenter aid).
-// Opens a VISIBLE browser and performs real actions that SHOW RESULTS, slowly,
-// with a big on-screen banner (page title + what the page does + what to say),
-// so you can narrate while it runs. Drives the REAL app on localhost:4173.
-// It does NOT change any product code.
+// TERAGON — hands-free GUIDED auto-demo (presenter aid), SCREEN-SHARE SAFE.
+// The DEMO WINDOW stays 100% CLEAN (nothing overlaid) so it's safe to share.
+// Your narration cues go ONLY to places the audience does NOT see:
+//   - the terminal (always), and
+//   - an optional separate "presenter notes" window (NOTES=1) you keep to yourself.
+// Drives the REAL app on localhost:4173. Changes NO product code.
 //
-// Run:  node demo/auto-demo.mjs          (slow, presentation pace — default)
-//       FAST=1 node demo/auto-demo.mjs   (quicker)
-//       LOOP=1 node demo/auto-demo.mjs   (repeat forever)
+// Run:  node demo/auto-demo.mjs           (clean demo, cues in this terminal)
+//       NOTES=1 node demo/auto-demo.mjs   (also opens a separate presenter-notes window)
+//       FAST=1  node demo/auto-demo.mjs   (quicker)
+//       LOOP=1  node demo/auto-demo.mjs   (repeat forever)
 // Requires the local preview on http://localhost:4173 (START-TERAGON-DEMO.bat).
 import { chromium } from "@playwright/test";
 
 const BASE = process.env.BASE || "http://localhost:4173";
 const PACE = process.env.FAST ? 0.6 : 1.35;          // slow by default
 const LOOP = !!process.env.LOOP;
+const NOTES = !!process.env.NOTES;
 const sec = (s) => new Promise((r) => setTimeout(r, s * 1000 * PACE));
 
-let PAGE; // set in main
+let notesPage = null;
 
 // ---------- helpers ----------
 async function login(p, portal) {
@@ -31,34 +34,35 @@ async function logout(p) {
     await p.waitForURL(`${BASE}/welcome`, { timeout: 8000 }).catch(() => {});
   }
 }
-// slow scroll top→bottom→top so viewers actually see the page content
 async function scrollTour(p, ms = 6000) {
   const steps = 6, dt = ms / (steps * 2);
   for (let i = 1; i <= steps; i++) { await p.mouse.wheel(0, 320).catch(()=>{}); await new Promise(r=>setTimeout(r, dt*PACE)); }
   for (let i = 1; i <= steps; i++) { await p.mouse.wheel(0, -320).catch(()=>{}); await new Promise(r=>setTimeout(r, dt*PACE)); }
 }
-async function banner(p, i, total, title, does, cue, hold) {
-  await p.evaluate(({ i, total, title, does, cue, hold }) => {
-    let b = document.getElementById("__tg_banner__");
-    if (!b) {
-      b = document.createElement("div"); b.id = "__tg_banner__"; b.dir = "rtl";
-      b.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:2147483647;pointer-events:none;" +
-        "background:linear-gradient(180deg,rgba(8,13,24,.97),rgba(8,13,24,.85));color:#eaf2ff;" +
-        "font-family:system-ui,'Segoe UI',Arial;padding:14px 26px 16px;border-bottom:2px solid #2f6df6;box-shadow:0 8px 28px rgba(0,0,0,.45)";
-      document.body.appendChild(b);
-    }
-    b.innerHTML =
-      `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px">` +
-        `<div style="font-size:25px;font-weight:800">${title}</div>` +
-        `<div style="font-size:13px;opacity:.65;white-space:nowrap">TERAGON · הדגמה מודרכת · ${i}/${total}</div></div>` +
-      `<div style="font-size:15px;opacity:.9;margin-top:6px"><b style="color:#8fd18f">מה העמוד עושה:</b> ${does}</div>` +
-      `<div style="font-size:16px;opacity:.95;margin-top:4px;line-height:1.5"><b style="color:#7fb0ff">מה לומר:</b> ${cue}</div>` +
-      `<div id="__tg_bar__" style="height:3px;background:#2f6df6;margin-top:10px;width:0%;transition:width ${hold}s linear"></div>`;
-    requestAnimationFrame(() => { const bar = document.getElementById("__tg_bar__"); if (bar) bar.style.width = "100%"; });
-  }, { i, total, title, does, cue, hold }).catch(() => {});
+
+// cue goes to the TERMINAL (and optional notes window) — NEVER onto the shared demo window
+function termCue(i, total, title, does, cue, hold) {
+  const line = "─".repeat(64);
+  console.log(`\n${line}\n▶ [${i}/${total}]  ${title}   (~${Math.round(hold*PACE)}s)\n  📄 מה העמוד עושה: ${does}\n  🎤 מה לומר:      ${cue}\n${line}`);
+}
+async function notesCue(i, total, title, does, cue, hold) {
+  if (!notesPage) return;
+  await notesPage.evaluate(({ i, total, title, does, cue, hold }) => {
+    document.body.style.cssText = "margin:0;background:#0b1220;color:#eaf2ff;font-family:system-ui,'Segoe UI',Arial";
+    document.body.dir = "rtl";
+    document.body.innerHTML =
+      `<div style="padding:26px 30px">` +
+      `<div style="display:flex;justify-content:space-between;opacity:.6;font-size:14px"><span>TERAGON · הערות מרצה (לא לשיתוף)</span><span>${i}/${total}</span></div>` +
+      `<div style="font-size:34px;font-weight:800;margin-top:10px">${title}</div>` +
+      `<div style="font-size:19px;margin-top:16px"><b style="color:#8fd18f">מה העמוד עושה:</b><br>${does}</div>` +
+      `<div style="font-size:23px;line-height:1.55;margin-top:18px"><b style="color:#7fb0ff">מה לומר:</b><br>${cue}</div>` +
+      `<div style="height:5px;background:#1e2a44;border-radius:3px;margin-top:26px"><div id="pb" style="height:5px;background:#2f6df6;border-radius:3px;width:0%;transition:width ${hold}s linear"></div></div>` +
+      `</div>`;
+    requestAnimationFrame(()=>{const b=document.getElementById("pb"); if(b) b.style.width="100%";});
+  }, { i, total, title, does, cue, hold }).catch(()=>{});
 }
 
-// ---------- scenes (each may DO something, then hold while you talk) ----------
+// ---------- scenes ----------
 const SCENES = [
   { hold: 13, title: "TERAGON AI BUSINESS OS",
     does: "עמוד הכניסה — שלושה כרטיסי תפקיד להדגמה.",
@@ -72,7 +76,7 @@ const SCENES = [
 
   { hold: 20, title: "חיפוש חכם — פעולה ותוצאה",
     does: "חיפוש גלובלי בכל המערכת עם דירוג רלוונטיות, בכפוף להרשאות התפקיד.",
-    cue: "מקלידים שם לקוח — והמערכת מוצאת אותו על-פני כל המודולים. שימו לב: תוצאות אמיתיות, לא תפריט קבוע.",
+    cue: "מקלידים שם לקוח — והמערכת מוצאת אותו על-פני כל המודולים. תוצאות אמיתיות, לא תפריט קבוע.",
     run: async (p) => {
       await p.getByRole("searchbox", { name: "חיפוש גלובלי" }).click().catch(()=>{});
       await p.waitForTimeout(700);
@@ -98,13 +102,13 @@ const SCENES = [
 
   { hold: 28, title: "מרחב AI — הרצת סוכן (פעולה → תוצאה)",
     does: "שבעה סוכנים דטרמיניסטיים. מריצים סוכן — והוא מפיק תוצאה מנומקת, בלי מודל מרוחק.",
-    cue: "עכשיו רואים פעולה→תוצאה אמיתית: אני מריץ סוכן שסוקר את המצב ומכין תוכנית — והתוצאה מופיעה ב'פעילות אחרונה' עם ראיות. ה-Orchestrator מתזמר; אף סוכן לא פועל לבד.",
+    cue: "פעולה→תוצאה אמיתית: מריצים סוכן שסוקר את המצב ומכין תוכנית — התוצאה מופיעה ב'פעילות אחרונה' עם ראיות. ה-Orchestrator מתזמר; אף סוכן לא פועל לבד.",
     run: async (p) => {
       await p.goto(`${BASE}/ai-workspace`); await p.waitForTimeout(1500);
       const run = p.getByRole("button", { name: "הרצה" }).first();
       if (await run.count().catch(()=>0)) { await run.scrollIntoViewIfNeeded().catch(()=>{}); await run.click().catch(()=>{}); }
-      await p.waitForTimeout(3500);            // let the deterministic result appear
-      await scrollTour(p, 8000);               // scroll so the result / agent network are seen
+      await p.waitForTimeout(3500);
+      await scrollTour(p, 8000);
     } },
 
   { hold: 14, title: "אבטחה — חסימת גישה אמיתית",
@@ -114,7 +118,7 @@ const SCENES = [
 
   { hold: 22, title: "★ עכשיו לחלון Obsidian החי ★",
     does: "הדמו האוטומטי לא נוגע בכספת המקומית (אבטחה). את Obsidian מציגים ידנית בחלון המחובר.",
-    cue: "כאן עוברים ל: localhost:4173/memory (הדפדפן המשויך) — כספת TERAGON OS אמיתית, מפת ידע חיה, ו-workflow מבוקר: הסוכן קורא מהכספת, ממליץ, ואתם מאשרים ידנית. שם לוחצים 'אשר קבלה' → הושלם.",
+    cue: "עוברים ל: localhost:4173/memory (הדפדפן המשויך) — כספת TERAGON OS אמיתית, מפת ידע חיה, ו-workflow מבוקר: הסוכן קורא מהכספת, ממליץ, ואתם מאשרים ידנית. שם לוחצים 'אשר קבלה' → הושלם.",
     run: async (p) => { await logout(p).catch(()=>{}); await p.goto(`${BASE}/welcome`); } },
 ];
 
@@ -122,18 +126,27 @@ async function runOnce(p) {
   for (let i = 0; i < SCENES.length; i++) {
     const s = SCENES[i];
     try { await s.run(p); } catch {}
-    await banner(p, i + 1, SCENES.length, s.title, s.does, s.cue, s.hold);
+    termCue(i + 1, SCENES.length, s.title, s.does, s.cue, s.hold);
+    await notesCue(i + 1, SCENES.length, s.title, s.does, s.cue, s.hold);
     await sec(s.hold);
   }
 }
 
 (async () => {
   const browser = await chromium.launch({ headless: false, args: ["--start-maximized"] });
-  const context = await browser.newContext({ viewport: null, locale: "he-IL" });
-  PAGE = await context.newPage();
-  console.log("TERAGON guided auto-demo running against " + BASE + " (slow pace). Narrate along with the banner. Close the window to stop.");
-  do { await runOnce(PAGE); } while (LOOP);
-  await banner(PAGE, SCENES.length, SCENES.length, "סוף — תודה!",
-    "ארכיטקטורה: React 19 + RBAC (route+record) + AI מבוקר + Obsidian.",
-    "בכנות על הגבולות (record-scope מקומי הוא הצגה; RLS ברמת-משתמש בהמשך), עם Roadmap ברור. תודה!", 4);
+  const demoCtx = await browser.newContext({ viewport: null, locale: "he-IL" });
+  const page = await demoCtx.newPage();
+
+  if (NOTES) {
+    const notesCtx = await browser.newContext({ viewport: { width: 720, height: 560 }, locale: "he-IL" });
+    notesPage = await notesCtx.newPage();
+    await notesPage.goto("about:blank");
+    await notesPage.evaluate(() => { document.title = "TERAGON — הערות מרצה (אל תשתף חלון זה)"; document.body.style.background = "#0b1220"; });
+    console.log("\n*** נפתח חלון 'הערות מרצה' נפרד — שים אותו על המסך שלך, ושַתֵּף רק את חלון ההדגמה. ***");
+  }
+
+  console.log("\nTERAGON demo — the SHARED window stays clean (no captions). Read cues here" + (NOTES ? " or in the notes window." : "."));
+  console.log("Screen-share tip: share ONLY the demo browser window (not the whole screen), and keep this terminal" + (NOTES ? " and the notes window" : "") + " to yourself.");
+  do { await runOnce(page); } while (LOOP);
+  console.log("\n✔ סוף ההדגמה. החלון נשאר פתוח.");
 })();

@@ -4,24 +4,30 @@ External helpers only — **no product code is changed**. They drive the real ap
 
 ## On your Desktop (double-click)
 - **`START-TERAGON-DEMO.bat`** — brings the demo up: starts Obsidian (bridge) if closed, starts the preview server on `http://localhost:4173` (skips if already running — no more "port in use" error), and opens the browser at `/welcome`.
-- **`START-TERAGON-AUTODEMO.bat`** — runs the **hands-free auto-demo**: opens a browser that tours the app by itself with a big on-screen banner showing the scene title and **"what to say"**, so you can talk while it runs.
+- **`START-TERAGON-AUTODEMO.bat`** — runs the **hands-free auto-demo**: opens a browser that tours the app by itself, **slowly**, performing real actions and showing their results, so you can narrate while it runs.
 
 ## The auto-demo (`demo/auto-demo.mjs`)
-A standalone Playwright script (uses the app's real demo logins; changes nothing in the product). It walks through:
-1. Welcome — the pitch
-2. Manager portal — decisions first
-3. Analytics
-4. Student portal — learning
-5. Technician portal — current job
-6. AI Workspace — the 7 agents
-7. AccessDenied — real RBAC
-8. **Pause** → switch to the live Obsidian window yourself (`localhost:4173/memory`)
+A standalone Playwright script (uses the app's real demo logins; changes nothing in the product).
 
-Each scene holds ~11–22s with a progress bar so you can narrate. Options:
+**Screen-share safe:** the demo window stays **100% clean — no captions overlaid** (so it's safe to share with the audience). Your narration cues appear **only where the audience does NOT see them**: in the terminal you launched it from, and (with `NOTES=1`) in a **separate "presenter notes" window** you keep to yourself. Tip: in your meeting tool, **share only the demo browser window**, not the whole screen.
+
+Slow by default. It **performs actions and shows results**, not just navigation:
+1. Welcome — the pitch
+2. Manager portal — decisions first (slow scroll through the home)
+3. **Global search** — types a real customer name → **live results appear**
+4. Analytics — trends/metrics
+5. Student portal — learning experience
+6. Technician portal — current job
+7. **AI Workspace** — **runs an agent → its deterministic result appears** (action → result)
+8. AccessDenied — real RBAC block
+9. **Pause** → switch to the live Obsidian window yourself (`localhost:4173/memory`)
+
+Each scene holds ~14–28s (slow) so you can narrate. Options:
 ```bash
-node demo/auto-demo.mjs          # default pace
-SLOW=1 node demo/auto-demo.mjs   # ~1.5x slower
-LOOP=1 node demo/auto-demo.mjs   # repeat forever
+node demo/auto-demo.mjs           # slow, clean; cues in the terminal
+NOTES=1 node demo/auto-demo.mjs   # also opens a separate presenter-notes window (don't share it)
+FAST=1  node demo/auto-demo.mjs   # quicker
+LOOP=1  node demo/auto-demo.mjs   # repeat forever
 ```
 Close the browser window to stop.
 
