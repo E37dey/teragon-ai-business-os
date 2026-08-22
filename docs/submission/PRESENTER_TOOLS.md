@@ -31,6 +31,12 @@ LOOP=1  node demo/auto-demo.mjs   # repeat forever
 ```
 Close the browser window to stop.
 
+## Training booklet (`docs/submission/he/GUIDE_HE.html`)
+A Hebrew, print-ready **guide with annotated screenshots** — 10 chapters, each with **numbered arrow callouts** over a real screenshot, a **"what each element does"** legend, and a **"what to say"** narration line, plus a role→portal **summary**, mobile figures, and an honest-boundaries note. Open it in a browser and present from it, or **Ctrl/⌘-P → Save as PDF**. Regenerate after re-capturing screenshots with:
+```bash
+node demo/build-guide.mjs
+```
+
 ## Important — two surfaces
 - **Portals / agents / navigation:** works anywhere — public URL `https://teragon-final-project-demo.netlify.app` **or** `localhost:4173`.
 - **Live Obsidian (vault, Knowledge Map, governed workflow):** **`http://localhost:4173/memory`** only — the paired browser on your machine (a public site cannot and must not reach your local `127.0.0.1:5200` bridge; that is by design). The auto-demo deliberately does **not** touch the local vault; do the Obsidian part live in your paired window.
