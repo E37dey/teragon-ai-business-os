@@ -1,6 +1,6 @@
 // W7-A — /implementation page selectors: six stage cards, five rollout waves,
 // honest pilot state, drawer tabs on real records, rail "מבקר ההטמעה".
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
@@ -10,7 +10,7 @@ import { __resetRepositoriesForTests } from "@/repositories";
 import { implementationStores } from "@/repositories/implementationStores";
 import { ensureImplementationProgramme } from "@/domain/adoption/bootstrap";
 import ImplementationPage from "@/modules/implementation/ImplementationPage";
-import { makeClock } from "./helpers";
+import { makeClock, NOW } from "./helpers";
 
 /** Renders the published rail content — stands in for OsShell's rail slot. */
 function RailOutlet(): ReactElement {
@@ -30,12 +30,20 @@ function ui(): ReactElement {
 }
 
 beforeEach(async () => {
+  // The page derives "overdue" from the real clock. Pin only Date (not timers,
+  // which waitFor needs) to the same instant as the deterministic fixture clock,
+  // so the result does not depend on the day the suite runs.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(NOW));
   __resetRepositoriesForTests();
   // run the bootstrap deterministically BEFORE render (the page's own
   // module-level single-flight guard may have consumed its first run already)
   await ensureImplementationProgramme(implementationStores(), makeClock());
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe("/implementation — page selectors", () => {
   it("renders header, health KPIs, current stage, exactly 6 stage cards and 5 waves", async () => {
